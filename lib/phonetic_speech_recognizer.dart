@@ -18,7 +18,7 @@ class PhoneticSpeechRecognizer {
 
   static Future<String?> recognize({
     required PhoneticType type,
-    String? languageCode,
+    String? languageCode, required int timeout,
   }) async {
     try {
       final String result = await _channel.invokeMethod('recognize', {
