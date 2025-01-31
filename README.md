@@ -1,4 +1,5 @@
 # phonetic_speech_recognizer
+<<<<<<< HEAD
 
 A new Flutter plugin project.
 
@@ -13,3 +14,6 @@ For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
 
+=======
+This is made for android projects only.
+>>>>>>> 655f286006aabb9bc08098d39091502a4271243c

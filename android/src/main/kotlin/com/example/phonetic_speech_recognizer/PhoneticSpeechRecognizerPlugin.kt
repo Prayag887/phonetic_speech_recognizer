@@ -35,11 +35,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
     when (call.method) {
-
-      "getPlatformVersion" -> {
-          return
-      }
-
       "recognize" -> {
         if (activeResult != null) {
           result.error("ALREADY_ACTIVE", "Recognition already active", null)
