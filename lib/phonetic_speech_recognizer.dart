@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 
-enum PhoneticType { alphabet, number, wordsOrSentence }
+enum PhoneticType { alphabet, koreanAlphabet, number, wordsOrSentence }
 
 class PhoneticSpeechRecognizer {
   static const MethodChannel _channel =

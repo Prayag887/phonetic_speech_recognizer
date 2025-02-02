@@ -47,11 +47,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
         val type = call.argument<String>("type")
         val languageCode = call.argument<String>("languageCode")
-        val timeoutMillis = call.argument<Int>("timeout") ?: 0 // Extract timeout
+        val timeoutMillis = call.argument<Int>("timeout") ?: 0
 
         when (type) {
-          "alphabet" -> handleAlphabetRecognition(languageCode, timeoutMillis)
-          "number" -> handleNumberRecognition(languageCode, timeoutMillis)
+          "alphabet" -> handleAlphabetRecognition(timeoutMillis)
+          "koreanAlphabet" -> handleKoreanAlphabetRecognition(timeoutMillis)
+          "number" -> handleNumberRecognition(timeoutMillis)
           "wordsOrSentence" -> handleWordsRecognition(languageCode, timeoutMillis)
           else -> result.error("INVALID_TYPE", "Unsupported type", null)
         }
@@ -60,7 +61,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
-  private fun handleAlphabetRecognition(languageCode: String?, timeoutMillis: Int) {
+  private fun handleAlphabetRecognition(timeoutMillis: Int) {
     val isConnected = isNetworkAvailable(context)
     val lang = if (isConnected) "ne-NP" else "hi-IN"
     startRecognition(
@@ -70,7 +71,15 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     )
   }
 
-  private fun handleNumberRecognition(languageCode: String?, timeoutMillis: Int) {
+  private fun handleKoreanAlphabetRecognition(timeoutMillis: Int) {
+    startRecognition(
+      lang = "ne-NP",
+      mapper = { text -> mapText(text, PhoneticMapping.phoneticKoreanMapping) },
+      timeoutMillis = timeoutMillis
+    )
+  }
+
+  private fun handleNumberRecognition(timeoutMillis: Int) {
     startRecognition(
       lang = "hi-IN",
       mapper = { text -> mapText(text, PhoneticMapping.phoneticNumbersMapping) },
@@ -102,10 +111,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
       putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
       putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
-      putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+      putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 7)
     }
 
-    // Setup timeout
     timeoutHandler = Handler(context.mainLooper)
     if (timeoutMillis > 0) {
       timeoutRunnable = Runnable {
@@ -118,20 +126,19 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
     speechRecognizer?.setRecognitionListener(object : RecognitionListener {
       override fun onResults(results: Bundle) {
-        cancelTimeout() // Cancel timeout on results
+        cancelTimeout()
         val matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-        val recognizedText = matches?.firstOrNull() ?: ""
+        val recognizedText = matches?.firstOrNull { it.length == 1 && it[0].isLetter() } ?: matches?.firstOrNull() ?: ""
         activeResult?.success(mapper(recognizedText))
         cleanup()
       }
 
       override fun onError(error: Int) {
-        cancelTimeout() // Cancel timeout on error
+        cancelTimeout()
         activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
         cleanup()
       }
 
-      // Other overridden methods
       override fun onReadyForSpeech(params: Bundle?) {}
       override fun onBeginningOfSpeech() {}
       override fun onRmsChanged(rmsdB: Float) {}
@@ -152,9 +159,15 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
   private fun mapText(text: String, mapping: Map<String, List<String>>): String {
     val normalizedText = text.lowercase(Locale.ROOT)
-    return mapping.flatMap { entry ->
-      entry.value.map { it.lowercase(Locale.ROOT) to entry.key.toString() }
-    }.toMap()[normalizedText] ?: text.uppercase(Locale.ROOT)
+    val reversedMapping = mutableMapOf<String, MutableList<String>>()
+    mapping.forEach { (key, values) ->
+      values.forEach { pronunciation ->
+        val normalizedPronunciation = pronunciation.lowercase(Locale.ROOT)
+        reversedMapping.getOrPut(normalizedPronunciation) { mutableListOf() }.add(key)
+      }
+    }
+    val matchedKeys = reversedMapping[normalizedText]?.distinct() ?: listOf(text.uppercase(Locale.ROOT))
+    return matchedKeys.joinToString(", ")
   }
 
   private fun getErrorText(errorCode: Int): String = when (errorCode) {

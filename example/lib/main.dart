@@ -47,7 +47,7 @@ class _MyAppState extends State<MyApp> {
 
     try {
       final result = await PhoneticSpeechRecognizer.recognize(
-        type: PhoneticType.alphabet,
+        type: PhoneticType.koreanAlphabet,
         timeout: _timeoutDuration,
       );
 
