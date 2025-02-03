@@ -5,7 +5,49 @@ A new Flutter plugin project.
 
 ## Getting Started
 
-Use
+## For Sentences:
+
+### If you are saying a sentence or words for the speech recognizer to recognize, phonetic type needs to be wordsOrSentence.
+### sentence parameter is optional, but if you are doing something like recognizing the sentence or matching it with something
+### that will be displayed in the screen then it will give you more accurate result.
+    final result = await PhoneticSpeechRecognizer.recognize(
+        languageCode: "en-US",
+        type: PhoneticType.wordsOrSentence,
+        timeout: _timeoutDuration,
+        sentence: randomSentence
+    );
+
+
+## For Alphabets
+
+### If you are trying to acheive the accuracy to the level of alphabets, then no need to sent the language code or sentence.
+### This will work best for english alphabets.
+
+    final result = await PhoneticSpeechRecognizer.recognize(
+        type: PhoneticType.alphabet,
+        timeout: _timeoutDuration,
+    );
+
+## For Korean alphabets
+
+### If you are trying to get the korean alphabets, then no need to sent the language code or sentence.
+### This will work best for english alphabets.
+
+    final result = await PhoneticSpeechRecognizer.recognize(
+        type: PhoneticType.koreanAlphabet,
+        timeout: _timeoutDuration,
+    );
+
+
+## For Numbers
+
+### If you are trying to get the numbers, then no need to sent the language code or sentence.
+
+    final result = await PhoneticSpeechRecognizer.recognize(
+        type: PhoneticType.alphabet,
+        timeout: _timeoutDuration,
+    );
+
 
 =======
 This is made for android projects only.

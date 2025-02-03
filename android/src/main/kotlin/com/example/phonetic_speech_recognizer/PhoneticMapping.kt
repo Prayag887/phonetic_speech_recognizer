@@ -1,13 +1,133 @@
 package com.example.phonetic_speech_recognizer
 
 object PhoneticMapping {
+    // Hiragana to Nepali and English mapping
+    val phoneticHiraganaToNepaliAndEnglishMapping = mapOf(
+        "あ" to listOf("a", "अ", "आ"),
+        "い" to listOf("e", "इ", "ई"),
+        "う" to listOf("u", "उ", "ऊ"),
+        "え" to listOf("a", "ए", "एई"),
+        "お" to listOf("o", "ओ", "औ", "ho"),
+
+        "か" to listOf("ka", "का", "क"),
+        "き" to listOf("ki", "कि", "की"),
+        "く" to listOf("ku", "कु", "कू"),
+        "け" to listOf("ke", "के", "के"),
+        "こ" to listOf("ko", "को", "कौ"),
+
+        "さ" to listOf("sa", "सा", "स", "शाह"),
+        "し" to listOf("shi", "शि", "शी", "c",  "C", "see", "SEE", "सी"),
+        "す" to listOf("su", "सु", "सू", "shu"),
+        "せ" to listOf("se", "से", "से"),
+        "そ" to listOf("so", "सो", "सो"),
+
+        "た" to listOf("ta", "ता", "त"),
+        "ち" to listOf("chi", "चि", "ची", "CHE"),
+        "つ" to listOf("tsu", "तु", "तू", "चु", "छु"),
+        "て" to listOf("te", "ते", "ते", "त्यही"),
+        "と" to listOf("to", "तो", "तो", "त्यो"),
+
+        "な" to listOf("na", "ना", "न"),
+        "に" to listOf("ni", "नि", "नी"),
+        "ぬ" to listOf("nu", "नु", "नू"),
+        "ね" to listOf("ne", "ने", "ने"),
+        "の" to listOf("no", "नो", "नो"),
+
+        "は" to listOf("ha", "हा", "ह"),
+        "ひ" to listOf("hi", "हि", "ही", "यी"),
+        "ふ" to listOf("fu", "फु", "फू", "पु"),
+        "へ" to listOf("he", "हे", "हे"),
+        "ほ" to listOf("ho", "हो", "हो"),
+
+        "ま" to listOf("ma", "मा", "म"),
+        "み" to listOf("mi", "मी", "मी", "me"),
+        "む" to listOf("mu", "मु", "मू"),
+        "め" to listOf("main", "मे", "मे"),
+        "も" to listOf("mo", "मो", "मो"),
+
+        "や" to listOf("ya", "या", "य"),
+        "ゆ" to listOf("yu", "यु", "यू", "you", "u"),
+        "よ" to listOf("yo", "यो", "यो"),
+
+        "ら" to listOf("ra", "रा", "र"),
+        "り" to listOf("ri", "री", "री"),
+        "る" to listOf("ru", "रु", "रू"),
+        "れ" to listOf("re", "रे", "रे","हरे", "RAY"),
+        "ろ" to listOf("ro", "रो", "रो", "ROW"),
+
+        "わ" to listOf("wa", "वा", "व"),
+        "を" to listOf("wo", "वो", "वो", "BOW", "भो"),
+        "ん" to listOf("n", "न्", "ं", "AND")
+    )
+
+    // Katakana to Nepali and English mapping
+    val phoneticKatakanaToNepaliAndEnglishMapping = mapOf(
+        "ア" to listOf("a", "अ", "आ"),
+        "イ" to listOf("e", "इ", "ई"),
+        "ウ" to listOf("u", "उ", "ऊ"),
+        "エ" to listOf("ae", "ए", "एई", "a"),
+        "オ" to listOf("o", "ओ", "औ"),
+
+        "カ" to listOf("ka", "का", "क"),
+        "キ" to listOf("ki", "कि", "की"),
+        "ク" to listOf("ku", "कु", "कू"),
+        "ケ" to listOf("ke", "के", "के"),
+        "コ" to listOf("ko", "को", "कौ"),
+
+        "サ" to listOf("sa", "सा", "स", "शाह"),
+        "シ" to listOf("shi", "शि", "शी", "c",  "C", "see", "SEE", "सी"),
+        "ス" to listOf("su", "सु", "सू"),
+        "セ" to listOf("se", "से", "से"),
+        "ソ" to listOf("so", "सो", "सो"),
+
+        "タ" to listOf("ta", "ता", "त"),
+        "チ" to listOf("chi", "चि", "ची", "CHE"),
+        "ツ" to listOf("tsu", "तु", "तू", "छु", "JOHN", "त्सु", "चु"),
+        "テ" to listOf("te", "ते", "ते", "त्यही"),
+        "ト" to listOf("to", "तो", "तो", "त्यो"),
+
+        "ナ" to listOf("na", "ना", "न"),
+        "ニ" to listOf("ni", "नि", "नी"),
+        "ヌ" to listOf("nu", "नु", "नू"),
+        "ネ" to listOf("ne", "ने", "ने"),
+        "ノ" to listOf("no", "नो", "नो"),
+
+        "ハ" to listOf("ha", "हा", "ह"),
+        "ヒ" to listOf("hi", "हि", "ही", "यी"),
+        "フ" to listOf("fu", "फु", "फू", "पु"),
+        "ヘ" to listOf("he", "हे", "हे"),
+        "ホ" to listOf("ho", "हो", "हो"),
+
+        "マ" to listOf("ma", "मा", "म"),
+        "ミ" to listOf("mi", "मी", "मी", "me"),
+        "ム" to listOf("mu", "मु", "मू"),
+        "メ" to listOf("मे", "मे", "main"),
+        "モ" to listOf("mo", "मो", "मो"),
+
+        "ヤ" to listOf("ya", "या", "य"),
+        "ユ" to listOf("yu", "यु", "यू", "YOU", "u"),
+        "ヨ" to listOf("yo", "यो", "यो"),
+
+        "ラ" to listOf("ra", "रा", "र"),
+        "リ" to listOf("ri", "री", "री"),
+        "ル" to listOf("ru", "रु", "रू"),
+        "レ" to listOf("re", "रे", "रे", "हरे", "RAY"),
+        "ロ" to listOf("ro", "रो", "रो", "ROW"),
+
+        "ワ" to listOf("wa", "वा", "व"),
+        "ヲ" to listOf("wo", "वो", "वो", "BOW", "भो"),
+        "ン" to listOf("n", "ं", "ं", "AND")
+    )
+
+
+    // Nepali and English mapping
     val phoneticNepaliToEnglishMapping = mapOf(
         "A" to listOf("a", "ay", "ए", "अ", "एए", "हे"),
         "B" to listOf("b", "bee", "be", "बी", "बि", "ब्बी"),
         "C" to listOf("c", "see", "sea", "si", "सी", "सि", "सि।"),
         "D" to listOf("d", "dee", "de", "डी", "ढि", "दि", "डि", "डि।", "ढी", "thie", "the"),
         "E" to listOf("e", "ee", "ie", "eee", "eh", "eeew", "eeeeh", "ई", "इ", "यी", "यि"),
-        "F" to listOf("f", "ef", "eff", "एफ", "एफ्फ", "एभ", "apps"),
+        "F" to listOf("f", "ef", "eff", "एफ", "एफ्फ", "एभ", "apps", "app"),
         "G" to listOf("g", "gee", "je", "gi", "ji", "जी", "जी।", "जि"),
         "H" to listOf(
             "h",
@@ -62,7 +182,8 @@ object PhoneticMapping {
             "जेठ",
             "जेत",
             "zet",
-            "चेत"
+            "चेत",
+            "jatt"
         ),
     )
 
@@ -71,7 +192,7 @@ object PhoneticMapping {
         "ङ" to listOf("ङ", "अन्न", "अं", "अंग")
     )
 
-    //    works for offline
+    // Hindi to English mapping for offline capability
     val phoneticNumbersMapping = mapOf(
         //offline alphabet mapping
         "A" to listOf("a", "ay", "ए", "अ", "एए", "हे"),
@@ -173,100 +294,10 @@ object PhoneticMapping {
         ),
         "9" to listOf("nine", "9", "नाइन", "nine"),
         "10" to listOf("ten", "10", "टेन", "ten"),
-//        "11" to listOf("eleven", "11", "इलेवन", "eleven", "इलेभेन", "elevin", "elaven", "इलाभेन"),
-//        "12" to listOf("twelve", "12", "ट्वेल्व", "twelv", "टुबेल", "टुवेल", "tovel", "twelf", "twill", "to belve", "to belb", "two belb"), //mistake
-//        "13" to listOf("थर्टिन", "थीन","thirteen", "13", "थर्टीन", "thirteen"),
-//        "14" to listOf("fourteen", "14", "फोर्टीन", "fourteen", "प्रोटिन", "फोटिन", "फोर्टिन", "4ting", "4tine"), // mistake
-//        "15" to listOf("fifteen", "15", "फिफ्टीन", "fifteen", "फिप्टिन", "फिफ्टिन", "फिफ्टिङ", "fifting", "fiftine"), //mistake
-//        "16" to listOf("sixteen", "16", "सिक्सटीन", "sixteen", "s*** in", "s** teen"),
-//        "17" to listOf("seventeen", "17", "सिवन्टीन", "seventeen", "seven teen", "सेभेन्टिन", "सेभटिन", "सेभन्टिन", "seventine", "sevention"), //mistake
-//        "18" to listOf("eighteen", "18", "एटीएन", "eighteen", "एटिन", "atin", "eatin", "एक्टिन"), //mistake
-//        "19" to listOf("nineteen", "19", "नाइन्टीन", "nineteen", "१९"),
-//        "20" to listOf("twenty", "20", "ट्वेंटी", "twenty", "२०", "ट्वान्टी", "ट्wenty"),
-//        "21" to listOf("twenty one", "21", "ट्वेंटी वान", "twenty one"),
-//        "22" to listOf("twenty two", "22", "ट्वेंटी टू", "twenty two"),
-//        "23" to listOf("twenty three", "23", "ट्वेंटी थ्री", "twenty three"),
-//        "24" to listOf("twenty four", "24", "ट्वेंटी फोर", "twenty four"),
-//        "25" to listOf("twenty five", "25", "ट्वेंटी फाइव", "twenty five", "२५"),
-//        "26" to listOf("twenty six", "26", "ट्वेंटी सिक्स", "twenty six"),
-//        "27" to listOf("twenty seven", "27", "ट्वेंटी सेवेन", "twenty seven"),
-//        "28" to listOf("twenty eight", "28", "ट्वेंटी एट", "twenty eight"),
-//        "29" to listOf("twenty nine", "29", "ट्वेंटी नाइन", "twenty nine", "२९"),
-//        "30" to listOf("thirty", "30", "थर्टी", "thirty"),
-//        "31" to listOf("thirty one", "31", "थर्टी वान", "thirty one"),
-//        "32" to listOf("thirty two", "32", "थर्टी टू", "thirty two"),
-//        "33" to listOf("thirty three", "33", "थर्टी थ्री", "thirty three", "३३"),
-//        "34" to listOf("thirty four", "34", "थर्टी फोर", "thirty four", "३४"),
-//        "35" to listOf("thirty five", "35", "थर्टी फाइव", "thirty five"),
-//        "36" to listOf("thirty six", "36", "थर्टी सिक्स", "thirty six"),
-//        "37" to listOf("thirty seven", "37", "थर्टी सेवेन", "thirty seven"),
-//        "38" to listOf("thirty eight", "38", "थर्टी एट", "thirty eight"),
-//        "39" to listOf("thirty nine", "39", "थर्टी नाइन", "thirty nine"),
-//        "40" to listOf("forty", "40", "फोर्टी", "forty", "फोटी", "porty", "p40", "4t"),
-//        "41" to listOf("forty one", "41", "फोर्टी वान", "forty one", "४१"),
-//        "42" to listOf("forty two", "42", "फोर्टी टू", "forty two"),
-//        "43" to listOf("forty three", "43", "फोर्टी थ्री", "forty three"),
-//        "44" to listOf("forty four", "44", "फोर्टी फोर", "forty four"),
-//        "45" to listOf("forty five", "45", "फोर्टी फाइव", "forty five"),
-//        "46" to listOf("forty six", "46", "फोर्टी सिक्स", "forty six"),
-//        "47" to listOf("forty seven", "47", "फोर्टी सेवेन", "forty seven", "पट्टि सेभेन", "४७", "4t7"),
-//        "48" to listOf("forty eight", "48", "फोर्टी एट", "forty eight", "४८"),
-//        "49" to listOf("forty nine", "49", "फोर्टी नाइन", "forty nine", "४९", "४9"),
-//        "50" to listOf("fifty", "50", "फिफ्टी", "fifty", "५०"),
-//        "51" to listOf("fifty one", "51", "फिफ्टी वान", "fifty one", "५१"),
-//        "52" to listOf("fifty two", "52", "फिफ्टी टू", "fifty two", "५2", "५२", "f2"),
-//        "53" to listOf("fifty three", "53", "फिफ्टी थ्री", "fifty three", "५३"),
-//        "54" to listOf("fifty four", "54", "फिफ्टी फोर", "fifty four", "५४", "fip4","fift4"),
-//        "55" to listOf("fifty five", "55", "फिफ्टी फाइव", "fifty five"),
-//        "56" to listOf("fifty six", "56", "फिफ्टी सिक्स", "fifty six", "५६","५6", "ft6"),
-//        "57" to listOf("fifty seven", "57", "फिफ्टी सेवेन", "fifty seven", "५७"),
-//        "58" to listOf("fifty eight", "58", "फिफ्टी एट", "fifty eight", "५८"),
-//        "59" to listOf("fifty nine", "59", "फिफ्टी नाइन", "fifty nine", "५९"),
-//        "60" to listOf("sixty", "60", "सिक्स्टी", "sixty", "६०"),
-//        "61" to listOf("sixty one", "61", "सिक्स्टी वान", "sixty one", "६१"),
-//        "62" to listOf("sixty two", "62", "सिक्स्टी टू", "sixty two", "६२", "६2"),
-//        "63" to listOf("sixty three", "63", "सिक्स्टी थ्री", "sixty three", "६३"),
-//        "64" to listOf("sixty four", "64", "सिक्स्टी फोर", "sixty four", "६४"),
-//        "65" to listOf("sixty five", "65", "सिक्स्टी फाइव", "sixty five", "६५", "६5"),
-//        "66" to listOf("sixty six", "66", "सिक्स्टी सिक्स", "sixty six", "६६", "६6"),
-//        "67" to listOf("sixty seven", "67", "सिक्स्टी सेवेन", "sixty seven", "६७"),
-//        "68" to listOf("sixty eight", "68", "सिक्स्टी एट", "sixty eight", "६८"),
-//        "69" to listOf("sixty nine", "69", "सिक्स्टी नाइन", "sixty nine", "६९"),
-//        "70" to listOf("seventy", "70", "सेवंटी", "seventy","७०", "सेभेन्टि", "सेभेन्टी"),
-//        "71" to listOf("seventy one", "71", "सेवंटी वान", "seventy one", "७१"),
-//        "72" to listOf("seventy two", "72", "सेवंटी टू", "seventy two", "७२", "७2"),
-//        "73" to listOf("seventy three", "73", "सेवंटी थ्री", "seventy three", "७३"),
-//        "74" to listOf("seventy four", "74", "सेवंटी फोर", "seventy four", "७४"),
-//        "75" to listOf("seventy five", "75", "सेवंटी फाइव", "seventy five", "७५", "७5"),
-//        "76" to listOf("seventy six", "76", "सेवंटी सिक्स", "seventy six", "७६"),
-//        "77" to listOf("seventy seven", "77", "सेवंटी सेवेन", "seventy seven"),
-//        "78" to listOf("seventy eight", "78", "सेवंटी एट", "seventy eight", "७८"),
-//        "79" to listOf("seventy nine", "79", "सेवंटी नाइन", "seventy nine"),
-//        "80" to listOf("eighty", "80", "एटी", "eighty"),
-//        "81" to listOf("eighty one", "81", "एटी वान", "eighty one", "८१", "at1"),
-//        "82" to listOf("eighty two", "82", "एटी टू", "eighty two", "at2", "at2", "atitu", "attito", "atito"),
-//        "83" to listOf("eighty three", "83", "एटी थ्री", "eighty three", "८३", "at3", "het3"),
-//        "84" to listOf("eighty four", "84", "एटी फोर", "eighty four"),
-//        "85" to listOf("eighty five", "85", "एटी फाइव", "eighty five", "at5", "anti5", "atti5"),
-//        "86" to listOf("eighty six", "86", "एटी सिक्स", "eighty six", "ht6", "एटि सिक्स", "एटिसी"),
-//        "87" to listOf("eighty seven", "87", "एटी सेवेन", "eighty seven", "८७"),
-//        "88" to listOf("eighty eight", "88", "एटी एट", "eighty eight", "८८", "एटिएट"),
-//        "89" to listOf("eighty nine", "89", "एटी नाइन", "eighty nine"),
-//        "90" to listOf("ninety", "90", "नाइन्टी", "ninety", "नाइन्टि", "नायन्टी"),
-//        "91" to listOf("ninety one", "91", "नाइन्टी वान", "ninety one", "९१"),
-//        "92" to listOf("ninety two", "92", "नाइन्टी टू", "ninety two", "९२", "९2"),
-//        "93" to listOf("ninety three", "93", "नाइन्टी थ्री", "ninety three", "९३"),
-//        "94" to listOf("ninety four", "94", "नाइन्टी फोर", "ninety four", "९४"),
-//        "95" to listOf("ninety five", "95", "नाइन्टी फाइव", "ninety five", "९५", "entify"),
-//        "96" to listOf("ninety six", "96", "नाइन्टी सिक्स", "ninety six"),
-//        "97" to listOf("ninety seven", "97", "नाइन्टी सेवेन", "ninety seven", "९७"),
-//        "98" to listOf("ninety eight", "98", "नाइन्टी एट", "ninety eight", "९८"),
-//        "99" to listOf("ninety nine", "99", "नाइन्टी नाइन", "ninety nine", "९९"),
-//        "100" to listOf("one hundred", "100", "वान हण्ड्रेड", "one hundred", "हन्ड्रेड", "१००", "१००ड"),
     )
 
+    // Nepali to Korean mapping
     val phoneticKoreanMapping = mapOf(
-        //korean mapping
         "ㄱ" to listOf("ga", "kha", "ग", "का", "ख"),
         "ㄴ" to listOf("na", "न", "ना"),
         "ㄷ" to listOf("द्", "थ्", "da", "the", "डी", "दो", "द"),
