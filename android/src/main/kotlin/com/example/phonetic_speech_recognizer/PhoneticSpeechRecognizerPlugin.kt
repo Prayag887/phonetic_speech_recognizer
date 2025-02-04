@@ -92,6 +92,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         returnOutOfMap = false,
         lang = lang,
         mapper = { text ->
+          //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
           mapText(
             text,
             PhoneticMapping.phoneticHiraganaToNepaliAndEnglishMapping
@@ -104,6 +105,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         returnOutOfMap = false,
         lang = lang,
         mapper = { text ->
+          //mapText returns only the mapped value (). If it picks up the noise on top of users voice then response wont be provided
           mapText(
             text,
             PhoneticMapping.phoneticKatakanaToNepaliAndEnglishMapping
@@ -120,6 +122,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     startRecognition(
       returnOutOfMap = false,
       lang = lang,
+      //mapText returns only the mapped value (english alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapText(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
       timeoutMillis = timeoutMillis
     )
@@ -129,6 +132,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     startRecognition(
       returnOutOfMap = false,
       lang = "ne-NP",
+      //mapText returns only the mapped value (korean alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapText(text, PhoneticMapping.phoneticKoreanMapping) },
       timeoutMillis = timeoutMillis
     )
@@ -138,6 +142,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     startRecognition(
       returnOutOfMap = true,
       lang = "hi-IN",
+      //mapNumber has to only the mapped value (number in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapNumber(text, PhoneticMapping.phoneticNumbersMapping) },
       timeoutMillis = timeoutMillis
     )

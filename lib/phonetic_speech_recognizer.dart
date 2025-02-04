@@ -17,7 +17,7 @@ class PhoneticSpeechRecognizer {
   }
 
 
-  Future<bool> stopRecognition() async {
+   static Future<bool> stopRecognition() async {
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
       return result;
