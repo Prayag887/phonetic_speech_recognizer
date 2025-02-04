@@ -44,6 +44,17 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  void stopRecognition() {
+    PhoneticSpeechRecognizer.stopRecognition();
+    _timer?.cancel();
+    setState(() {
+      _isListening = false;
+      _progress = 1.0;
+      _recognizedText = "Recognization has been stopped";
+    });
+  }
+
+
   Future<void> _startRecognition() async {
     if (_isListening) return;
 
@@ -68,6 +79,7 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.numbers:
         phoneticType = PhoneticType.number;
         break;
+
       case RecognitionType.katakanaJapanese:
         phoneticType = PhoneticType.katakanaJapanese;
         break;
@@ -77,6 +89,7 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.koreanAlphabets:
         phoneticType = PhoneticType.koreanAlphabet;
         break;
+
       case RecognitionType.sentences:
       default:
         phoneticType = PhoneticType.englishWordsOrSentence;
@@ -85,12 +98,13 @@ class _MyAppState extends State<MyApp> {
 
     try {
       final result = await PhoneticSpeechRecognizer.recognize(
-        languageCode: "en-US",
-        type: phoneticType,
-        timeout: _timeoutDuration,
-        sentence: _randomText,
+          languageCode: "en-US",
+          type: phoneticType,
+          timeout: _timeoutDuration,
+          sentence: _randomText
       );
 
+      // Print the result to the console
       print("Recognized Text: $result");
 
       setState(() {
@@ -112,16 +126,6 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  void _stopRecognition() {
-    PhoneticSpeechRecognizer.stopRecognition();
-    _timer?.cancel();
-    setState(() {
-      _isListening = false;
-      _recognizedText = "Recognition stopped";
-      _progress = 1.0;
-    });
-  }
-
   void _generateRandomText() {
     switch (_selectedType) {
       case RecognitionType.alphabets:
@@ -134,10 +138,10 @@ class _MyAppState extends State<MyApp> {
         _randomText = String.fromCharCode(0xAC00 + (DateTime.now().millisecondsSinceEpoch % 11172));
         break;
       case RecognitionType.hiraganaJapanese:
-        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
+        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96)); // Range for Hiragana
         break;
       case RecognitionType.katakanaJapanese:
-        _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
+        _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96)); // Range for Katakana
         break;
       case RecognitionType.sentences:
       default:
@@ -147,39 +151,52 @@ class _MyAppState extends State<MyApp> {
     setState(() {});
   }
 
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Speech Recognizer'),
+          actions: [
+            PopupMenuButton<RecognitionType>(
+              onSelected: (RecognitionType type) {
+                setState(() {
+                  _selectedType = type;
+                  _generateRandomText();
+                });
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<RecognitionType>>[
+                const PopupMenuItem(value: RecognitionType.alphabets, child: Text('Alphabets')),
+                const PopupMenuItem(value: RecognitionType.numbers, child: Text('Numbers')),
+                const PopupMenuItem(value: RecognitionType.koreanAlphabets, child: Text('Korean Alphabets')),
+                const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
+                const PopupMenuItem(value: RecognitionType.hiraganaJapanese, child: Text('Japanese (Hiragana)')),
+                const PopupMenuItem(value: RecognitionType.katakanaJapanese, child: Text('Japanese (Katakana)')),
+              ],
+            ),
+          ],
         ),
         body: Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                _randomText,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
+              Text(_randomText, style: const TextStyle(fontSize: 16)),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isListening ? null : _requestAudioPermission,
                 child: Text(_isListening ? 'Processing...' : 'Start Recognition'),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _isListening ? _stopRecognition : null,
+                onPressed: _isListening ? stopRecognition : null,
                 child: const Text('Stop Recognition'),
               ),
               const SizedBox(height: 20),
               LinearProgressIndicator(value: _progress),
               const SizedBox(height: 20),
-              Text(
-                _recognizedText,
-                textAlign: TextAlign.center,
-              ),
+              Text(_recognizedText, textAlign: TextAlign.center),
             ],
           ),
         ),

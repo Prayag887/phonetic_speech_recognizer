@@ -1,5 +1,5 @@
 # phonetic_speech_recognizer
-<<<<<<< HEAD
+## Works for android projects only, iOS support will be provided later
 
 A new Flutter plugin project.
 
@@ -7,9 +7,7 @@ A new Flutter plugin project.
 
 ## For Sentences:
 
-### If you are saying a sentence or words for the speech recognizer to recognize, phonetic type needs to be wordsOrSentence.
-### sentence parameter is optional, but if you are doing something like recognizing the sentence or matching it with something
-### that will be displayed in the screen then it will give you more accurate result.
+### If you are saying a sentence or words for the speech recognizer to recognize, phonetic type needs to be wordsOrSentence. sentence parameter is optional, but if you are doing something like recognizing the sentence or matching it with something that will be displayed in the screen then it will give you more accurate result.
     final result = await PhoneticSpeechRecognizer.recognize(
         languageCode: "en-US",
         type: PhoneticType.wordsOrSentence,
@@ -48,7 +46,6 @@ A new Flutter plugin project.
         timeout: _timeoutDuration,
     );
 
+## Get the status of microphone (if its listening or not)
 
-=======
-This is made for android projects only.
->>>>>>> 655f286006aabb9bc08098d39091502a4271243c
+    PhoneticSpeechRecognizer.isListening();

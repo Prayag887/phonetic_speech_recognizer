@@ -26,18 +26,32 @@ class PhoneticSpeechRecognizer {
     }
   }
 
+   static Future<bool> isListening() async {
+    try {
+      final bool result = await _channel.invokeMethod('isListening');
+      return result;
+    } catch (e) {
+      throw PlatformException(code: 'STOP_ERROR', message: e.toString());
+    }
+  }
+
   static Future<String?> recognize({
     required PhoneticType type,
     String? languageCode,
     required int timeout,
     String? sentence,
   }) async {
+    // Validate timeout
+    if (timeout < 0) {
+      throw ArgumentError('Timeout must be a positive value');
+    }
+
     try {
       final String result = await _channel.invokeMethod('recognize', {
         'type': type.toString().split('.').last,
         'languageCode': languageCode,
         'timeout': timeout,
-        'sentence' : sentence
+        'sentence': sentence
       });
 
       if (result.isEmpty || result == "null") {
@@ -45,8 +59,18 @@ class PhoneticSpeechRecognizer {
       }
       return result;
     } on PlatformException catch (e) {
-      print("Error: ${e.message}");
-      return "";
+      print("Speech Recognition Error: ${e.code} - ${e.message}");
+      // You might want to handle specific error codes differently
+      switch (e.code) {
+        case 'TIMEOUT':
+          return "";
+        case 'SPEECH_ERROR':
+          return "";
+        case 'ALREADY_ACTIVE':
+          return "";
+        default:
+          return "";
+      }
     }
   }
 }
