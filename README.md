@@ -20,7 +20,6 @@ A new Flutter plugin project.
 
 ### If you are trying to acheive the accuracy to the level of alphabets, then no need to sent the language code or sentence.
 ### This will work best for english alphabets.
-
     final result = await PhoneticSpeechRecognizer.recognize(
         type: PhoneticType.alphabet,
         timeout: _timeoutDuration,
@@ -29,8 +28,7 @@ A new Flutter plugin project.
 ## For Korean alphabets
 
 ### If you are trying to get the korean alphabets, then no need to sent the language code or sentence.
-### This will work best for english alphabets.
-
+### This will work best for korean alphabets.
     final result = await PhoneticSpeechRecognizer.recognize(
         type: PhoneticType.koreanAlphabet,
         timeout: _timeoutDuration,
@@ -40,12 +38,33 @@ A new Flutter plugin project.
 ## For Numbers
 
 ### If you are trying to get the numbers, then no need to sent the language code or sentence.
-
     final result = await PhoneticSpeechRecognizer.recognize(
-        type: PhoneticType.alphabet,
+        type: PhoneticType.number,
         timeout: _timeoutDuration,
     );
 
-## Get the status of microphone (if its listening or not)
 
+## For Japanese Alphabets
+
+### If you are trying to get the numbers, then no need to sent the language code or sentence.
+    final result = await PhoneticSpeechRecognizer.recognize(
+        type: PhoneticType.katakanaJapanese,
+        timeout: _timeoutDuration,
+    );
+
+    final result = await PhoneticSpeechRecognizer.recognize(
+        type: PhoneticType.hiraganaJapanese,
+        timeout: _timeoutDuration,
+    );
+
+
+## Get the status of microphone (if its listening or not)
     PhoneticSpeechRecognizer.isListening();
+
+## For all language support
+### If you are trying to get the different language not given above, then you can get that particular language support with this
+    final result = await PhoneticSpeechRecognizer.recognize(
+        type: PhoneticType.allLanguageSupport,
+        languageCode = "ja-JP", //send different language code here as needed
+        timeout: _timeoutDuration,
+    );

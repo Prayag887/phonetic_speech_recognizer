@@ -3,7 +3,7 @@ package com.example.phonetic_speech_recognizer
 object PhoneticMapping {
     // Hiragana to Nepali and English mapping
     val phoneticHiraganaToNepaliAndEnglishMapping = mapOf(
-        "あ" to listOf("a", "अ", "आ"),
+        "あ" to listOf("अ", "आ"),
         "い" to listOf("e", "इ", "ई"),
         "う" to listOf("u", "उ", "ऊ"),
         "え" to listOf("a", "ए", "एई"),
@@ -12,7 +12,7 @@ object PhoneticMapping {
         "か" to listOf("ka", "का", "क"),
         "き" to listOf("ki", "कि", "की"),
         "く" to listOf("ku", "कु", "कू"),
-        "け" to listOf("ke", "के", "के"),
+        "け" to listOf("ke", "के", "के","k"),
         "こ" to listOf("ko", "को", "कौ"),
 
         "さ" to listOf("sa", "सा", "स", "शाह"),
@@ -35,7 +35,7 @@ object PhoneticMapping {
 
         "は" to listOf("ha", "हा", "ह"),
         "ひ" to listOf("hi", "हि", "ही", "यी"),
-        "ふ" to listOf("fu", "फु", "फू", "पु"),
+        "ふ" to listOf("fu", "फु", "फू", "पु", "फ", "swoo", "fuoh"),
         "へ" to listOf("he", "हे", "हे"),
         "ほ" to listOf("ho", "हो", "हो"),
 
@@ -50,19 +50,19 @@ object PhoneticMapping {
         "よ" to listOf("yo", "यो", "यो"),
 
         "ら" to listOf("ra", "रा", "र"),
-        "り" to listOf("ri", "री", "री"),
+        "り" to listOf("ri", "री", "री", "रि", "हरि"),
         "る" to listOf("ru", "रु", "रू"),
         "れ" to listOf("re", "रे", "रे","हरे", "RAY"),
         "ろ" to listOf("ro", "रो", "रो", "ROW"),
 
-        "わ" to listOf("wa", "वा", "व"),
-        "を" to listOf("wo", "वो", "वो", "BOW", "भो"),
+        "わ" to listOf("wa", "वा", "ब"),
+        "を" to listOf("wo", "वो", "वो", "BOW", "भो", "व"),
         "ん" to listOf("n", "न्", "ं", "AND")
     )
 
     // Katakana to Nepali and English mapping
     val phoneticKatakanaToNepaliAndEnglishMapping = mapOf(
-        "ア" to listOf("a", "अ", "आ"),
+        "ア" to listOf("अ", "आ"),
         "イ" to listOf("e", "इ", "ई"),
         "ウ" to listOf("u", "उ", "ऊ"),
         "エ" to listOf("ae", "ए", "एई", "a"),
@@ -71,7 +71,7 @@ object PhoneticMapping {
         "カ" to listOf("ka", "का", "क"),
         "キ" to listOf("ki", "कि", "की"),
         "ク" to listOf("ku", "कु", "कू"),
-        "ケ" to listOf("ke", "के", "के"),
+        "ケ" to listOf("ke", "के", "के", "k"),
         "コ" to listOf("ko", "को", "कौ"),
 
         "サ" to listOf("sa", "सा", "स", "शाह"),
@@ -94,7 +94,7 @@ object PhoneticMapping {
 
         "ハ" to listOf("ha", "हा", "ह"),
         "ヒ" to listOf("hi", "हि", "ही", "यी"),
-        "フ" to listOf("fu", "फु", "फू", "पु"),
+        "フ" to listOf("fu", "फु", "फू", "पु", "फ", "swoo", "fuoh"),
         "ヘ" to listOf("he", "हे", "हे"),
         "ホ" to listOf("ho", "हो", "हो"),
 
@@ -109,12 +109,12 @@ object PhoneticMapping {
         "ヨ" to listOf("yo", "यो", "यो"),
 
         "ラ" to listOf("ra", "रा", "र"),
-        "リ" to listOf("ri", "री", "री"),
+        "リ" to listOf("ri", "री", "री", "रि", "हरि"),
         "ル" to listOf("ru", "रु", "रू"),
         "レ" to listOf("re", "रे", "रे", "हरे", "RAY"),
         "ロ" to listOf("ro", "रो", "रो", "ROW"),
 
-        "ワ" to listOf("wa", "वा", "व"),
+        "ワ" to listOf("wa", "वा", "व", "ब"),
         "ヲ" to listOf("wo", "वो", "वो", "BOW", "भो"),
         "ン" to listOf("n", "ं", "ं", "AND")
     )

@@ -1,6 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-enum PhoneticType { alphabet, koreanAlphabet, number, englishWordsOrSentence, hiraganaJapanese, katakanaJapanese }
+enum PhoneticType { alphabet, koreanAlphabet, number, englishWordsOrSentence, hiraganaJapanese, katakanaJapanese, allLanguageSupport }
 
 class PhoneticSpeechRecognizer {
   static const MethodChannel _channel =
@@ -11,11 +12,12 @@ class PhoneticSpeechRecognizer {
       final String? version = await _channel.invokeMethod('getPlatformVersion');
       return version;
     } on PlatformException catch (e) {
-      print("Error: ${e.message}");
+      if (kDebugMode) {
+        print("Error: ${e.message}");
+      }
       return null;
     }
   }
-
 
    static Future<bool> stopRecognition() async {
     try {
@@ -59,8 +61,10 @@ class PhoneticSpeechRecognizer {
       }
       return result;
     } on PlatformException catch (e) {
-      print("Speech Recognition Error: ${e.code} - ${e.message}");
-      // You might want to handle specific error codes differently
+        if (kDebugMode) {
+          print("Speech Recognition Error: ${e.code} - ${e.message}");
+        }
+        // You might want to handle specific error codes differently
       switch (e.code) {
         case 'TIMEOUT':
           return "";
