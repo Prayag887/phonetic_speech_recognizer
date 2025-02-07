@@ -19,7 +19,6 @@ class PhoneticSpeechRecognizer {
     }
   }
 
-
    static Future<bool> stopRecognition() async {
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
@@ -62,7 +61,9 @@ class PhoneticSpeechRecognizer {
       }
       return result;
     } on PlatformException catch (e) {
-        print("Speech Recognition Error: ${e.code} - ${e.message}");
+        if (kDebugMode) {
+          print("Speech Recognition Error: ${e.code} - ${e.message}");
+        }
         // You might want to handle specific error codes differently
       switch (e.code) {
         case 'TIMEOUT':

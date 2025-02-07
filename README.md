@@ -39,7 +39,7 @@ A new Flutter plugin project.
 
 ### If you are trying to get the numbers, then no need to sent the language code or sentence.
     final result = await PhoneticSpeechRecognizer.recognize(
-        type: PhoneticType.alphabet,
+        type: PhoneticType.number,
         timeout: _timeoutDuration,
     );
 
@@ -48,7 +48,12 @@ A new Flutter plugin project.
 
 ### If you are trying to get the numbers, then no need to sent the language code or sentence.
     final result = await PhoneticSpeechRecognizer.recognize(
-        type: PhoneticType.alphabet,
+        type: PhoneticType.katakanaJapanese,
+        timeout: _timeoutDuration,
+    );
+
+    final result = await PhoneticSpeechRecognizer.recognize(
+        type: PhoneticType.hiraganaJapanese,
         timeout: _timeoutDuration,
     );
 
@@ -60,6 +65,6 @@ A new Flutter plugin project.
 ### If you are trying to get the different language not given above, then you can get that particular language support with this
     final result = await PhoneticSpeechRecognizer.recognize(
         type: PhoneticType.allLanguageSupport,
-        languageCode = "ja-JP",
+        languageCode = "ja-JP", //send different language code here as needed
         timeout: _timeoutDuration,
     );
