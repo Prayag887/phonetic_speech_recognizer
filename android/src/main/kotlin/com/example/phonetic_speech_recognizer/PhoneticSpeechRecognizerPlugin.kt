@@ -53,9 +53,11 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         activeResult = result
 
         val type = call.argument<String>("type")
-        val languageCode = call.argument<String>("languageCode")
+        val languageCode = call.argument<String>("languageCode") ?: "ja-JP"
         val timeoutMillis = call.argument<Int>("timeout")!!
         val sentence = call.argument<String>("sentence") ?: ""
+
+        Log.d("TAG", "THIS IS LANGUAGE CODE: $languageCode")
 
         Log.d("TAG", "onMethodCall: ----------------- $timeoutMillis ")
         when (type) {
@@ -65,6 +67,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           "englishWordsOrSentence" -> handleWordsRecognition(languageCode, timeoutMillis, sentence)
           "hiraganaJapanese" -> handleJapaneseRecognition(timeoutMillis, "hiragana")
           "katakanaJapanese" -> handleJapaneseRecognition(timeoutMillis, "katakana")
+          "allLanguageSupport" -> handleAllLanguages(timeoutMillis, languageCode)
           else -> result.error("INVALID_TYPE", "Unsupported type", null)
         }
       }
@@ -95,13 +98,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private fun handleJapaneseRecognition(timeoutMillis: Int, type: String) {
     isNetworkAvailable(context)
     val lang = "ne-NP"
+    val jpLang = "ja-JP"
     if (type == "hiragana") {
       startRecognition(
-        returnOutOfMap = false,
+        nativeLang = jpLang,
         lang = lang,
         mapper = { text ->
           //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
-          mapText(
+          mapNumber(
             text,
             PhoneticMapping.phoneticHiraganaToNepaliAndEnglishMapping
           )
@@ -110,11 +114,11 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       )
     } else{
       startRecognition(
-        returnOutOfMap = false,
+        nativeLang = jpLang,
         lang = lang,
         mapper = { text ->
           //mapText returns only the mapped value (). If it picks up the noise on top of users voice then response wont be provided
-          mapText(
+          mapNumber(
             text,
             PhoneticMapping.phoneticKatakanaToNepaliAndEnglishMapping
           )
@@ -128,17 +132,27 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     val isConnected = isNetworkAvailable(context)
     val lang = if (isConnected) "ne-NP" else "hi-IN"
     startRecognition(
-      returnOutOfMap = false,
+      nativeLang = "",
       lang = lang,
       //mapText returns only the mapped value (english alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapText(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
       timeoutMillis = timeoutMillis
     )
   }
+  private fun handleAllLanguages(timeoutMillis: Int, languageCode: String) {
+    Log.d("TAG", "handleAllLanguages: ------------------- $languageCode")
+    startRecognition(
+      nativeLang = "",
+      lang = languageCode,
+      //mapText returns only the mapped value (english alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
+      mapper = { text -> mapNumber(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
+      timeoutMillis = timeoutMillis
+    )
+  }
 
   private fun handleKoreanAlphabetRecognition(timeoutMillis: Int) {
     startRecognition(
-      returnOutOfMap = false,
+      nativeLang = "",
       lang = "ne-NP",
       //mapText returns only the mapped value (korean alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapText(text, PhoneticMapping.phoneticKoreanMapping) },
@@ -148,7 +162,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
   private fun handleNumberRecognition(timeoutMillis: Int) {
     startRecognition(
-      returnOutOfMap = true,
+      nativeLang = "",
       lang = "hi-IN",
       //mapNumber has to only the mapped value (number in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapNumber(text, PhoneticMapping.phoneticNumbersMapping) },
@@ -166,7 +180,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       return
     }
     startRecognition(
-      returnOutOfMap = true,
+      nativeLang = "",
       lang = languageCode,
       mapper = { text ->
         if (languageCode == "en-US") correctRecognizedPhrase(listOf(text), sentence) else text
@@ -175,7 +189,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     )
   }
 
-  private fun startRecognition(lang: String, mapper: (String) -> String, timeoutMillis: Int, returnOutOfMap: Boolean) {
+  private fun startRecognition(lang: String, mapper: (String) -> String, timeoutMillis: Int, nativeLang: String) {
     isListening = true
     if (speechRecognizer != null) {
       speechRecognizer?.cancel()
@@ -242,6 +256,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     if (text.isBlank()) {
       return speakLoud
     }
+    Log.d("TAG", "japanese: ------------- $text")
     val normalizedText = text.lowercase(Locale.ROOT)
     val reversedMapping = mutableMapOf<String, MutableList<String>>()
     mapping.forEach { (key, values) ->

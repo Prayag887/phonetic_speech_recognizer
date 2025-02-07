@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
 import 'package:phonetic_speech_recognizer_example/randomsetencegenerator.dart';
 
-enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, katakanaJapanese, hiraganaJapanese }
+enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, katakanaJapanese, hiraganaJapanese, allLanguageSupport }
 
 void main() {
   runApp(const MyApp());
@@ -50,10 +50,9 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _isListening = false;
       _progress = 1.0;
-      _recognizedText = "Recognization has been stopped";
+      _recognizedText = "Recognition has been stopped";
     });
   }
-
 
   Future<void> _startRecognition() async {
     if (_isListening) return;
@@ -72,40 +71,49 @@ class _MyAppState extends State<MyApp> {
     });
 
     PhoneticType phoneticType;
+    String languageCode;
+
     switch (_selectedType) {
       case RecognitionType.alphabets:
         phoneticType = PhoneticType.alphabet;
+        languageCode = "en-US";
         break;
       case RecognitionType.numbers:
         phoneticType = PhoneticType.number;
+        languageCode = "en-US";
         break;
-
       case RecognitionType.katakanaJapanese:
         phoneticType = PhoneticType.katakanaJapanese;
+        languageCode = "ja-JP";
         break;
       case RecognitionType.hiraganaJapanese:
         phoneticType = PhoneticType.hiraganaJapanese;
+        languageCode = "ja-JP";
         break;
       case RecognitionType.koreanAlphabets:
         phoneticType = PhoneticType.koreanAlphabet;
+        languageCode = "en-US";
         break;
-
+      case RecognitionType.allLanguageSupport:
+        phoneticType = PhoneticType.allLanguageSupport;
+        languageCode = "ja-JP";
+        break;
       case RecognitionType.sentences:
       default:
         phoneticType = PhoneticType.englishWordsOrSentence;
+        languageCode = "en-US";
         break;
     }
 
     try {
       final result = await PhoneticSpeechRecognizer.recognize(
-          languageCode: "en-US",
+          languageCode: languageCode,
           type: phoneticType,
           timeout: _timeoutDuration,
           sentence: _randomText
       );
 
-      // Print the result to the console
-      print("Recognized Text: $result");
+      print("Recognized Text: ${PhoneticType.allLanguageSupport}");
 
       setState(() {
         _recognizedText = result ?? "Recognition failed";
@@ -138,10 +146,13 @@ class _MyAppState extends State<MyApp> {
         _randomText = String.fromCharCode(0xAC00 + (DateTime.now().millisecondsSinceEpoch % 11172));
         break;
       case RecognitionType.hiraganaJapanese:
-        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96)); // Range for Hiragana
+        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.katakanaJapanese:
-        _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96)); // Range for Katakana
+        _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
+        break;
+      case RecognitionType.allLanguageSupport:
+        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.sentences:
       default:
@@ -150,7 +161,6 @@ class _MyAppState extends State<MyApp> {
     }
     setState(() {});
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -173,6 +183,10 @@ class _MyAppState extends State<MyApp> {
                 const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
                 const PopupMenuItem(value: RecognitionType.hiraganaJapanese, child: Text('Japanese (Hiragana)')),
                 const PopupMenuItem(value: RecognitionType.katakanaJapanese, child: Text('Japanese (Katakana)')),
+                const PopupMenuItem(
+                  value: RecognitionType.allLanguageSupport,
+                  child: Text('All Language Support (sentences)'),
+                ),
               ],
             ),
           ],
@@ -182,7 +196,7 @@ class _MyAppState extends State<MyApp> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_randomText, style: const TextStyle(fontSize: 16)),
+              Text(_randomText, style: const TextStyle(fontSize: 30,)),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isListening ? null : _requestAudioPermission,
