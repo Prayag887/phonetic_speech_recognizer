@@ -99,7 +99,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     isNetworkAvailable(context)
     val lang = "ne-NP"
     val jpLang = "ja-JP"
-    if (type == "hiragana") {
       startRecognition(
         nativeLang = jpLang,
         lang = lang,
@@ -107,25 +106,11 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
           mapNumber(
             text,
-            PhoneticMapping.phoneticHiraganaToNepaliAndEnglishMapping
+            PhoneticMapping.phoneticJapaneseAlphabetMapping
           )
         },
         timeoutMillis = timeoutMillis
       )
-    } else{
-      startRecognition(
-        nativeLang = jpLang,
-        lang = lang,
-        mapper = { text ->
-          //mapText returns only the mapped value (). If it picks up the noise on top of users voice then response wont be provided
-          mapNumber(
-            text,
-            PhoneticMapping.phoneticKatakanaToNepaliAndEnglishMapping
-          )
-        },
-        timeoutMillis = timeoutMillis
-      )
-    }
   }
 
   private fun handleAlphabetRecognition(timeoutMillis: Int) {
@@ -338,29 +323,56 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         }
     }
 
-    // Function to calculate phonetic similarity between two phrases
+
+    fun calculateCodeSimilarity(code1: String, code2: String): Double {
+      // Group similar sounds together
+      val soundGroups = mapOf(
+        setOf('R', 'W') to 0.8,
+        setOf('N', "NG") to 0.8,
+        setOf("EY", "EH", "AE") to 0.7,
+        setOf("CH", "JH", "GE") to 0.7
+      )
+
+      // If codes are identical, return 1.0
+      if (code1 == code2) return 1.0
+
+      // Check if codes belong to the same sound group
+      for ((group, similarity) in soundGroups) {
+        if (code1 in group && code2 in group) {
+          return similarity
+        }
+      }
+
+      // Handle partial matches
+      val minLength = kotlin.math.min(code1.length, code2.length)
+      val commonPrefix = code1.commonPrefixWith(code2)
+      if (commonPrefix.length > 0) {
+        return commonPrefix.length.toDouble() / minLength * 0.5
+      }
+
+      return 0.0
+    }
+
+
     fun calculatePhoneticSimilarity(phrase1: String, phrase2: String): Double {
       val phonetics1 = getPhoneticCodes(phrase1)
       val phonetics2 = getPhoneticCodes(phrase2)
 
-      // Allow for one word difference between phrases
       if (kotlin.math.abs(phonetics1.size - phonetics2.size) > 1) return 0.0
 
-      var matchCount = 0
+      var totalSimilarity = 0.0
       val maxLength = kotlin.math.max(phonetics1.size, phonetics2.size)
 
-      // Compare phonetic codes between two phrases
       phonetics1.forEachIndexed { index, code1 ->
         if (index < phonetics2.size) {
           val code2 = phonetics2[index]
-          if (code1 == code2) matchCount++
+          // Calculate similarity between individual phonetic codes
+          totalSimilarity += calculateCodeSimilarity(code1, code2)
         }
       }
 
-      // Return the similarity as a fraction
-      return matchCount.toDouble() / maxLength
+      return totalSimilarity / maxLength
     }
-
     var bestMatch = recognizedPhrases[0]
     var bestSimilarity = 0.0
 

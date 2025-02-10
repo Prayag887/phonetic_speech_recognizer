@@ -25,7 +25,7 @@ class _MyAppState extends State<MyApp> {
   int _timeoutDuration = 5000;
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
-  String _randomText = RandomSentenceGenerator.generateSentence();
+  String _randomText = "wrench";
 
   @override
   void dispose() {
