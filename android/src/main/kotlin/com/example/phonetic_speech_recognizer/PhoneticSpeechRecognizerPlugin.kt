@@ -205,9 +205,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         isListening = false
         val matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         if (!matches.isNullOrEmpty()) {
-          recognizedResults.clear()
-          recognizedResults.addAll(matches)
+          val finalResult = mapper(matches.first())
+          activeResult?.success(finalResult) // Return immediately
+        } else {
+          activeResult?.error("NO_MATCH", "No speech recognized", null)
         }
+        speechRecognizer?.cancel()
+        cleanup()
       }
 
       override fun onError(error: Int) {
@@ -285,11 +289,21 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     else -> "Unknown error"
   }
 
+//  private fun cleanup() {
+//    cancelTimeout()
+//    speechRecognizer?.destroy()
+//    speechRecognizer = null
+//    activeResult = null
+//  }
+
   private fun cleanup() {
-    cancelTimeout()
+    timeoutHandler?.removeCallbacks(timeoutRunnable!!)
+    timeoutHandler = null
+    timeoutRunnable = null
     speechRecognizer?.destroy()
     speechRecognizer = null
     activeResult = null
+    isListening = false
   }
 
   private fun isNetworkAvailable(context: Context): Boolean {

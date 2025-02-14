@@ -105,33 +105,29 @@ class _MyAppState extends State<MyApp> {
         break;
     }
 
-    try {
-      final result = await PhoneticSpeechRecognizer.recognize(
-          languageCode: languageCode,
-          type: phoneticType,
-          timeout: _timeoutDuration,
-          sentence: _randomText
-      );
-
-      print("Recognized Text: ${PhoneticType.allLanguageSupport}");
-
+    PhoneticSpeechRecognizer.recognize(
+      languageCode: languageCode,
+      type: phoneticType,
+      timeout: _timeoutDuration,
+      sentence: _randomText,
+    ).then((result) {
       setState(() {
         _recognizedText = result ?? "Recognition failed";
         if (_recognizedText == _randomText) {
           _generateRandomText();
         }
       });
-    } on PlatformException catch (e) {
+    }).catchError((error) {
       setState(() {
-        _recognizedText = e.code == 'TIMEOUT' ? "Timeout: No speech detected" : "Error: ${e.message}";
+        _recognizedText = "Error: $error";
       });
-    } finally {
+    }).whenComplete(() {
       _timer?.cancel();
       setState(() {
         _isListening = false;
         _progress = 1.0;
       });
-    }
+    });
   }
 
   void _generateRandomText() {
