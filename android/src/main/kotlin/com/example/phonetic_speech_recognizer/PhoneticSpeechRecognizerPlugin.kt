@@ -115,7 +115,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
   private fun handleAlphabetRecognition(timeoutMillis: Int) {
     val isConnected = isNetworkAvailable(context)
-    val lang = if (isConnected) "ne-NP" else "hi-IN"
+    val lang = "ne-NP"
+//    val lang = if (isConnected) "ne-NP" else "hi-IN"
     startRecognition(
       nativeLang = "",
       lang = lang,
