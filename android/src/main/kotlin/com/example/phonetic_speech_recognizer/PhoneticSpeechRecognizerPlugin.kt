@@ -203,10 +203,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     speechRecognizer?.setRecognitionListener(object : RecognitionListener {
       override fun onResults(results: Bundle) {
         isListening = false
+        for (key in results.keySet()) {
+          Log.d("TAG", "Key: $key => Value: ${results.get(key)}")
+        }
         val matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         if (!matches.isNullOrEmpty()) {
           val finalResult = mapper(matches.first())
-          activeResult?.success(finalResult) // Return immediately
+          activeResult?.success(finalResult)
         } else {
           activeResult?.error("NO_MATCH", "No speech recognized", null)
         }
@@ -245,7 +248,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     if (text.isBlank()) {
       return speakLoud
     }
-    Log.d("TAG", "japanese: ------------- $text")
+    Log.d("TAG", "numbers: ------------- $text")
     val normalizedText = text.lowercase(Locale.ROOT)
     val reversedMapping = mutableMapOf<String, MutableList<String>>()
     mapping.forEach { (key, values) ->
@@ -259,9 +262,11 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private fun mapText(text: String, mapping: Map<String, List<String>>): String {
-    if (text.isBlank()) {
-      return speakLoud
-    }
+
+    Log.d("TAG", "texts: ------------- $text")
+//    if (text.isBlank()) {
+//      return speakLoud
+//    }
     val normalizedText = text.lowercase(Locale.ROOT)
     val matchedKeys = mapping.entries
       .filter { (_, pronunciations) ->
