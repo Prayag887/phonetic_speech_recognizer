@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
 import 'package:phonetic_speech_recognizer_example/randomsetencegenerator.dart';
 
-enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, katakanaJapanese, hiraganaJapanese, allLanguageSupport }
+enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, japaneseNumber, japaneseAlphabet, allLanguageSupport }
 
 void main() {
   runApp(const MyApp());
@@ -22,7 +22,7 @@ class _MyAppState extends State<MyApp> {
   String _recognizedText = "Press the button to start";
   bool _isListening = false;
   double _progress = 1.0;
-  int _timeoutDuration = 5000;
+  final int _timeoutDuration = 5000;
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
   String _randomText = "wrench";
@@ -82,12 +82,12 @@ class _MyAppState extends State<MyApp> {
         phoneticType = PhoneticType.number;
         languageCode = "en-US";
         break;
-      case RecognitionType.katakanaJapanese:
-        phoneticType = PhoneticType.katakanaJapanese;
+      case RecognitionType.japaneseNumber:
+        phoneticType = PhoneticType.japaneseNumber;
         languageCode = "ja-JP";
         break;
-      case RecognitionType.hiraganaJapanese:
-        phoneticType = PhoneticType.hiraganaJapanese;
+      case RecognitionType.japaneseAlphabet:
+        phoneticType = PhoneticType.japaneseAlphabet;
         languageCode = "ja-JP";
         break;
       case RecognitionType.koreanAlphabets:
@@ -141,10 +141,10 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.koreanAlphabets:
         _randomText = String.fromCharCode(0xAC00 + (DateTime.now().millisecondsSinceEpoch % 11172));
         break;
-      case RecognitionType.hiraganaJapanese:
+      case RecognitionType.japaneseAlphabet:
         _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
-      case RecognitionType.katakanaJapanese:
+      case RecognitionType.japaneseNumber:
         _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.allLanguageSupport:
@@ -177,8 +177,8 @@ class _MyAppState extends State<MyApp> {
                 const PopupMenuItem(value: RecognitionType.numbers, child: Text('Numbers')),
                 const PopupMenuItem(value: RecognitionType.koreanAlphabets, child: Text('Korean Alphabets')),
                 const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
-                const PopupMenuItem(value: RecognitionType.hiraganaJapanese, child: Text('Japanese (Hiragana)')),
-                const PopupMenuItem(value: RecognitionType.katakanaJapanese, child: Text('Japanese (Katakana)')),
+                const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese (Alphabets)')),
+                const PopupMenuItem(value: RecognitionType.japaneseNumber, child: Text('Japanese (Numbers)')),
                 const PopupMenuItem(
                   value: RecognitionType.allLanguageSupport,
                   child: Text('All Language Support (sentences)'),

@@ -88,6 +88,19 @@ object PhoneticMapping {
         "ぽ, ポ" to listOf("po", "पो", "पो", "फो"),
     )
 
+    val phoneticJapaneseNumberMapping = mapOf(
+        "1" to listOf("ichi", "इची", "इचि", "echi", "इच्छी"),
+        "2" to listOf("ni", "नी", "नि"),
+        "3" to listOf("san", "सान"),
+        "4" to listOf("shi", "शि", "शी", "सी", "सि", "सी।"),
+        "5" to listOf("go", "गो"),
+        "6" to listOf("roku", "रोकु", "रोखु"),
+        "7" to listOf("shichi", "शिचि", "शिची", "शिक्षिक", "शिक्षी", "शिक्षि", "शिक्षित", "city"),
+        "8" to listOf("hachi", "हाचि", "हाची"),
+        "9" to listOf("kyuu", "क्यु", "q"),
+        "10" to listOf("juu", "ज्यू", "जू", "zoo", "जुन", "jo")
+    )
+
 
     // Nepali and English mapping
     val phoneticNepaliToEnglishMapping = mapOf(
