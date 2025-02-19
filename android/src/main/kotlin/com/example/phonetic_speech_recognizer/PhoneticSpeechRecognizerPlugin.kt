@@ -65,8 +65,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           "koreanAlphabet" -> handleKoreanAlphabetRecognition(timeoutMillis)
           "number" -> handleNumberRecognition(timeoutMillis)
           "englishWordsOrSentence" -> handleWordsRecognition(languageCode, timeoutMillis, sentence)
-          "hiraganaJapanese" -> handleJapaneseRecognition(timeoutMillis, "hiragana")
-          "katakanaJapanese" -> handleJapaneseRecognition(timeoutMillis, "katakana")
+          "japaneseAlphabet" -> handleJapaneseRecognition(timeoutMillis, "hiragana")
+          "japaneseNumber" -> handleJapaneseNumberRecognition(timeoutMillis, "katakana")
           "allLanguageSupport" -> handleAllLanguages(timeoutMillis, languageCode)
           else -> result.error("INVALID_TYPE", "Unsupported type", null)
         }
@@ -107,6 +107,24 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           mapNumber(
             text,
             PhoneticMapping.phoneticJapaneseAlphabetMapping
+          )
+        },
+        timeoutMillis = timeoutMillis
+      )
+  }
+
+  private fun handleJapaneseNumberRecognition(timeoutMillis: Int, type: String) {
+    isNetworkAvailable(context)
+    val lang = "ne-NP"
+    val jpLang = "ja-JP"
+      startRecognition(
+        nativeLang = jpLang,
+        lang = lang,
+        mapper = { text ->
+          //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
+          mapNumber(
+            text,
+            PhoneticMapping.phoneticJapaneseNumberMapping
           )
         },
         timeoutMillis = timeoutMillis
@@ -416,7 +434,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     // Log the final decision
     Log.d("SpeechRecognition", "Best match: \"$bestMatch\" | Similarity: $bestSimilarity")
 
-    if (bestSimilarity >= 0.5) {
+    if (bestSimilarity >= 0.8) {
       Log.d("SpeechRecognition", "Returning expected phrase: $expectedPhrase")
       return expectedPhrase
     }
