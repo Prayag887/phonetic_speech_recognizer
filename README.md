@@ -46,15 +46,25 @@ A new Flutter plugin project.
 
 ## For Japanese Alphabets
 
-### If you are trying to get the numbers, then no need to sent the language code or sentence.
+### If you are trying to get the japanese alphabets, then no need to sent the language code or sentence.
     final result = await PhoneticSpeechRecognizer.recognize(
-        type: PhoneticType.katakanaJapanese,
+        type: PhoneticType.japaneseAlphabet,
         timeout: _timeoutDuration,
     );
 
+### If you are trying to get the japanese numbers, then:
+## For 1 to 10
     final result = await PhoneticSpeechRecognizer.recognize(
-        type: PhoneticType.hiraganaJapanese,
+        type: PhoneticType.japaneseNumber,
         timeout: _timeoutDuration,
+    );
+
+## For 10 and above
+    final result = await PhoneticSpeechRecognizer.recognize(
+        languageCode: "ja-JP",
+        type: PhoneticType.wordsOrSentence,
+        timeout: _timeoutDuration,
+        sentence: randomSentence
     );
 
 

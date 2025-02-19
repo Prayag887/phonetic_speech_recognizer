@@ -434,7 +434,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     // Log the final decision
     Log.d("SpeechRecognition", "Best match: \"$bestMatch\" | Similarity: $bestSimilarity")
 
-    if (bestSimilarity >= 0.5) {
+    if (bestSimilarity >= 0.8) {
       Log.d("SpeechRecognition", "Returning expected phrase: $expectedPhrase")
       return expectedPhrase
     }
