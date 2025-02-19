@@ -5,7 +5,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
 import 'package:phonetic_speech_recognizer_example/randomsetencegenerator.dart';
 
-enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, japaneseNumber, japaneseAlphabet, allLanguageSupport }
+enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, japaneseNumber, japaneseAlphabet, allLanguageSupport, koreanNumbers }
 
 void main() {
   runApp(const MyApp());
@@ -89,6 +89,10 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.japaneseAlphabet:
         phoneticType = PhoneticType.japaneseAlphabet;
         languageCode = "ja-JP";
+        break;
+        case RecognitionType.koreanNumbers:
+        phoneticType = PhoneticType.allLanguageSupport;
+        languageCode = "ko-KR";
         break;
       case RecognitionType.koreanAlphabets:
         phoneticType = PhoneticType.koreanAlphabet;
@@ -178,10 +182,10 @@ class _MyAppState extends State<MyApp> {
                 const PopupMenuItem(value: RecognitionType.koreanAlphabets, child: Text('Korean Alphabets')),
                 const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
                 const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese (Alphabets)')),
-                const PopupMenuItem(value: RecognitionType.japaneseNumber, child: Text('Japanese (Numbers)')),
+                const PopupMenuItem(value: RecognitionType.koreanNumbers, child: Text('Korean (Numbers)')),
                 const PopupMenuItem(
                   value: RecognitionType.allLanguageSupport,
-                  child: Text('All Language Support (sentences)'),
+                  child: Text('Japanese (Numbers)'),
                 ),
               ],
             ),
