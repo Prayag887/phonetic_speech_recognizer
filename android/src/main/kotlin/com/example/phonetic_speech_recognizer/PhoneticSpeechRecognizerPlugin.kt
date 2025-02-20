@@ -66,7 +66,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           "number" -> handleNumberRecognition(timeoutMillis)
           "englishWordsOrSentence" -> handleWordsRecognition(languageCode, timeoutMillis, sentence)
           "japaneseAlphabet" -> handleJapaneseRecognition(timeoutMillis, "hiragana")
-          "japaneseNumber" -> handleJapaneseNumberRecognition(timeoutMillis, "katakana")
+          "koreanNumber" -> handleKoreanNumberRecognition(timeoutMillis, "katakana")
           "allLanguageSupport" -> handleAllLanguages(timeoutMillis, languageCode)
           else -> result.error("INVALID_TYPE", "Unsupported type", null)
         }
@@ -113,7 +113,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       )
   }
 
-  private fun handleJapaneseNumberRecognition(timeoutMillis: Int, type: String) {
+  private fun handleKoreanNumberRecognition(timeoutMillis: Int, type: String) {
     isNetworkAvailable(context)
     val lang = "ne-NP"
     val jpLang = "ja-JP"
@@ -124,7 +124,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
           mapNumber(
             text,
-            PhoneticMapping.phoneticJapaneseNumberMapping
+            PhoneticMapping.phoneticKoreanNumberMapping
           )
         },
         timeoutMillis = timeoutMillis

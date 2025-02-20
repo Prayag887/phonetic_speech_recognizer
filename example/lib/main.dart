@@ -26,6 +26,7 @@ class _MyAppState extends State<MyApp> {
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
   String _randomText = "this is an apple";
+  String _randomNumber = RandomSentenceGenerator.generateRandomKoreanNumber();
 
   @override
   void dispose() {
@@ -72,36 +73,50 @@ class _MyAppState extends State<MyApp> {
 
     PhoneticType phoneticType;
     String languageCode;
+    String textToRecognize = _selectedType == RecognitionType.koreanNumbers ? _randomNumber : _randomText;
 
     switch (_selectedType) {
       case RecognitionType.alphabets:
         phoneticType = PhoneticType.alphabet;
         languageCode = "en-US";
         break;
+
       case RecognitionType.numbers:
         phoneticType = PhoneticType.number;
         languageCode = "en-US";
         break;
       case RecognitionType.japaneseNumber:
-        phoneticType = PhoneticType.japaneseNumber;
-        languageCode = "ja-JP";
+        phoneticType = PhoneticType.koreanNumber;
+        languageCode = "ko-KR";
         break;
       case RecognitionType.japaneseAlphabet:
         phoneticType = PhoneticType.japaneseAlphabet;
         languageCode = "ja-JP";
         break;
-        case RecognitionType.koreanNumbers:
-        phoneticType = PhoneticType.allLanguageSupport;
+
+      case RecognitionType.koreanNumbers:
+      // Extract the numeric part from the Korean number string
+        String numericPart = _randomNumber.substring(_randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
+        int number = int.tryParse(numericPart) ?? 0;
+
+        if (number <= 10) {
+          phoneticType = PhoneticType.koreanNumber;
+        } else {
+          phoneticType = PhoneticType.allLanguageSupport;
+        }
         languageCode = "ko-KR";
         break;
+
       case RecognitionType.koreanAlphabets:
         phoneticType = PhoneticType.koreanAlphabet;
         languageCode = "en-US";
         break;
+
       case RecognitionType.allLanguageSupport:
         phoneticType = PhoneticType.allLanguageSupport;
         languageCode = "ja-JP";
         break;
+
       case RecognitionType.sentences:
       default:
         phoneticType = PhoneticType.englishWordsOrSentence;
@@ -113,12 +128,26 @@ class _MyAppState extends State<MyApp> {
       languageCode: languageCode,
       type: phoneticType,
       timeout: _timeoutDuration,
-      sentence: _randomText,
+      sentence: textToRecognize,
     ).then((result) {
       setState(() {
         _recognizedText = result ?? "Recognition failed";
-        if (_recognizedText == _randomText) {
-          _generateRandomText();
+
+        // Check if recognition was successful
+        if (_selectedType == RecognitionType.koreanNumbers) {
+          // For Korean numbers, we need to compare with the Korean number
+          String insideBrackets = _randomNumber.substring(
+              _randomNumber.indexOf('(') + 1,
+              _randomNumber.indexOf(')')
+          );
+          if (insideBrackets.contains(_recognizedText)) {
+            _generateRandomText();
+          }
+        } else {
+          // For other types, compare with _randomText
+          if (_recognizedText == _randomText) {
+            _generateRandomText();
+          }
         }
       });
     }).catchError((error) {
@@ -154,7 +183,9 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.allLanguageSupport:
         _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
-      case RecognitionType.sentences:
+      case RecognitionType.koreanNumbers:
+        _randomNumber = RandomSentenceGenerator.generateRandomKoreanNumber();
+        break;
       default:
         _randomText = RandomSentenceGenerator.generateSentence();
         break;
@@ -196,7 +227,10 @@ class _MyAppState extends State<MyApp> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_randomText, style: const TextStyle(fontSize: 30,)),
+              Text(
+                _selectedType == RecognitionType.koreanNumbers ? _randomNumber : _randomText,
+                style: const TextStyle(fontSize: 30),
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isListening ? null : _requestAudioPermission,
