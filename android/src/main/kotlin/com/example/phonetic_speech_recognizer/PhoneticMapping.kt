@@ -768,17 +768,35 @@ object PhoneticMapping {
 
     // korean objects and numbers mappings
     val phoneticKoreanNumberMapping = mapOf(
-        "1" to listOf("इल", "ill", "eel"),
-        "2" to listOf("ई", "e"),
-        "3" to listOf("साम", "sam"),
-        "4" to listOf("सा", "saa", "शाह"),
-        "5" to listOf("ओ", "o"),
-        "6" to listOf("युक", "yuk", "युग", "युक्क"),
-        "7" to listOf("चिल", "chill"),
-        "8" to listOf("फाल", "faal", "पाल", "fall"),
-        "9" to listOf("गु", "gu"),
-        "10" to listOf("सिप", "seep"),
-        "16" to listOf("sipyuk", )
+        "1" to listOf("इल", "ill", "eel", "is", "하나", "hana", "आना", "हाना", "आना।", "खाना"),
+        "2" to listOf("ई", "e", "둘", "dul", "थुल", "ठुल", "ठूल", "full", "फुल", "ful", "फूल", "ठुली", "ठूली", "ठुल", "ठूल", "ठूलो", "ठुलो", "thull"),
+        "3" to listOf("साम", "saam", "शान", "sam", "셋", "set", "सेत"),
+        "4" to listOf("सा", "saa", "शाह", "넷", "need", "net", "neet", "nate", "नेट", "nate", "need", "nath", "nathe"),
+        "5" to listOf("ओ", "o", "हो", "다섯", "daseot", "दा सोत", "दासोत", "दासोत्त"),
+        "6" to listOf("युक", "yuk", "युग", "युक्क", "युक्त", "युक", "युग", "युक्", "여섯", "yeoseot", "यो सोत", "यो स्रोत", "यो शोत", "यो सोच", "यो स्वत", "यो शोध", "यो शोत", "यो श्वत"),
+        "7" to listOf("चिल", "chill", "chil", "छिल", "일곱", "ilgop", "ugop", "ukope", "ugope",
+            "irgop", "युग गोप", "you gop", "युगोप", "you goep", "इल गोप", "इल्ड गोप", "इल gop", "इल gope",
+            "इलकोप", "इलको", "इल कोप", "इल्कोप", "ill gop", "igop", "ilgop", "igo", "ill gope",
+            "il gop", "ill gop", "il go", "ill go"),
+        "8" to listOf("फाल", "faal", "पाल", "fall", "여덟", "yeodeol", "यो दोलन", "यो दोल", "यो दुल", "यो दूल"),
+        "9" to listOf("kho", "खु", "khu", "खुo", "ख", "아홉", "ahop", "आहोप", "a होप", "ahoop"),
+        "10" to listOf("सिप", "seep", "sip", "सीप", "सिप", "열", "yeol", "योल", "योग", "yol"),
+        "11" to listOf("सिपिल", "seep eel", "sipil", "cpu", "열하나", "yeolhana"),
+        "16" to listOf("sipyuk", "सिप्युक", "CPUK", "열여섯", "yeolyeoseot"),
+        "18" to listOf("sippal", "सिपाल", "seep pal", "sip pal", "सिप फाल", "सीप फाल", "सिपाल", "सिपाल।", "열여덟", "yeolyeodeol"),
+        "20" to listOf("isip", "esip", "eseep", "스물", "seumul", "semul", "seamul", "seamull", "सेमुल", "सेमूल", "saymul", "simul", "simuli"),
+        "21" to listOf("isipil", "ecpl", "ecl", "easypail", "easypael", "easypair", "esibil", "essibil", "esible", "easivil", "스물하나", "seumulhana", "इसिप इल", "इसीप इल", "saymul hana", "semul hana", "saymul hanna", "semul hanna"),
+        "27" to listOf("isipchil", "ई सीप चिल", "यी सिपचिल", "यी सिप चिल", "스물일곱", "seumulilgop"),
+        "28" to listOf("ईशिपपल", "इसिपल", "isiple", "यी सिपल", "esiple", "इचिप्पल", "ecle", "esipal", "스물여덟", "seumulyeodeol"),
+        "30" to listOf("samsip", "samsheep", "साम सीप", "सामसीप", "सान सीप", "서른", "seoreun"),
+        "58" to listOf("osippal", "ओसिपल", "ओशिपाल", "ओसिपाल", "ओसिप पाल", "쉰여덟", "swinyeodeol"),
+        "68" to listOf("yuksippal", "युग सिपाल", "युगसीपाल", "युग सीपाल", "यो सिपाल", "예순여덟", "yesunyeodeol"),
+        "71" to listOf("चिलसिपिल", "cheelsipur", "chilsi pil", "चिल सी पील", "चिल्सी पिल", "चिलसिपल", "일흔하나", "ilheunhana"),
+        "76" to listOf("चिलसिप्युक", "चिल्सिप्युक", "चिल्सिप युक", "चिलसीप्युक", "चिलसिप्यक", "childsipuk", "चिलसिप युग", "चिलसिप युक्", "चिलसिप युक्त", "चिलसिप युक", "चिल्सिप युग", "चिलसिप्युक्क", "chelshippuk", "chelsipuk", "चिलसिप्युक्त", "चिलसिपयोग", "चिलसिप युग", "चिल सिप युग", "त्यो सिप युग", "त्यो सीप युग", "त्यो सिप युक", "त्यो सीप युक", "일흔여섯", "ilheunyeoseot"),
+        "78" to listOf("चिल्सीपाल", "चिलसिपाल", "चिलसीपाल", "चिल सिपाल", "चिलसिपाल।", "च्युसीपाल", "CHELSIPAL", "चेल्सीपाल", "chelsippal", "चेल्सी पाल", "cusipal", "cusical", "cushippal", "cusic", "일흔여덟", "ilheunyeodeol"),
+        "80" to listOf("pulsip", "पालसीप", "पालसिप", "ballship", "पल्सीप", "पल्सिप", "palsip", "पाल्सिप", "여든", "yeodeun"),
+        "90" to listOf("gusip", "ग* सीप", "गुसिप", "gossip", "GOO SHIP", "아흔", "aheun"),
+        "100" to listOf("baek", "बेक", "bank", "bake", "big", "fake", "pake", "pek", "pak", "pekk", "백", "baek")
     )
 
     val phoneticKoreanObjectsMapping = mapOf(

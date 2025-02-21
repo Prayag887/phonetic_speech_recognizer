@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
 import 'package:phonetic_speech_recognizer_example/randomsetencegenerator.dart';
@@ -26,7 +25,7 @@ class _MyAppState extends State<MyApp> {
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
   String _randomText = "this is an apple";
-  String _randomNumber = RandomSentenceGenerator.generateRandomKoreanNumber();
+  String _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
 
   @override
   void dispose() {
@@ -98,12 +97,11 @@ class _MyAppState extends State<MyApp> {
       // Extract the numeric part from the Korean number string
         String numericPart = _randomNumber.substring(_randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
         int number = int.tryParse(numericPart) ?? 0;
-
-        if (number <= 10) {
-          phoneticType = PhoneticType.koreanNumber;
-        } else {
-          phoneticType = PhoneticType.allLanguageSupport;
-        }
+        final koreanNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9 ,10, 20, 21, 100};
+    // 18
+        phoneticType = koreanNumbers.contains(number)
+            ? PhoneticType.koreanNumber
+            : PhoneticType.allLanguageSupport;
         languageCode = "ko-KR";
         break;
 
@@ -184,7 +182,7 @@ class _MyAppState extends State<MyApp> {
         _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.koreanNumbers:
-        _randomNumber = RandomSentenceGenerator.generateRandomKoreanNumber();
+        _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
         break;
       default:
         _randomText = RandomSentenceGenerator.generateSentence();

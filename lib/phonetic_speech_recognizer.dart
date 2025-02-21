@@ -56,7 +56,9 @@ class PhoneticSpeechRecognizer {
         'sentence': sentence
       });
 
-      print("Received result: $result");
+      if (kDebugMode) {
+        print("Received result: $result");
+      }
 
       if (result.isEmpty || result == "null") {
         return "";
