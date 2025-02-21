@@ -82,7 +82,7 @@ class _MyAppState extends State<MyApp> {
 
       case RecognitionType.numbers:
         phoneticType = PhoneticType.number;
-        languageCode = "en-US";
+        languageCode = "ne-NP";
         break;
       case RecognitionType.japaneseNumber:
         phoneticType = PhoneticType.koreanNumber;

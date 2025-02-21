@@ -701,7 +701,7 @@ object PhoneticMapping {
         "4" to listOf("four", "4", "फोर", "for", "फो", "पोर", "फोहोर", "पोहोर", "पो"),
         "5" to listOf("five", "5", "फाइव", "five", "फाइभ"),
         "6" to listOf("six", "6", "सिक्स", "six", "shiks", "s**", "सेक्स"),
-        "7" to listOf("seven", "7", "सेवेन", "seven", "सेभेन", "सेवेन", "saven", "सावन"),
+        "7" to listOf("seven", "7", "सेवेन", "seven", "सेभेन", "सेवेन", "saven", "सावन", "सेवन"),
         "8" to listOf(
             "eight",
             "8",
