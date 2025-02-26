@@ -4,7 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
 import 'package:phonetic_speech_recognizer_example/randomsetencegenerator.dart';
 
-enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, japaneseNumber, japaneseAlphabet, allLanguageSupport, koreanNumbers }
+enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, koreanNumber, japaneseAlphabet, allLanguageSupport, koreanNumbers }
 
 void main() {
   runApp(const MyApp());
@@ -84,7 +84,7 @@ class _MyAppState extends State<MyApp> {
         phoneticType = PhoneticType.number;
         languageCode = "ne-NP";
         break;
-      case RecognitionType.japaneseNumber:
+      case RecognitionType.koreanNumber:
         phoneticType = PhoneticType.koreanNumber;
         languageCode = "ko-KR";
         break;
@@ -161,6 +161,8 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+
+
   void _generateRandomText() {
     switch (_selectedType) {
       case RecognitionType.alphabets:
@@ -175,7 +177,7 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.japaneseAlphabet:
         _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
-      case RecognitionType.japaneseNumber:
+      case RecognitionType.koreanNumber:
         _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.allLanguageSupport:
