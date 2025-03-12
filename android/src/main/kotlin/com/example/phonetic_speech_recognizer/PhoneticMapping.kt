@@ -38,10 +38,10 @@ object PhoneticMapping {
         "ほ, ホ, を, ヲ" to listOf("ho", "हो", "हो", "wo", "वो", "वो", "BOW", "भो", "o"),
 
         "ま, マ, ま, マ" to listOf("ma", "मा", "maa"),
-        "み, ミ, み, ミ" to listOf("mi", "मी", "मी", "me"),
+        "み, ミ, み, ミ" to listOf("mi", "मी", "मि", "me"),
         "む, ム, む, ム" to listOf("mu", "मु", "मू", "म"),
-        "め, メ, め, メ" to listOf("main", "मे", "मे", "may"),
-        "も, モ, も, モ" to listOf("mo", "मो", "मो", "म"),
+        "め, メ, め, メ" to listOf("main", "मे", "may"),
+        "も, モ, も, モ" to listOf("mo", "मो", "म"),
 
         "や, ヤ, や, ヤ" to listOf("ya", "या", "य"),
         "ゆ, ユ, ゆ, ユ" to listOf("yu", "यु", "यू", "you", "u"),
@@ -85,22 +85,41 @@ object PhoneticMapping {
         "ぷ, プ, ぷ, プ" to listOf("pu", "पु", "पू", "फु", "फू"),
         "ぺ, ペ, ぺ, ペ" to listOf("pe", "पे", "पे", "फे", "pay"),
         "ぽ, ポ, ぽ, ポ" to listOf("po", "पो", "पो", "फो"),
-    )
 
-    val phoneticJapaneseNumberMapping = mapOf(
-        //0 correct answer but not in integer
-        "1" to listOf("ichi", "इची", "इचि", "echi", "इच्छी"),
-        "2" to listOf("ni", "नी", "नि"),
-        "3" to listOf("san", "सान"),
-        "4" to listOf("shi", "शि", "शी", "सी", "सि", "सी।", "यौन", "see", "c"),
-        "5" to listOf("go", "गो"),
-        "6" to listOf("roku", "रोकु", "रोखु"),
-        "7" to listOf("shichi", "शिचि", "शिची", "शिक्षिक", "शिक्षी", "शिक्षि", "शिक्षित", "city"),
-        "8" to listOf("hachi", "हाचि", "हाची"),
-        "9" to listOf("kyuu", "क्यु", "q"),
-        "10" to listOf("juu", "ज्यू", "जू", "zoo", "जुन", "jo")
+        //new alphabets
+        "きゃ, キャ, きゃ, キャ" to listOf("kya", "क्या", "क्य"),
+        "きゅ, キュ, きゅ, キュ" to listOf("kyu", "क्यु", "क्यू"),
+        "きょ, キョ, きょ, キョ" to listOf("kyo", "क्यो", "क्यो"),
+        "しゅ, シュ, しゅ, シュ" to listOf("shu", "शु", "शू"),
+        "しょ, ショ, しょ, ショ" to listOf("sho", "शो", "शो"),
+        "ちゃ, チャ, ちゃ, チャ" to listOf("cha", "चा", "च"),
+        "ちゅ, チュ, ちゅ, チュ" to listOf("chu", "चु", "चू"),
+        "ちょ, チョ, ちょ, チョ" to listOf("cho", "चो", "चो"),
+        "にゃ, ニャ, にゃ, ニャ" to listOf("nya", "न्या", "न्य"),
+        "にゅ, ニュ, にゅ, ニュ" to listOf("nyu", "न्यु", "न्यू"),
+        "にょ, ニョ, にょ, ニョ" to listOf("nyo", "न्यो", "न्यो"),
+        "ひゃ, ヒャ, ひゃ, ヒャ" to listOf("hya", "ह्या", "ह्य"),
+        "ひゅ, ヒュ, ひゅ, ヒュ" to listOf("hyu", "ह्यु", "ह्यू"),
+        "ひょ, ヒョ, ひょ, ヒョ" to listOf("hyo", "ह्यो", "ह्यो"),
+        "みゃ, ミャ, みゃ, ミャ" to listOf("mya", "म्या", "म्य"),
+        "みゅ, ミュ, みゅ, ミュ" to listOf("myu", "म्यु", "म्यू"),
+        "みょ, ミョ, みょ, ミョ" to listOf("myo", "म्यो", "म्यो"),
+        "りゃ, リャ, りゃ, リャ" to listOf("rya", "र्या", "र्य"),
+        "りゅ, リュ, りゅ, リュ" to listOf("ryu", "र्यु", "र्यू"),
+        "りょ, リョ, りょ, リョ" to listOf("ryo", "र्यो", "र्यो"),
+        "ぎゃ, ギャ, ぎゃ, ギャ" to listOf("gya", "ग्या", "ग्य"),
+        "ぎゅ, ギュ, ぎゅ, ギュ" to listOf("gyu", "ग्यु", "ग्यू"),
+        "ぎょ, ギョ, ぎょ, ギョ" to listOf("gyo", "ग्यो", "ग्यो"),
+        "じゃ, ジャ, じゃ, ジャ" to listOf("ja", "जा", "ज"),
+        "じゅ, ジュ, じゅ, ジュ" to listOf("ju", "जु", "जू"),
+        "じょ, ジョ, じょ, ジョ" to listOf("jo", "जो", "जो"),
+        "びゃ, ビャ, びゃ, ビャ" to listOf("bya", "ब्या", "ब्य"),
+        "びゅ, ビュ, びゅ, ビュ" to listOf("byu", "ब्यु", "ब्यू"),
+        "びょ, ビョ, びょ, ビョ" to listOf("byo", "ब्यो", "ब्यो"),
+        "ぴゃ, ピャ, ぴゃ, ピャ" to listOf("pya", "प्या", "प्य"),
+        "ぴゅ, ピュ, ぴゅ, ピュ" to listOf("pyu", "प्यु", "प्यू"),
+        "ぴょ, ピョ, ぴょ, ピョ" to listOf("pyo", "प्यो", "प्यो")
     )
-
 
     // Nepali and English mapping
     val phoneticNepaliToEnglishMapping = mapOf(
@@ -682,7 +701,7 @@ object PhoneticMapping {
         "4" to listOf("four", "4", "फोर", "for", "फो", "पोर", "फोहोर", "पोहोर", "पो"),
         "5" to listOf("five", "5", "फाइव", "five", "फाइभ"),
         "6" to listOf("six", "6", "सिक्स", "six", "shiks", "s**", "सेक्स"),
-        "7" to listOf("seven", "7", "सेवेन", "seven", "सेभेन", "सेवेन", "saven", "सावन"),
+        "7" to listOf("seven", "7", "सेवेन", "seven", "सेभेन", "सेवेन", "saven", "सावन", "सेवन"),
         "8" to listOf(
             "eight",
             "8",
@@ -699,8 +718,6 @@ object PhoneticMapping {
         "9" to listOf("nine", "9", "नाइन", "nine"),
         "10" to listOf("ten", "10", "टेन", "ten"),
     )
-
-    // korean objects and numbers mappings
 
     // Nepali to Korean mapping
     val phoneticKoreanMapping = mapOf(
@@ -740,11 +757,53 @@ object PhoneticMapping {
         "ㅒ" to listOf("ए", "a", "ये", "ye", "yae", "ऐ", "ae", "ei", "i", "अई", "ये"),
         "ㅖ" to listOf("ए", "a", "ये", "ye", "yae", "ऐ", "ae", "ei", "i", "अई", "ये"),
         "ㅟ" to listOf("वी", "wi", "wee", "उइ", "उई", "wi", "eui", "ui"),
-        "ㅢ" to listOf("वी", "wi", "wee", "उइ", "उई", "wi", "eui", "ui"), // duita wi
+        "ㅢ" to listOf("वी", "wi", "wee", "उइ", "उई", "wi", "eui", "ui"),
         "ㅘ" to listOf("वा", "waa"),
         "ㅝ" to listOf("व", "wa"),
         "ㅚ" to listOf("वे", "we", "oe", "way", "वै", "we", "way", "week", "wei", "wai", "huawei"),
         "ㅙ" to listOf("वे", "we", "oe", "way", "वै", "we", "way", "week", "wei", "wai", "huawei"),
         "ㅞ" to listOf("वे", "we", "oe", "way", "वै", "we", "way", "week", "wei", "wai", "huawei")
     )
+
+
+    // korean objects and numbers mappings
+    val phoneticKoreanNumberMapping = mapOf(
+        "1" to listOf("इल", "ill", "eel", "is", "하나", "hana", "आना", "हाना", "आना।", "खाना"),
+        "2" to listOf("ई", "e", "둘", "dul", "थुल", "ठुल", "ठूल", "full", "फुल", "ful", "फूल", "ठुली", "ठूली", "ठुल", "ठूल", "ठूलो", "ठुलो", "thull"),
+        "3" to listOf("साम", "saam", "शान", "sam", "셋", "set", "सेत"),
+        "4" to listOf("सा", "saa", "शाह", "넷", "need", "net", "neet", "nate", "नेट", "nate", "need", "nath", "nathe", "ney"),
+        "5" to listOf("ओ", "o", "हो", "다섯", "daseot", "दा सोत", "दासोत", "दासोत्त", "thaseot"), //thaseot  tha-da eutai ho
+        "6" to listOf("युक", "yuk", "युग", "युक्क", "युक्त", "युक", "युग", "युक्", "여섯", "yeoseot", "यो सोत", "यो स्रोत", "यो शोत", "यो सोच", "यो स्वत", "यो शोध", "यो शोत", "यो श्वत"), //yok //yasat , esat
+        "7" to listOf("चिल", "chill", "chil", "छिल", "일곱", "ilgop", "ugop", "ukope", "ugope","chhil",
+            "irgop", "युग गोप", "you gop", "युगोप", "you goep", "इल गोप", "इल्ड गोप", "इल gop", "इल gope",
+            "इलकोप", "इलको", "इल कोप", "इल्कोप", "ill gop", "igop", "ilgop", "igo", "ill gope",
+            "il gop", "ill gop", "il go", "ill go"), //ilgop nepali
+        "8" to listOf("फाल", "faal", "पाल", "fall", "여덟", "yeodeol", "यो दोलन", "यो दोल", "यो दुल", "यो दूल"),
+        "9" to listOf("kho", "खु", "khu", "खुo", "ख", "아홉", "ahop", "आहोप", "a होप", "ahoop"),
+        "10" to listOf("सिप", "seep", "sip", "सीप", "सिप", "열", "yeol", "योल", "योग", "yol"),
+        "11" to listOf("सिपिल", "seep eel", "sipil", "cpu", "열하나", "yeolhana"),
+        "12" to listOf("CB"),
+//        14 sipsa ma chhipsa suneko xa....korean model
+//        19 ma
+        "16" to listOf("sipyuk", "सिप्युक", "CPUK", "열여섯", "yeolyeoseot"),
+        "18" to listOf("sippal", "सिपाल", "seep pal", "sip pal", "सिप फाल", "सीप फाल", "सिपाल", "सिपाल।", "열여덟", "yeolyeodeol"),
+        "20" to listOf("isip", "esip", "eseep", "스물", "seumul", "semul", "seamul", "seamull", "सेमुल", "सेमूल", "saymul", "simul", "simuli"),
+        "21" to listOf("isipil", "ecpl", "ecl", "easypail", "easypael", "easypair", "esibil", "essibil", "esible", "easivil", "스물하나", "seumulhana", "इसिप इल", "इसीप इल", "saymul hana", "semul hana", "saymul hanna", "semul hanna"),
+        "27" to listOf("isipchil", "ई सीप चिल", "यी सिपचिल", "यी सिप चिल", "스물일곱", "seumulilgop"),
+        "28" to listOf("ईशिपपल", "इसिपल", "isiple", "यी सिपल", "esiple", "इचिप्पल", "ecle", "esipal", "스물여덟", "seumulyeodeol"),
+        "30" to listOf("samsip", "samsheep", "साम सीप", "सामसीप", "सान सीप", "서른", "seoreun"),
+        "58" to listOf("osippal", "ओसिपल", "ओशिपाल", "ओसिपाल", "ओसिप पाल", "쉰여덟", "swinyeodeol"),
+        "68" to listOf("yuksippal", "युग सिपाल", "युगसीपाल", "युग सीपाल", "यो सिपाल", "예순여덟", "yesunyeodeol"),
+        "71" to listOf("चिलसिपिल", "cheelsipur", "chilsi pil", "चिल सी पील", "चिल्सी पिल", "चिलसिपल", "일흔하나", "ilheunhana"),
+        "76" to listOf("चिलसिप्युक", "चिल्सिप्युक", "चिल्सिप युक", "चिलसीप्युक", "चिलसिप्यक", "childsipuk", "चिलसिप युग", "चिलसिप युक्", "चिलसिप युक्त", "चिलसिप युक", "चिल्सिप युग", "चिलसिप्युक्क", "chelshippuk", "chelsipuk", "चिलसिप्युक्त", "चिलसिपयोग", "चिलसिप युग", "चिल सिप युग", "त्यो सिप युग", "त्यो सीप युग", "त्यो सिप युक", "त्यो सीप युक", "일흔여섯", "ilheunyeoseot"),
+        "78" to listOf("चिल्सीपाल", "चिलसिपाल", "चिलसीपाल", "चिल सिपाल", "चिलसिपाल।", "च्युसीपाल", "CHELSIPAL", "चेल्सीपाल", "chelsippal", "चेल्सी पाल", "cusipal", "cusical", "cushippal", "cusic", "일흔여덟", "ilheunyeodeol"),
+        "80" to listOf("pulsip", "पालसीप", "पालसिप", "ballship", "पल्सीप", "पल्सिप", "palsip", "पाल्सिप", "여든", "yeodeun"),
+        "90" to listOf("gusip", "ग* सीप", "गुसिप", "gossip", "GOO SHIP", "아흔", "aheun"),
+        "100" to listOf("baek", "बेक", "bank", "bake", "big", "fake", "pake", "pek", "pak", "pekk", "백", "baek")
+    )
+
+    val phoneticKoreanObjectsMapping = mapOf(
+        "" to listOf("")
+    )
+
 }
