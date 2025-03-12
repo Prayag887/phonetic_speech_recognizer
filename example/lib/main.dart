@@ -4,7 +4,17 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
 import 'package:phonetic_speech_recognizer_example/randomsetencegenerator.dart';
 
-enum RecognitionType { alphabets, numbers, koreanAlphabets, sentences, koreanNumber, japaneseAlphabet, allLanguageSupport, koreanNumbers }
+enum RecognitionType {
+  alphabets,
+  numbers,
+  koreanAlphabets,
+  sentences,
+  koreanNumber,
+  japaneseAlphabet,
+  allLanguageSupport,
+  koreanNumbers,
+  paragraphMapping
+}
 
 void main() {
   runApp(const MyApp());
@@ -21,15 +31,21 @@ class _MyAppState extends State<MyApp> {
   String _recognizedText = "Press the button to start";
   bool _isListening = false;
   double _progress = 1.0;
-  final int _timeoutDuration = 5000;
+  final int _timeoutDuration = 120000;
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
-  String _randomText = "this is an apple";
+  String _randomText = "This is an apple";
   String _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
+  String _partialText = "";
+
+  PhoneticSpeechRecognizer recognizer = PhoneticSpeechRecognizer();
+  // For streaming partial results
+  StreamSubscription? subscription;
 
   @override
   void dispose() {
     _timer?.cancel();
+    subscription?.cancel();
     super.dispose();
   }
 
@@ -47,10 +63,26 @@ class _MyAppState extends State<MyApp> {
   void stopRecognition() {
     PhoneticSpeechRecognizer.stopRecognition();
     _timer?.cancel();
+    subscription?.cancel();
     setState(() {
       _isListening = false;
       _progress = 1.0;
       _recognizedText = "Recognition has been stopped";
+      _partialText = "";
+    });
+  }
+
+  void _listenForPartialResults() {
+    // Cancel any existing subscription
+    subscription?.cancel();
+
+    // Start listening to the stream
+    subscription = recognizer.listenToStream().listen((data) {
+      setState(() {
+        _partialText = data;
+      });
+    }, onError: (error) {
+      print("Stream error: $error");
     });
   }
 
@@ -61,6 +93,7 @@ class _MyAppState extends State<MyApp> {
       _isListening = true;
       _progress = 1.0;
       _recognizedText = "Listening...";
+      _partialText = "";
     });
 
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
@@ -79,7 +112,12 @@ class _MyAppState extends State<MyApp> {
         phoneticType = PhoneticType.alphabet;
         languageCode = "en-US";
         break;
-
+      case RecognitionType.paragraphMapping:
+        phoneticType = PhoneticType.paragraphsMapping;
+        languageCode = "en-GB";
+        // Start listening to partial results
+        _listenForPartialResults();
+        break;
       case RecognitionType.numbers:
         phoneticType = PhoneticType.number;
         languageCode = "ne-NP";
@@ -92,29 +130,24 @@ class _MyAppState extends State<MyApp> {
         phoneticType = PhoneticType.japaneseAlphabet;
         languageCode = "ja-JP";
         break;
-
       case RecognitionType.koreanNumbers:
       // Extract the numeric part from the Korean number string
         String numericPart = _randomNumber.substring(_randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
         int number = int.tryParse(numericPart) ?? 0;
-        final koreanNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9 ,10, 20, 21, 100};
-    // 18
+        final koreanNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 21, 100};
         phoneticType = koreanNumbers.contains(number)
             ? PhoneticType.koreanNumber
             : PhoneticType.allLanguageSupport;
         languageCode = "ko-KR";
         break;
-
       case RecognitionType.koreanAlphabets:
         phoneticType = PhoneticType.koreanAlphabet;
         languageCode = "en-US";
         break;
-
       case RecognitionType.allLanguageSupport:
         phoneticType = PhoneticType.allLanguageSupport;
         languageCode = "ja-JP";
         break;
-
       case RecognitionType.sentences:
       default:
         phoneticType = PhoneticType.englishWordsOrSentence;
@@ -157,11 +190,12 @@ class _MyAppState extends State<MyApp> {
       setState(() {
         _isListening = false;
         _progress = 1.0;
+        // Cancel subscription when done
+        subscription?.cancel();
+        _partialText = "";
       });
     });
   }
-
-
 
   void _generateRandomText() {
     switch (_selectedType) {
@@ -186,12 +220,52 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.koreanNumbers:
         _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
         break;
+      case RecognitionType.paragraphMapping:
+        // _randomText = "The morning sun peeked through the dense canopy, casting golden rays on to the forest floor. Birds chirped melodiously, "
+        //     "their songs blending with the rustling leaves. A gentle breeze carried the scent of damp earth and blooming flowers. Somewhere in the distance, "
+        //     "a small stream bubbled over smooth stones, its rhythm soothing to the ears. A lone deer cautiously stepped into the clearing, its ears twitching at "
+        //     "every sound. The world seemed peaceful, untouched by the worries of civilization. Shadows danced as the wind swayed the towering trees. Insects buzzed "
+        //     "lazily around patches of wild flowers, drawn by their vibrant colors.";
+        _randomText = "This is a random paragraph created for the testing purpose. The test is to be carried out for speech recognizer to see if it can "
+            "accurately detect the words being spoken. This is a much simpler form of paragraph. This paragraph does not contain the words that are conflicting "
+            "with each others. The conflicts can appear when there are multiple words that sounds the same but are different in spellings like [RIGHT] and [WRITE]. "
+            "When both words are being used then there is no way to check which of the two spellings are required to be registered.";
+        break;
       default:
         _randomText = RandomSentenceGenerator.generateSentence();
         break;
     }
     setState(() {});
   }
+
+  Widget _buildHighlightedText() {
+    if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
+      // For real-time highlighting during paragraph mapping
+      return recognizer.buildRealTimeHighlightedText(_randomText, _partialText);
+    } else {
+      // For normal highlighting
+      List<String> words = _randomText.split(" ");
+
+      return RichText(
+        text: TextSpan(
+          children: List.generate(words.length, (index) {
+
+            return TextSpan(
+              text: "${words[index]} ",
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+                backgroundColor:Colors.transparent,
+              ),
+            );
+          }),
+        ),
+      );
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -218,6 +292,10 @@ class _MyAppState extends State<MyApp> {
                   value: RecognitionType.allLanguageSupport,
                   child: Text('Japanese (Numbers)'),
                 ),
+                const PopupMenuItem(
+                  value: RecognitionType.paragraphMapping,
+                  child: Text('Paragraphs'),
+                ),
               ],
             ),
           ],
@@ -227,10 +305,7 @@ class _MyAppState extends State<MyApp> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                _selectedType == RecognitionType.koreanNumbers ? _randomNumber : _randomText,
-                style: const TextStyle(fontSize: 30),
-              ),
+              _buildHighlightedText(),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isListening ? null : _requestAudioPermission,
@@ -243,8 +318,6 @@ class _MyAppState extends State<MyApp> {
               ),
               const SizedBox(height: 20),
               LinearProgressIndicator(value: _progress),
-              const SizedBox(height: 20),
-              Text(_recognizedText, textAlign: TextAlign.center),
             ],
           ),
         ),
