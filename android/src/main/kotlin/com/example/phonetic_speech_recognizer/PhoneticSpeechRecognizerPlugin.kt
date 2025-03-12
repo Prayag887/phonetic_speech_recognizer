@@ -337,8 +337,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             // TODO() faster grammar check is required for real time updates in paragraph. Somewhat achieved by the intent above
 //            val correctedText = correctRecognizedParagraph(accumulatedText, paragraph!!)
 
-//            during mapping, the check for corrected text is taking a longer time (it could be corrected text for checked
-//            or accumulated text without check)
             eventSink?.success(mapper(accumulatedText))
             // Restart listening for continuous input
             speechRecognizer?.startListening(intent)
