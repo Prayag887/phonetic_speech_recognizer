@@ -493,7 +493,8 @@ object PhoneticMapping {
             "तीती",
             "ती ती",
             "tee tee",
-            "tea tea"
+            "tea tea",
+            "टिक"
         ),
 
         "U" to listOf(

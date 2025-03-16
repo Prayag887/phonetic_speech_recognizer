@@ -37,6 +37,8 @@ class _MyAppState extends State<MyApp> {
   String _randomText = "This is an apple";
   String _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
   String _partialText = "";
+  bool _isTextReceived = false;
+  bool _isRealTIme = false;
 
   PhoneticSpeechRecognizer recognizer = PhoneticSpeechRecognizer();
   // For streaming partial results
@@ -67,15 +69,14 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _isListening = false;
       _progress = 1.0;
-      _recognizedText = "Recognition has been stopped";
       _partialText = "";
     });
   }
 
+  // this is to populate the partial data for the real time data mapping
   void _listenForPartialResults() {
     // Cancel any existing subscription
     subscription?.cancel();
-
     // Start listening to the stream
     subscription = recognizer.listenToStream().listen((data) {
       setState(() {
@@ -90,9 +91,10 @@ class _MyAppState extends State<MyApp> {
     if (_isListening) return;
 
     setState(() {
+      _isTextReceived = false;
       _isListening = true;
       _progress = 1.0;
-      _recognizedText = "Listening...";
+      // _recognizedText = "Listening...";
       _partialText = "";
     });
 
@@ -114,7 +116,7 @@ class _MyAppState extends State<MyApp> {
         break;
       case RecognitionType.paragraphMapping:
         phoneticType = PhoneticType.paragraphsMapping;
-        languageCode = "en-GB";
+        languageCode = "en-US";
         // Start listening to partial results
         _listenForPartialResults();
         break;
@@ -163,6 +165,11 @@ class _MyAppState extends State<MyApp> {
     ).then((result) {
       setState(() {
         _recognizedText = result ?? "Recognition failed";
+        if(_recognizedText != null || _recognizedText.isNotEmpty){
+          _isTextReceived = true;
+        } else {
+          _isTextReceived = false;
+        }
 
         // Check if recognition was successful
         if (_selectedType == RecognitionType.koreanNumbers) {
@@ -200,27 +207,36 @@ class _MyAppState extends State<MyApp> {
   void _generateRandomText() {
     switch (_selectedType) {
       case RecognitionType.alphabets:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(65 + (DateTime.now().millisecondsSinceEpoch % 26));
         break;
       case RecognitionType.numbers:
+        _isRealTIme = false;
         _randomText = (DateTime.now().millisecondsSinceEpoch % 100).toString();
         break;
       case RecognitionType.koreanAlphabets:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(0xAC00 + (DateTime.now().millisecondsSinceEpoch % 11172));
         break;
       case RecognitionType.japaneseAlphabet:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.koreanNumber:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.allLanguageSupport:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.koreanNumbers:
+        _isRealTIme = false;
         _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
         break;
       case RecognitionType.paragraphMapping:
+        _recognizedText = "";
+        _isRealTIme = true;
         // _randomText = "The morning sun peeked through the dense canopy, casting golden rays on to the forest floor. Birds chirped melodiously, "
         //     "their songs blending with the rustling leaves. A gentle breeze carried the scent of damp earth and blooming flowers. Somewhere in the distance, "
         //     "a small stream bubbled over smooth stones, its rhythm soothing to the ears. A lone deer cautiously stepped into the clearing, its ears twitching at "
@@ -306,17 +322,42 @@ class _MyAppState extends State<MyApp> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildHighlightedText(),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _isListening ? null : _requestAudioPermission,
-                child: Text(_isListening ? 'Processing...' : 'Start Recognition'),
+              SizedBox(
+                height: 10,
+              ),
+              _isTextReceived
+                  ? Container() // If _isTextReceived is true, show nothing
+                  : Text(
+                _isListening ? "Listening..." : "",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+              ),
+
+              Text(
+                _recognizedText,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _isListening ? stopRecognition : null,
-                child: const Text('Stop Recognition'),
+              GestureDetector(
+                onLongPressStart: (_) => _requestAudioPermission(),
+                onLongPressEnd: (_) {
+                  if (_isRealTIme) {
+                    stopRecognition();  // Stop recognition immediately if _isRealTime is true
+                  } else {
+                    _isTextReceived ? stopRecognition() : print("Still analyzing");
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _isListening ? Colors.red : Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.mic, color: Colors.white, size: 32),
+                ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(
+                height: 10,
+              ),
               LinearProgressIndicator(value: _progress),
             ],
           ),

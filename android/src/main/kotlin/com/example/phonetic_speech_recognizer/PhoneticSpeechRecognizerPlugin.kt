@@ -1,9 +1,7 @@
 package com.example.phonetic_speech_recognizer
 
-import android.annotation.TargetApi
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
@@ -13,9 +11,6 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.text.Spannable
-import android.text.SpannableString
-import android.text.style.ForegroundColorSpan
 import android.util.Log
 import com.google.firebase.crashlytics.buildtools.reloc.org.apache.commons.codec.language.DoubleMetaphone
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -36,6 +31,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var timeoutRunnable: Runnable? = null
   private var isListening = false
   private val speakLoud : String = "Please speak clearly and loudly in a silent environment."
+  private var isProcessing: Boolean = false
 
   override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     context = binding.applicationContext
@@ -66,8 +62,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     when (call.method) {
       "recognize" -> {
         if (activeResult != null) {
-          result.error("ALREADY_ACTIVE", "Recognition already active", null)
+//          result.error("ALREADY_ACTIVE", "Recognition already active", null)
+          isProcessing = true
+          result.error("ALREADY_ACTIVE", "Analyzing...", null)
           return
+        } else {
+          isProcessing = false
+
         }
         activeResult = result
 
@@ -93,7 +94,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       "stopRecognition" -> {
-        stopRecognition(result)
+        if (isProcessing) {
+          stopRecognition(result)
+        } else {
+          Log.d("TAG", "Still analyzing")
+          Handler(Looper.getMainLooper()).postDelayed({
+            stopRecognition(result)
+          }, 100)
+        }
       }
 
       "isListening" -> {
@@ -109,6 +117,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       speechRecognizer?.cancel()
       cleanup()
       result.success(true)
+      Log.d("TAG", "stopRecognition: stopped successfully")
       isListening = false
     } catch (e: Exception) {
       result.error("STOP_ERROR", "Failed to stop recognition", e.message)
@@ -118,7 +127,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private fun handleJapaneseRecognition(timeoutMillis: Int, type: String) {
     isNetworkAvailable(context)
     val lang = "ne-NP"
-    val jpLang = "ja-JP"
     startRecognition(
       paragraph = "",
       lang = lang,
@@ -137,7 +145,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private fun handleKoreanNumberRecognition(timeoutMillis: Int, type: String) {
     isNetworkAvailable(context)
     val lang = "ne-NP"
-    val jpLang = "ja-JP"
     startRecognition(
       paragraph = "",
       lang = lang,
@@ -285,7 +292,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     return mapOf("highlights" to highlightedIndices.sortedBy { it["start"] })
   }
 
-  @TargetApi(Build.VERSION_CODES.M)
   private fun startRecognition(lang: String, mapper: (String) -> Any, timeoutMillis: Int, paragraph: String?, keepListening: Boolean) {
     isListening = true
     if (speechRecognizer != null) {
@@ -299,9 +305,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
       }
-
     } else {
       Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
@@ -419,14 +424,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     speechRecognizer?.startListening(intent)
   }
 
-
-
-  private fun cancelTimeout() {
-    timeoutRunnable?.let { timeoutHandler?.removeCallbacks(it) }
-    timeoutHandler = null
-    timeoutRunnable = null
-  }
-
   private fun mapNumber(text: String, mapping: Map<String, List<String>>): String {
     if (text.isBlank()) {
       return speakLoud
@@ -445,7 +442,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private fun mapText(text: String, mapping: Map<String, List<String>>): String {
-
     Log.d("TAG", "texts: ------------- $text")
     val normalizedText = text.lowercase(Locale.ROOT)
     val matchedKeys = mapping.entries
@@ -473,13 +469,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech"
     else -> "Unknown error"
   }
-
-//  private fun cleanup() {
-//    cancelTimeout()
-//    speechRecognizer?.destroy()
-//    speechRecognizer = null
-//    activeResult = null
-//  }
 
   private fun cleanup() {
     timeoutHandler?.removeCallbacks(timeoutRunnable!!)
