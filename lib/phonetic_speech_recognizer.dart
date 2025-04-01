@@ -54,18 +54,23 @@ class PhoneticSpeechRecognizer {
 
   // build the real time highlight when speaking
   Widget buildRealTimeHighlightedText(String _randomText, String _partialText) {
-    // Function to normalize text (removes symbols, extra spaces, and converts to lowercase)
     String cleanText(String text) {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
     }
 
-    List<String> originalWords = _randomText.split(RegExp(r'\s+')); // Preserve spaces for display
+    List<String> originalWords = _randomText.split(RegExp(r'\s+'));
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords = _partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    int minLength = targetWords.length < partialWords.length
-        ? targetWords.length
-        : partialWords.length; // Ensures valid range
+    int startIndex = -1;
+
+    // Find the first word in partialText within targetWords
+    for (int i = 0; i < targetWords.length; i++) {
+      if (targetWords[i].contains(partialWords.firstOrNull ?? "")) {
+        startIndex = i;
+        break;
+      }
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -73,26 +78,18 @@ class PhoneticSpeechRecognizer {
         RichText(
           text: TextSpan(
             children: List.generate(originalWords.length, (index) {
-              String originalWord = originalWords[index]; // Keep punctuation for display
-              bool isHighlighted = index < minLength && targetWords[index] == partialWords[index];
-              bool isIncorrect = index < minLength && targetWords[index] != partialWords[index];
-
-              // Handle missing words: Prevent red highlights if it's a minor difference
-              if (index >= partialWords.length) {
-                isIncorrect = false; // Ignore missing words instead of marking them red
-              }
+              String originalWord = originalWords[index];
+              bool isHighlighted = startIndex != -1 && index >= startIndex &&
+                  (index - startIndex) < partialWords.length &&
+                  targetWords[index] == partialWords[index - startIndex];
 
               return TextSpan(
-                text: "$originalWord ", // Preserve symbols
+                text: "$originalWord ",
                 style: TextStyle(
                   fontSize: 16,
                   color: Colors.black,
                   fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
-                  backgroundColor: isHighlighted
-                      ? Colors.yellow // Correct words highlighted
-                      : isIncorrect
-                      ? Colors.red // Incorrect words in red
-                      : Colors.transparent, // Default
+                  backgroundColor: isHighlighted ? Colors.yellow : Colors.transparent,
                 ),
               );
             }),
@@ -102,7 +99,7 @@ class PhoneticSpeechRecognizer {
         Text(
           "Current recognition: $_partialText",
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 18,
             fontStyle: FontStyle.italic,
             color: Colors.grey,
           ),
@@ -110,6 +107,7 @@ class PhoneticSpeechRecognizer {
       ],
     );
   }
+
 
   static Future<String?> recognize({
     required PhoneticType type,

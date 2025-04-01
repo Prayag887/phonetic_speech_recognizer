@@ -105,7 +105,9 @@ class _MyAppState extends State<MyApp> {
 
     PhoneticType phoneticType;
     String languageCode;
-    String textToRecognize = _selectedType == RecognitionType.koreanNumbers ? _randomNumber : _randomText;
+    String textToRecognize = _selectedType == RecognitionType.koreanNumbers
+        ? _randomNumber
+        : _randomText;
 
     switch (_selectedType) {
       case RecognitionType.alphabets:
@@ -122,17 +124,18 @@ class _MyAppState extends State<MyApp> {
         phoneticType = PhoneticType.number;
         languageCode = "ne-NP";
         break;
-      case RecognitionType.koreanNumber:
-        phoneticType = PhoneticType.koreanNumber;
-        languageCode = "ko-KR";
-        break;
+      // case RecognitionType.koreanNumber:
+      //   phoneticType = PhoneticType.koreanNumber;
+      //   languageCode = "ko-KR";
+      //   break;
       case RecognitionType.japaneseAlphabet:
         phoneticType = PhoneticType.japaneseAlphabet;
         languageCode = "ja-JP";
         break;
       case RecognitionType.koreanNumbers:
-      // Extract the numeric part from the Korean number string
-        String numericPart = _randomNumber.substring(_randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
+        // Extract the numeric part from the Korean number string
+        String numericPart = _randomNumber.substring(
+            _randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
         int number = int.tryParse(numericPart) ?? 0;
         final koreanNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 21, 100};
         phoneticType = koreanNumbers.contains(number)
@@ -146,7 +149,7 @@ class _MyAppState extends State<MyApp> {
         break;
       case RecognitionType.allLanguageSupport:
         phoneticType = PhoneticType.allLanguageSupport;
-        languageCode = "ja-JP";
+        languageCode = "ne-NP";
         break;
       case RecognitionType.sentences:
       default:
@@ -164,13 +167,15 @@ class _MyAppState extends State<MyApp> {
       setState(() {
         _recognizedText = result ?? "Recognition failed";
 
+        if(_randomText.contains(result as Pattern)){
+          _generateRandomText();
+        }
+
         // Check if recognition was successful
         if (_selectedType == RecognitionType.koreanNumbers) {
           // For Korean numbers, we need to compare with the Korean number
           String insideBrackets = _randomNumber.substring(
-              _randomNumber.indexOf('(') + 1,
-              _randomNumber.indexOf(')')
-          );
+              _randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
           if (insideBrackets.contains(_recognizedText)) {
             _generateRandomText();
           }
@@ -215,19 +220,15 @@ class _MyAppState extends State<MyApp> {
         _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.allLanguageSupport:
-        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
+        _randomText = RandomSentenceGenerator.generateRandomKoreanWords();
         break;
       case RecognitionType.koreanNumbers:
         _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
         break;
       case RecognitionType.paragraphMapping:
-        // _randomText = "The morning sun peeked through the dense canopy, casting golden rays on to the forest floor. Birds chirped melodiously, "
-        //     "their songs blending with the rustling leaves. A gentle breeze carried the scent of damp earth and blooming flowers. Somewhere in the distance, "
-        //     "a small stream bubbled over smooth stones, its rhythm soothing to the ears. A lone deer cautiously stepped into the clearing, its ears twitching at "
-        //     "every sound. The world seemed peaceful, untouched by the worries of civilization. Shadows danced as the wind swayed the towering trees. Insects buzzed "
-        //     "lazily around patches of wild flowers, drawn by their vibrant colors.";
-        _randomText = "This is a random paragraph created for the testing purpose. The test is to be carried out for speech recognizer to see if it can "
-            "accurately detect the words being spoken. This is a much simpler form of paragraph. This paragraph does not contain the words that are conflicting "
+        _randomText =
+            "This is a random paragraph created for the testing purpose. The test is to be carried out for speech recognizer to see if it can "
+            "accurately detect the words that are being spoken. This is a much simpler form of paragraph. This paragraph does not contain the words that are conflicting "
             "with each others. The conflicts can appear when there are multiple words that sounds the same but are different in spellings like [RIGHT] and [WRITE]. "
             "When both words are being used then there is no way to check which of the two spellings are required to be registered.";
         break;
@@ -249,14 +250,13 @@ class _MyAppState extends State<MyApp> {
       return RichText(
         text: TextSpan(
           children: List.generate(words.length, (index) {
-
             return TextSpan(
               text: "${words[index]} ",
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.black,
                 fontWeight: FontWeight.bold,
-                backgroundColor:Colors.transparent,
+                backgroundColor: Colors.transparent,
               ),
             );
           }),
@@ -264,8 +264,6 @@ class _MyAppState extends State<MyApp> {
       );
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -281,13 +279,23 @@ class _MyAppState extends State<MyApp> {
                   _generateRandomText();
                 });
               },
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<RecognitionType>>[
-                const PopupMenuItem(value: RecognitionType.alphabets, child: Text('Alphabets')),
-                const PopupMenuItem(value: RecognitionType.numbers, child: Text('Numbers')),
-                const PopupMenuItem(value: RecognitionType.koreanAlphabets, child: Text('Korean Alphabets')),
-                const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
-                const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese (Alphabets)')),
-                const PopupMenuItem(value: RecognitionType.koreanNumbers, child: Text('Korean (Numbers)')),
+              itemBuilder: (BuildContext context) =>
+                  <PopupMenuEntry<RecognitionType>>[
+                const PopupMenuItem(
+                    value: RecognitionType.alphabets, child: Text('Alphabets')),
+                const PopupMenuItem(
+                    value: RecognitionType.numbers, child: Text('Numbers')),
+                const PopupMenuItem(
+                    value: RecognitionType.koreanAlphabets,
+                    child: Text('Korean Alphabets')),
+                const PopupMenuItem(
+                    value: RecognitionType.sentences, child: Text('Sentences')),
+                const PopupMenuItem(
+                    value: RecognitionType.japaneseAlphabet,
+                    child: Text('Japanese (Alphabets)')),
+                const PopupMenuItem(
+                    value: RecognitionType.koreanNumbers,
+                    child: Text('Korean (Numbers)')),
                 const PopupMenuItem(
                   value: RecognitionType.allLanguageSupport,
                   child: Text('Japanese (Numbers)'),
@@ -295,6 +303,10 @@ class _MyAppState extends State<MyApp> {
                 const PopupMenuItem(
                   value: RecognitionType.paragraphMapping,
                   child: Text('Paragraphs'),
+                ),
+                const PopupMenuItem(
+                  value: RecognitionType.allLanguageSupport,
+                  child: Text('All Language (Korean)'),
                 ),
               ],
             ),
@@ -309,7 +321,8 @@ class _MyAppState extends State<MyApp> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _isListening ? null : _requestAudioPermission,
-                child: Text(_isListening ? 'Processing...' : 'Start Recognition'),
+                child:
+                    Text(_isListening ? 'Processing...' : 'Start Recognition'),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -318,6 +331,15 @@ class _MyAppState extends State<MyApp> {
               ),
               const SizedBox(height: 20),
               LinearProgressIndicator(value: _progress),
+
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(
+                  _recognizedText,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ],
           ),
         ),

@@ -3,9 +3,6 @@ package com.example.phonetic_speech_recognizer
 import android.annotation.TargetApi
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -13,16 +10,15 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.text.Spannable
-import android.text.SpannableString
-import android.text.style.ForegroundColorSpan
 import android.util.Log
-import com.google.firebase.crashlytics.buildtools.reloc.org.apache.commons.codec.language.DoubleMetaphone
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import org.apache.commons.lang3.StringUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.*
 
 class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler {
@@ -35,7 +31,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var timeoutHandler: Handler? = null
   private var timeoutRunnable: Runnable? = null
   private var isListening = false
-  private val speakLoud : String = "Please speak clearly and loudly in a silent environment."
 
   override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     context = binding.applicationContext
@@ -85,8 +80,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           "number" -> handleNumberRecognition(timeoutMillis)
           "englishWordsOrSentence" -> handleWordsRecognition(languageCode, timeoutMillis, sentence)
           "japaneseAlphabet" -> handleJapaneseRecognition(timeoutMillis, "hiragana")
-          "koreanNumber" -> handleKoreanNumberRecognition(timeoutMillis, "katakana")
-          "allLanguageSupport" -> handleAllLanguages(timeoutMillis, languageCode)
+          "koreanNumber" -> handleKoreanNumberRecognition(timeoutMillis)
+          "allLanguageSupport" ->  handleKoreanWordsRecognition(timeoutMillis, languageCode) // THIS IS ONLY FOR STATIC KOREAN WORDS FOR TESTING PURPOOSE
+//            handleAllLanguages(timeoutMillis, languageCode)
           "paragraphsMapping" -> handleParagraphMapping(timeoutMillis = timeoutMillis, languageCode = languageCode, paragraph = sentence)
           else -> result.error("INVALID_TYPE", "Unsupported type", null)
         }
@@ -116,15 +112,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private fun handleJapaneseRecognition(timeoutMillis: Int, type: String) {
-    isNetworkAvailable(context)
     val lang = "ne-NP"
-    val jpLang = "ja-JP"
     startRecognition(
       paragraph = "",
       lang = lang,
       mapper = { text ->
         //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
-        mapNumber(
+        Mapper().mapNumber(
           text,
           PhoneticMapping.phoneticJapaneseAlphabetMapping
         )
@@ -134,16 +128,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     )
   }
 
-  private fun handleKoreanNumberRecognition(timeoutMillis: Int, type: String) {
-    isNetworkAvailable(context)
+  private fun handleKoreanNumberRecognition(timeoutMillis: Int) {
     val lang = "ne-NP"
-    val jpLang = "ja-JP"
     startRecognition(
       paragraph = "",
       lang = lang,
       mapper = { text ->
         //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
-        mapNumber(
+        Mapper().mapNumber(
           text,
           PhoneticMapping.phoneticKoreanNumberMapping
         )
@@ -153,15 +145,39 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     )
   }
 
+  private fun handleKoreanWordsRecognition(timeoutMillis: Int, languageCode: String) {
+    if (languageCode == "ne-NP") {
+      startRecognition(
+        paragraph = "",
+        lang = "ne-NP",
+        mapper = { text ->
+          //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
+          Mapper().mapNumber(
+            text,
+            PhoneticMapping.phoneticKoreanObjectsMapping
+          )
+        },
+        timeoutMillis = timeoutMillis,
+        keepListening = false
+      )
+    } else {
+      startRecognition(
+        paragraph = "",
+        lang = languageCode,
+        mapper = { text -> Mapper().mapNumber(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
+        timeoutMillis = timeoutMillis,
+        keepListening =  false
+      )
+    }
+  }
+
   private fun handleAlphabetRecognition(timeoutMillis: Int) {
-    val isConnected = isNetworkAvailable(context)
     val lang = "ne-NP"
-//    val lang = if (isConnected) "ne-NP" else "hi-IN"
     startRecognition(
       paragraph = "",
       lang = lang,
       //mapText returns only the mapped value (english alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
-      mapper = { text -> mapText(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
+      mapper = { text -> Mapper().mapText(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
       timeoutMillis = timeoutMillis,
       keepListening = false
     )
@@ -172,7 +188,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       paragraph = "",
       lang = languageCode,
       //mapText returns only the mapped value (english alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
-      mapper = { text -> mapNumber(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
+      mapper = { text -> Mapper().mapNumber(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
       timeoutMillis = timeoutMillis,
       keepListening =  false
     )
@@ -183,7 +199,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       paragraph = "",
       lang = "ne-NP",
       //mapText returns only the mapped value (korean alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
-      mapper = { text -> mapText(text, PhoneticMapping.phoneticKoreanMapping) },
+      mapper = { text -> Mapper().mapText(text, PhoneticMapping.phoneticKoreanMapping) },
       timeoutMillis = timeoutMillis,
       keepListening =  false
     )
@@ -194,7 +210,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       paragraph = "",
       lang = "hi-IN",
       //mapNumber has to only the mapped value (number in this case). If it picks up the noise on top of users voice then response wont be provided
-      mapper = { text -> mapNumber(text, PhoneticMapping.phoneticNumbersMapping) },
+      mapper = { text -> Mapper().mapNumber(text, PhoneticMapping.phoneticNumbersMapping) },
       timeoutMillis = timeoutMillis,
       keepListening =  false
     )
@@ -213,7 +229,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       paragraph = "",
       lang = languageCode,
       mapper = { text ->
-        if (languageCode == "en-US") correctRecognizedPhrase(listOf(text), sentence) else text
+        if (languageCode == "en-US") Util().correctRecognizedPhrase(listOf(text), sentence) else text
       },
       timeoutMillis = timeoutMillis,
       keepListening = false
@@ -229,15 +245,10 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       return
     }
 
-    val words = paragraph.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
-
     startRecognition(
       paragraph = paragraph,
       lang = languageCode,
       mapper = { text ->
-        if (languageCode == "en-US") {
-          updateHighlightedText(text, words, paragraph)
-        }
         text
       },
       timeoutMillis = timeoutMillis,
@@ -245,45 +256,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     )
   }
 
-  private fun updateHighlightedText(spokenText: String, words: List<String>, paragraph: String): Map<String, Any> {
-    val highlightedIndices = mutableListOf<Map<String, Int>>()
-    val spokenWords = spokenText.lowercase(Locale.ENGLISH).split(" ").filter { it.isNotEmpty() }
-    val lowerWords = words.map { it.lowercase(Locale.ENGLISH) }
-
-    // Create a map of word -> list of positions in paragraph
-    val wordPositions = mutableMapOf<String, MutableList<Int>>()
-    for (i in lowerWords.indices) {
-      val word = lowerWords[i]
-      if (!wordPositions.containsKey(word)) {
-        wordPositions[word] = mutableListOf()
-      }
-      wordPositions[word]?.add(i)
-    }
-
-    // For each spoken word, find all occurrences in the paragraph
-    for (spokenWord in spokenWords) {
-      val positions = wordPositions[spokenWord.lowercase(Locale.ENGLISH)] ?: continue
-
-      for (position in positions) {
-        val originalWord = words[position]
-        val start = paragraph.indexOf(originalWord,
-          // Start searching from after the last highlight if possible
-          if (highlightedIndices.isNotEmpty())
-            highlightedIndices.last()["end"] ?: 0
-          else 0
-        )
-
-        if (start >= 0) {
-          val end = start + originalWord.length
-          highlightedIndices.add(mapOf("start" to start, "end" to end))
-          break // Take the first occurrence after the last highlight
-        }
-      }
-    }
-
-    // Sort highlights by start position to ensure they're in order
-    return mapOf("highlights" to highlightedIndices.sortedBy { it["start"] })
-  }
 
   @TargetApi(Build.VERSION_CODES.M)
   private fun startRecognition(lang: String, mapper: (String) -> Any, timeoutMillis: Int, paragraph: String?, keepListening: Boolean) {
@@ -336,9 +308,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             recognizedResults.add(firstMatch)
             // this is to append the data after recognizer is restarted during the short pause
             val accumulatedText = recognizedResults.joinToString(" ")
-            // this is to correct the grammar according to the paragraph received from the flutter side
-            // TODO() faster grammar check is required for real time updates in paragraph. Somewhat achieved by the intent above
-//            val correctedText = correctRecognizedParagraph(accumulatedText, paragraph!!)
 
             eventSink?.success(mapper(accumulatedText))
             // Restart listening for continuous input
@@ -370,35 +339,36 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       override fun onPartialResults(partialResults: Bundle?) {
         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let { partialList ->
           if (partialList.isNotEmpty() && paragraph != null) {
-            if (keepListening) {
-              val currentPartial = partialList.firstOrNull { paragraph.contains(it) } ?: partialList.first()
+            val currentPartial = partialList.firstOrNull { paragraph.contains(it) } ?: partialList.first()
 
-              // val correctedPartial = correctRecognizedPhrase(listOf(currentPartial), paragraph)
-              // Combine accumulated recognized results with current partial
-              val accumulatedText = recognizedResults.joinToString(" ")
-              val fullText = if (accumulatedText.isNotEmpty()) {
-                "$accumulatedText $currentPartial"
-              } else {
-                currentPartial
-              }
-              eventSink?.success(mapper(fullText))
+            val accumulatedText = if (recognizedResults.isNotEmpty()) {
+              "${recognizedResults.joinToString(" ")} $currentPartial"
             } else {
-              // Normal behavior: update recognizedResults with partials
-              recognizedResults.clear()
-              recognizedResults.addAll(partialList)
-              val correctedText = correctRecognizedPhrase(partialList, paragraph)
-              eventSink?.success(mapper(correctedText))
+              currentPartial
+            }
+
+            // Send immediate response without waiting for grammar correction
+            eventSink?.success(mapper(accumulatedText))
+
+            // Run grammar correction in the background (optional)
+            CoroutineScope(Dispatchers.Default).launch {
+              val correctedText = Util().correctRecognizedPhrase(listOf(accumulatedText), paragraph)
+              withContext(Dispatchers.Main) {
+                eventSink?.success(mapper(correctedText))
+              }
             }
           }
         }
       }
 
+
       override fun onError(error: Int) {
         if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
                   error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
                   error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
-          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
-          speechRecognizer?.startListening(intent)
+          Handler(Looper.getMainLooper()).postDelayed({
+            speechRecognizer?.startListening(intent)
+          }, 200) // Reduce delay before restarting
         } else {
           isListening = false
           activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
@@ -406,6 +376,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           cleanup()
         }
       }
+
 
       // Other overrides remain unchanged
       override fun onEndOfSpeech() {}
@@ -421,47 +392,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
 
 
-  private fun cancelTimeout() {
-    timeoutRunnable?.let { timeoutHandler?.removeCallbacks(it) }
-    timeoutHandler = null
-    timeoutRunnable = null
-  }
-
-  private fun mapNumber(text: String, mapping: Map<String, List<String>>): String {
-    if (text.isBlank()) {
-      return speakLoud
-    }
-    Log.d("TAG", "numbers: ------------- $text")
-    val normalizedText = text.lowercase(Locale.ROOT)
-    val reversedMapping = mutableMapOf<String, MutableList<String>>()
-    mapping.forEach { (key, values) ->
-      values.forEach { pronunciation ->
-        val normalizedPronunciation = pronunciation.lowercase(Locale.ROOT)
-        reversedMapping.getOrPut(normalizedPronunciation) { mutableListOf() }.add(key)
-      }
-    }
-    val matchedKeys = reversedMapping[normalizedText]?.distinct() ?: listOf(text.uppercase(Locale.ROOT))
-    return matchedKeys.joinToString(", ")
-  }
-
-  private fun mapText(text: String, mapping: Map<String, List<String>>): String {
-
-    Log.d("TAG", "texts: ------------- $text")
-    val normalizedText = text.lowercase(Locale.ROOT)
-    val matchedKeys = mapping.entries
-      .filter { (_, pronunciations) ->
-        pronunciations.any { it.lowercase(Locale.ROOT) == normalizedText }
-      }
-      .map { it.key }
-      .distinct()
-
-    return if (matchedKeys.isNotEmpty()) {
-      matchedKeys.joinToString(", ")
-    } else {
-      speakLoud // if null
-    }
-  }
-
   private fun getErrorText(errorCode: Int): String = when (errorCode) {
     SpeechRecognizer.ERROR_AUDIO -> "Audio error"
     SpeechRecognizer.ERROR_CLIENT -> "Client error"
@@ -474,12 +404,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     else -> "Unknown error"
   }
 
-//  private fun cleanup() {
-//    cancelTimeout()
-//    speechRecognizer?.destroy()
-//    speechRecognizer = null
-//    activeResult = null
-//  }
 
   private fun cleanup() {
     timeoutHandler?.removeCallbacks(timeoutRunnable!!)
@@ -489,110 +413,5 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     speechRecognizer = null
     activeResult = null
     isListening = false
-  }
-
-  private fun isNetworkAvailable(context: Context): Boolean {
-    val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-      ?: return false
-
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-      val network = connectivityManager.activeNetwork ?: return false
-      val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-      capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-    } else {
-      @Suppress("DEPRECATION")
-      connectivityManager.activeNetworkInfo?.isConnected == true
-    }
-  }
-
-
-  private fun correctRecognizedPhrase(recognizedPhrases: List<String>, expectedPhrase: String): String {
-    if (recognizedPhrases.isEmpty()) return ""
-
-    val doubleMetaphone = DoubleMetaphone()
-
-    // Function to get the phonetic codes from a phrase
-    fun getPhoneticCodes(text: String): List<String> {
-      return text.lowercase()
-        .replace(Regex("[^a-z\\s]"), "")  // Remove non-alphabet characters
-        .split("\\s+".toRegex()) // Split by spaces (fix for multi-word phrases)
-        .map { word ->
-          // Ensure non-null phonetic codes, fallback to word if null
-          doubleMetaphone.doubleMetaphone(word) ?: word
-        }
-    }
-
-
-    fun calculateCodeSimilarity(code1: String, code2: String): Double {
-      // Group similar sounds together
-      val soundGroups = mapOf(
-        setOf('R', 'W') to 0.8,
-        setOf('N', "NG") to 0.8,
-        setOf("EY", "EH", "AE") to 0.7,
-        setOf("CH", "JH", "GE") to 0.7
-      )
-
-      // If codes are identical, return 1.0
-      if (code1 == code2) return 1.0
-
-      // Check if codes belong to the same sound group
-      for ((group, similarity) in soundGroups) {
-        if (code1 in group && code2 in group) {
-          return similarity
-        }
-      }
-
-      // Handle partial matches
-      val minLength = kotlin.math.min(code1.length, code2.length)
-      val commonPrefix = code1.commonPrefixWith(code2)
-      if (commonPrefix.length > 0) {
-        return commonPrefix.length.toDouble() / minLength * 0.5
-      }
-
-      return 0.0
-    }
-
-
-    fun calculatePhoneticSimilarity(phrase1: String, phrase2: String): Double {
-      val phonetics1 = getPhoneticCodes(phrase1)
-      val phonetics2 = getPhoneticCodes(phrase2)
-
-      if (kotlin.math.abs(phonetics1.size - phonetics2.size) > 1) return 0.0
-
-      var totalSimilarity = 0.0
-      val maxLength = kotlin.math.max(phonetics1.size, phonetics2.size)
-
-      phonetics1.forEachIndexed { index, code1 ->
-        if (index < phonetics2.size) {
-          val code2 = phonetics2[index]
-          // Calculate similarity between individual phonetic codes
-          totalSimilarity += calculateCodeSimilarity(code1, code2)
-        }
-      }
-
-      return totalSimilarity / maxLength
-    }
-    var bestMatch = recognizedPhrases[0]
-    var bestSimilarity = 0.0
-
-    // Iterate through all recognized phrases and calculate the best match based on similarity
-    for (recognizedPhrase in recognizedPhrases) {
-      val phoneticSimilarity = calculatePhoneticSimilarity(recognizedPhrase, expectedPhrase)
-
-//      this is to check the string similarity based on 0 to 1, 1 being best match.
-      val stringSimilarity = 1.0 - (StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() / kotlin.math.max(recognizedPhrase.length, expectedPhrase.length))
-      val similarity = (phoneticSimilarity + stringSimilarity) / 2.0  // Combine both phonetic and string similarity
-
-      // Keep track of the best match
-      if (similarity > bestSimilarity) {
-        bestSimilarity = similarity
-        bestMatch = recognizedPhrase
-      }
-    }
-
-    if (bestSimilarity >= 0.8) {
-      return expectedPhrase
-    }
-    return bestMatch
   }
 }
