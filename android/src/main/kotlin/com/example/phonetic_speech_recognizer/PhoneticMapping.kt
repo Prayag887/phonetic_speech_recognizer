@@ -778,17 +778,15 @@ object PhoneticMapping {
         "7" to listOf("चिल", "chill", "chil", "छिल", "일곱", "ilgop", "ugop", "ukope", "ugope","chhil",
             "irgop", "युग गोप", "you gop", "युगोप", "you goep", "इल गोप", "इल्ड गोप", "इल gop", "इल gope","ego",
             "इलकोप", "इलको", "इल कोप", "इल्कोप", "ill gop", "igop", "ilgop", "igo", "ill gope", "युगको",
-            "il gop", "ill gop", "il go", "ill go"), //ilgop nepali
+            "il gop", "ill gop", "il go", "ill go", "यिनको", " ईलको", "यिनको"), //ilgop nepali
         "8" to listOf("फाल", "faal", "पाल", "fall", "여덟", "yeodeol", "यो दोलन", "यो दोल", "यो दुल", "यो दूल"),
-        "9" to listOf("kho", "खु", "khu", "खुo", "ख", "아홉", "ahop", "आहोप", "a होप", "ahoop"),
-        "10" to listOf("सिप", "seep", "sip", "सीप", "सिप", "열", "yeol", "योल", "योग", "yol"),
+        "9" to listOf("kho", "खु", "khu", "खुo", "ख", "아홉", "ahop", "आहोप", "a होप", "ahoop", "आहोप","आ होप" ,"आहो"),
+        "10" to listOf("सिप", "seep", "sip", "सीप", "सिप", "열", "yeol", "योल", "योग", "yol", "यल"),
         "11" to listOf("सिपिल", "seep eel", "sipil", "cpu", "열하나", "yeolhana"),
         "12" to listOf("CB"),
-//        14 sipsa ma chhipsa suneko xa....korean model
-//        19 ma
         "16" to listOf("sipyuk", "सिप्युक", "CPUK", "열여섯", "yeolyeoseot", "सीप्युक", "sipuk"),
         "18" to listOf("sippal", "सिपाल", "seep pal", "sip pal", "सिप फाल", "सीप फाल", "सिपाल", "सिपाल।", "열여덟", "yeolyeodeol"),
-        "20" to listOf("isip", "esip", "eseep", "스물", "seumul", "semul", "seamul", "seamull", "सेमुल", "सेमूल", "saymul", "simul", "simuli"),
+        "20" to listOf("isip", "esip", "eseep", "스물", "seumul", "semul", "seamul", "seamull", "सेमुल", "सेमूल", "saymul", "simul", "simuli", "sumul"),
         "21" to listOf("isipil", "ecpl", "ecl", "easypail", "easypael", "easypair", "esibil", "essibil", "esible", "easivil", "스물하나", "seumulhana", "इसिप इल", "इसीप इल", "saymul hana", "semul hana", "saymul hanna", "semul hanna"),
         "27" to listOf("isipchil", "ई सीप चिल", "यी सिपचिल", "यी सिप चिल", "스물일곱", "seumulilgop"),
         "28" to listOf("ईशिपपल", "इसिपल", "isiple", "यी सिपल", "esiple", "इचिप्पल", "ecle", "esipal", "스물여덟", "seumulyeodeol"),
