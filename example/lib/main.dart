@@ -31,7 +31,7 @@ class _MyAppState extends State<MyApp> {
   String _recognizedText = "Press the button to start";
   bool _isListening = false;
   double _progress = 1.0;
-  final int _timeoutDuration = 120000;
+  final int _timeoutDuration = 220000;
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
   String _randomText = "This is an apple";
@@ -237,11 +237,6 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.paragraphMapping:
         _recognizedText = "";
         _isRealTIme = true;
-        // _randomText = "The morning sun peeked through the dense canopy, casting golden rays on to the forest floor. Birds chirped melodiously, "
-        //     "their songs blending with the rustling leaves. A gentle breeze carried the scent of damp earth and blooming flowers. Somewhere in the distance, "
-        //     "a small stream bubbled over smooth stones, its rhythm soothing to the ears. A lone deer cautiously stepped into the clearing, its ears twitching at "
-        //     "every sound. The world seemed peaceful, untouched by the worries of civilization. Shadows danced as the wind swayed the towering trees. Insects buzzed "
-        //     "lazily around patches of wild flowers, drawn by their vibrant colors.";
         _randomText = "This is a random paragraph created for the testing purpose. The test is to be carried out for speech recognizer to see if it can "
             "accurately detect the words being spoken. This is a much simpler form of paragraph. This paragraph does not contain the words that are conflicting "
             "with each others. The conflicts can appear when there are multiple words that sounds the same but are different in spellings like [RIGHT] and [WRITE]. "
@@ -262,22 +257,22 @@ class _MyAppState extends State<MyApp> {
       // For normal highlighting
       List<String> words = _randomText.split(" ");
 
-      return RichText(
+      return SingleChildScrollView(child: RichText(
         text: TextSpan(
           children: List.generate(words.length, (index) {
 
             return TextSpan(
               text: "${words[index]} ",
               style: TextStyle(
-                fontSize: 18,
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
+                fontSize: 22,
+                color: Color(0xFF444444),
+                fontWeight: FontWeight.normal,
                 backgroundColor:Colors.transparent,
               ),
             );
           }),
         ),
-      );
+      ));
     }
   }
 
@@ -304,14 +299,8 @@ class _MyAppState extends State<MyApp> {
                 const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
                 const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese (Alphabets)')),
                 const PopupMenuItem(value: RecognitionType.koreanNumbers, child: Text('Korean (Numbers)')),
-                const PopupMenuItem(
-                  value: RecognitionType.allLanguageSupport,
-                  child: Text('Japanese (Numbers)'),
-                ),
-                const PopupMenuItem(
-                  value: RecognitionType.paragraphMapping,
-                  child: Text('Paragraphs'),
-                ),
+                const PopupMenuItem(value: RecognitionType.allLanguageSupport, child: Text('Japanese (Numbers)')),
+                const PopupMenuItem(value: RecognitionType.paragraphMapping, child: Text('Paragraphs')),
               ],
             ),
           ],
@@ -332,10 +321,16 @@ class _MyAppState extends State<MyApp> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
               ),
 
-              Text(
-                _recognizedText,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              // _selectedType == RecognitionType.koreanNumbers
+              //     ? Text(
+              //   _randomNumber,
+              //   style: TextStyle(fontSize: 22, color: Color(0xFF444444)),
+              // )
+              //     : Text(
+              //   _randomText,
+              //   style: TextStyle(fontSize: 22, color: Color(0xFF444444)),
+              // ),
+
               const SizedBox(height: 20),
               GestureDetector(
                 onLongPressStart: (_) => _requestAudioPermission(),

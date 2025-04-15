@@ -773,11 +773,11 @@ object PhoneticMapping {
         "2" to listOf("ई", "e", "둘", "dul", "थुल", "ठुल", "ठूल", "full", "फुल", "ful", "फूल", "ठुली", "ठूली", "ठुल", "ठूल", "ठूलो", "ठुलो", "thull"),
         "3" to listOf("साम", "saam", "शान", "sam", "셋", "set", "सेत"),
         "4" to listOf("सा", "saa", "शाह", "넷", "need", "net", "neet", "nate", "नेट", "nate", "need", "nath", "nathe", "ney"),
-        "5" to listOf("ओ", "o", "हो", "다섯", "daseot", "दा सोत", "दासोत", "दासोत्त", "thaseot"), //thaseot  tha-da eutai ho
-        "6" to listOf("युक", "yuk", "युग", "युक्क", "युक्त", "युक", "युग", "युक्", "여섯", "yeoseot", "यो सोत", "यो स्रोत", "यो शोत", "यो सोच", "यो स्वत", "यो शोध", "यो शोत", "यो श्वत"), //yok //yasat , esat
+        "5" to listOf("ओ", "o", "हो", "다섯", "daseot", "दा सोत", "दासोत", "दासोत्त", "thaseot", "थासाथ", "थासोत", "थासत", "थाहासत्", "था स्वत", "थासो"), //thaseot  tha-da eutai ho
+        "6" to listOf("यसत","यस","युक", "yuk", "युग", "युक्क", "युक्त", "युक", "युग", "युक्", "여섯", "yeoseot", "यो सोत", "यो स्रोत", "यो शोत", "यो सोच", "यो स्वत", "यो शोध", "यो शोत", "यो श्वत"), //yok //yasat , esat
         "7" to listOf("चिल", "chill", "chil", "छिल", "일곱", "ilgop", "ugop", "ukope", "ugope","chhil",
-            "irgop", "युग गोप", "you gop", "युगोप", "you goep", "इल गोप", "इल्ड गोप", "इल gop", "इल gope",
-            "इलकोप", "इलको", "इल कोप", "इल्कोप", "ill gop", "igop", "ilgop", "igo", "ill gope",
+            "irgop", "युग गोप", "you gop", "युगोप", "you goep", "इल गोप", "इल्ड गोप", "इल gop", "इल gope","ego",
+            "इलकोप", "इलको", "इल कोप", "इल्कोप", "ill gop", "igop", "ilgop", "igo", "ill gope", "युगको",
             "il gop", "ill gop", "il go", "ill go"), //ilgop nepali
         "8" to listOf("फाल", "faal", "पाल", "fall", "여덟", "yeodeol", "यो दोलन", "यो दोल", "यो दुल", "यो दूल"),
         "9" to listOf("kho", "खु", "khu", "खुo", "ख", "아홉", "ahop", "आहोप", "a होप", "ahoop"),
@@ -786,7 +786,7 @@ object PhoneticMapping {
         "12" to listOf("CB"),
 //        14 sipsa ma chhipsa suneko xa....korean model
 //        19 ma
-        "16" to listOf("sipyuk", "सिप्युक", "CPUK", "열여섯", "yeolyeoseot"),
+        "16" to listOf("sipyuk", "सिप्युक", "CPUK", "열여섯", "yeolyeoseot", "सीप्युक", "sipuk"),
         "18" to listOf("sippal", "सिपाल", "seep pal", "sip pal", "सिप फाल", "सीप फाल", "सिपाल", "सिपाल।", "열여덟", "yeolyeodeol"),
         "20" to listOf("isip", "esip", "eseep", "스물", "seumul", "semul", "seamul", "seamull", "सेमुल", "सेमूल", "saymul", "simul", "simuli"),
         "21" to listOf("isipil", "ecpl", "ecl", "easypail", "easypael", "easypair", "esibil", "essibil", "esible", "easivil", "스물하나", "seumulhana", "इसिप इल", "इसीप इल", "saymul hana", "semul hana", "saymul hanna", "semul hanna"),

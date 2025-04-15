@@ -579,7 +579,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
     }
 
-    if (bestSimilarity >= 0.8) {
+    if (bestSimilarity >= 0.7) {
       return expectedPhrase
     }
     return bestMatch
