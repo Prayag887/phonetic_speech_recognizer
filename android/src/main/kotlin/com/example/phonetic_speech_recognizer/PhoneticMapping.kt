@@ -784,7 +784,6 @@ object PhoneticMapping {
         "11" to listOf("सिपिल", "seep eel", "sipil", "cpu", "열하나", "yeolhana"),
         "12" to listOf("CB"),
 //        14 sipsa ma chhipsa suneko xa....korean model
-//        19 ma
         "16" to listOf("sipyuk", "सिप्युक", "CPUK", "열여섯", "yeolyeoseot"),
         "18" to listOf("sippal", "सिपाल", "seep pal", "sip pal", "सिप फाल", "सीप फाल", "सिपाल", "सिपाल।", "열여덟", "yeolyeodeol"),
         "20" to listOf("isip", "esip", "eseep", "스물", "seumul", "semul", "seamul", "seamull", "सेमुल", "सेमूल", "saymul", "simul", "simuli"),
@@ -803,7 +802,24 @@ object PhoneticMapping {
     )
 
     val phoneticKoreanObjectsMapping = mapOf(
-        "" to listOf("")
+        "입" to listOf("इप्", "इप"),
+        "태양" to listOf("थेयाङ", "thaiyan", "थियाङ", "thange", "ठेयाङ", "थे याङ"),
+        "배" to listOf("बे"),
+        "오븐" to listOf("ओबुन", "ओबन", "obuna", "ओ बुना", "oubun", "obun", "ubun", "ओभुन", "oven", "open"),
+        "밥" to listOf("बाप्", "बाप"),
+        "밤" to listOf("बाम्"),
+        "손" to listOf("सोन्", "son", "sone", "सन्"),
+        "콩" to listOf("खोङ्", "hong", "home", "khong"),
+        "집" to listOf("चिप्", "chip"),
+        "벽" to listOf("ब्योक्", "उपयोग", "byok", "bike", "ब्युक", "bokek"),
+        "벌" to listOf("बोल्", "बोल"),
+        "열쇠" to listOf("योल्स्वे"),
+        "그릇" to listOf("गुरुत्", "गुरुत", "guruit", "good"),
+        "못" to listOf("मोत्", "मत", "moth", "मोत"),
+        "볼트" to listOf("बोल्टु", "बोल्टु।", "पोल्टो", "बोल्टो", "बोल्ड 2"),
+        "삽" to listOf("साप्", "sap"),
+        "밧줄" to listOf("बाच्चुल्", "बचुल", "battle", "बातचुल", "batchul", "बाचुन", "batul"),
+        "너트" to listOf("नटु"),
+        "닭" to listOf("ताक्", "ताक")
     )
-
 }

@@ -28,8 +28,14 @@ class RandomSentenceGenerator {
     '육십일(61) - yuksipil (yesunhana)', '육십이(62) - yuksipi (yesundul)', '육십삼(63) - yuksipsam (yesunset)', '육십사(64) - yuksipsa (yesunnet)', '육십오(65) - yuksipo (yesundaseot)', '육십육(66) - yuksipyuk (yesunyeoseot)', '육십칠(67) - yuksipchil (yesunilgop)', '육십팔(68) - yuksippal (yesunyeodeol)', '육십구(69) - yuksipgu (yesunahop)', '칠십(70) - chilsip (ilgop)',
     '칠십일(71) - chilsipil (ilgophana)', '칠십이(72) - chilsipi (ilgopdul)', '칠십삼(73) - chilsipsam (ilgopset)', '칠십사(74) - chilsipsa (ilgopnet)', '칠십오(75) - chilsipo (ilgopdaseot)', '칠십육(76) - chilsipyuk (ilgopyeoseot)', '칠십칠(77) - chilsipchil (ilgopilgop)', '칠십팔(78) - chilsippal (ilgopyeodeol)', '칠십구(79) - chilsipgu (ilgopahop)', '팔십(80) - palsip (yeodeun)',
     '팔십일(81) - palsipil (yeodeunhana)', '팔십이(82) - palsipi (yeodeundul)', '팔십삼(83) - palsipsam (yeodeunset)', '팔십사(84) - palsipsa (yeodeunnet)', '팔십오(85) - palsipo (yeodeundaseot)', '팔십육(86) - palsipyuk (yeodeunyeoseot)', '팔십칠(87) - palsipchil (yeodeunilgop)', '팔십팔(88) - palsippal (yeodeunyeodeol)', '팔십구(89) - palsipgu (yeodeunahop)', '구십(90) - gusip (ahoon)',
-    '구십일(91) - gusipil (ahoonhana)', '구십이(92) - gusipi (ahoondul)', '구십삼(93) - gusipsam (ahoonset)', '구십사(94) - gusipsa (ahoonnet)', '구십오(95) - gusipo (ahoondaseot)', '구십육(96) - gusipyuk (ahoonyeoseot)', '구십칠(97) - gusipchil (ahoonilgop)', '구십팔(98) - gusippal (ahoonyeodeol)', '구십구(99) - gusipgu (ahoonahop)', '백(100) - baek'
+    '구십일(91) - gusipil (ahoonhana)', '구십이(92) - gusipi (ahoondul)', '구십삼(93) - gusipsam (ahoonset)', '구십사(94) - gusipsa (ahoonnet)', '구십오(95) - gusipo (ahoondaseot)', '구십육(96) - gusipyuk (ahoonyeoseot)', '구십칠(97) - gusipchil (ahoonilgop)', '구십팔(98) - gusippal (ahoonyeodeol)', '구십구(99) - gusipgu (ahoonahop)', '백(100) - baek',
   ];
+
+
+static final List<String> koreanWords = ['입 (इप्)', '태양 (थेयाङ)', '배 (बे)', '오븐 (ओबुन)', '밥 (बाप्)', '밤 (बाम्)',
+  '손 (सोन्)', '콩 (खोङ्)', '집 (चिप्)', '벽 (ब्योक्)', '벌 (बोल्)',
+  '그릇 (गुरुत्)', '못 (मोत्)', '볼트 (बोल्टु)', '삽 (साप्)', '밧줄 (बाच्चुल्)',
+  '너트 (नटु)', '닭 (ताक्)'];
 
 
 
@@ -52,11 +58,14 @@ class RandomSentenceGenerator {
   static String generateRandomKoreanNumber() {
     return koreanNumbers[_random.nextInt(koreanNumbers.length)];
   }
+  // Generate a random Korean words
+  static String generateRandomKoreanWords() {
+    return koreanWords[_random.nextInt(koreanWords.length)];
+  }
 
   static String generateSerialKoreanNumber() {
     String number = koreanNumbers[_counter];
     _counter = (_counter + 1) % koreanNumbers.length; // Increment and reset at 100
     return number;
   }
-
 }
