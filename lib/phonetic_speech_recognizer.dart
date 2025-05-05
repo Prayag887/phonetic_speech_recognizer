@@ -170,14 +170,25 @@ class PhoneticSpeechRecognizer {
     return _eventChannel.receiveBroadcastStream();
   }
 
-  Widget buildRealTimeHighlightedText(String _randomText, String _partialText) {
+
+  Widget buildRealTimeHighlightedText({
+    required String randomText,
+    required String partialText,
+    required Color highlightCorrectColor,
+    required Color defaultTextColor,
+    required Color highlightWrongColor,
+    required bool isAutoScroll,
+    required int autoScrollSpeed,
+    required double fontSize,
+    required double lineSpace,
+  }) {
     String cleanText(String text) {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
     }
 
-    List<String> originalWords = _randomText.split(RegExp(r'\s+'));
+    List<String> originalWords = randomText.split(RegExp(r'\s+'));
     List<String> targetWords = originalWords.map(cleanText).toList();
-    List<String> partialWords = _partialText.split(RegExp(r'\s+')).map(cleanText).toList();
+    List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
     final int maxLookahead = 4;
     final int maxSkipLimit = 4;
@@ -206,8 +217,13 @@ class PhoneticSpeechRecognizer {
         word1.length + 1, (_) => List.filled(word2.length + 1, 0),
       );
 
-      for (int i = 0; i <= word1.length; i++) dp[i][0] = i;
-      for (int j = 0; j <= word2.length; j++) dp[0][j] = j;
+      for (int i = 0; i <= word1.length; i++) {
+        dp[i][0] = i;
+      }
+
+      for (int j = 0; j <= word2.length; j++) {
+        dp[0][j] = j;
+      }
 
       for (int i = 1; i <= word1.length; i++) {
         for (int j = 1; j <= word2.length; j++) {
@@ -230,7 +246,6 @@ class PhoneticSpeechRecognizer {
     }
 
     bool isSimilarMatch(String word1, String word2) {
-      // If they're homophones, it's not a "similar" match but an exact one
       if (isHomophone(word1, word2)) return false;
 
       if (word1.length >= 4 && word2.length >= 4) {
@@ -338,11 +353,22 @@ class PhoneticSpeechRecognizer {
         }
       }
     }
+    
+    ScrollController controller = ScrollController();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        RichText(
+    if (isAutoScroll) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (controller.hasClients) {
+          // Start continuous auto-scrolling
+          startAutoScroll(controller, autoScrollSpeed);
+        }
+      });
+    }
+
+    return Flexible(
+      child: SingleChildScrollView(
+        controller: controller,
+        child: RichText(
           text: TextSpan(
             children: List.generate(originalWords.length, (index) {
               String word = originalWords[index];
@@ -350,62 +376,80 @@ class PhoneticSpeechRecognizer {
               FontWeight weight = FontWeight.normal;
 
               if (matchedIndexes.contains(index)) {
-                wordColor = Colors.green;  // Correctly spoken
+                wordColor = highlightCorrectColor;
               } else if (mispronounceIndexes.contains(index)) {
-                wordColor = Colors.blue;  // Mispronounced
+                wordColor = Colors.blue;
                 weight = FontWeight.bold;
               } else if (skippedIndexes.contains(index)) {
-                wordColor = Colors.red;  // Missed/skipped
+                wordColor = highlightWrongColor;
                 weight = FontWeight.bold;
               } else if (index < targetIndex) {
-                wordColor = Colors.red;  // Error processing
+                wordColor = highlightWrongColor;
                 weight = FontWeight.bold;
               } else {
-                wordColor = Colors.black;  // Not yet reached
+                wordColor = defaultTextColor;
               }
 
-              return TextSpan(
-                text: "$word ",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: weight,
-                  color: wordColor,
+              return WidgetSpan(
+                child: Container(
+                  margin: EdgeInsets.symmetric(vertical: 2),
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: wordColor,
+                      width: 1.0,
+                    ),
+                    color: wordColor.withAlpha(25),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(
+                    word,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      height: lineSpace,
+                      fontWeight: weight,
+                      color: wordColor, // Text color
+                    ),
+                  ),
                 ),
               );
             }),
           ),
         ),
-        SizedBox(height: 10),
-
-        // legend display
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 12, height: 12, color: Colors.green),
-            SizedBox(width: 4),
-            Text("Correct", style: TextStyle(fontSize: 12)),
-            SizedBox(width: 8),
-            Container(width: 12, height: 12, color: Colors.blue),
-            SizedBox(width: 4),
-            Text("Minor Mistakes", style: TextStyle(fontSize: 12)),
-            SizedBox(width: 8),
-            Container(width: 12, height: 12, color: Colors.red),
-            SizedBox(width: 4),
-            Text("Big Mistake", style: TextStyle(fontSize: 12)),
-          ],
-        ),
-        const SizedBox(height: 20),
-        Text(
-          "Current recognition: $_partialText",
-          style: const TextStyle(
-            fontSize: 10,
-            fontStyle: FontStyle.italic,
-            color: Colors.grey,
-          ),
-        ),
-      ],
+      ),
     );
   }
+
+
+  void startAutoScroll(ScrollController controller, int autoScrollSpeed) {
+    // Calculate total scroll extent
+    final double maxScroll = controller.position.maxScrollExtent;
+    final double scrollAmount = 1.0; // Pixels to scroll per animation frame
+
+    // Animation duration - lower value = faster scroll
+    final scrollDuration = Duration(milliseconds: autoScrollSpeed ~/ 10);
+
+    // Create a ticker for smooth scrolling
+    Timer.periodic(scrollDuration, (timer) {
+      if (!controller.hasClients) {
+        timer.cancel();
+        return;
+      }
+
+      final currentPosition = controller.offset;
+      final nextPosition = currentPosition + scrollAmount;
+
+      // Check if we've reached the end
+      if (nextPosition >= maxScroll) {
+        timer.cancel();
+        return;
+      }
+
+      // Smooth scroll to next position
+      controller.jumpTo(nextPosition);
+    });
+  }
+
   static Future<String?> recognize({
     required PhoneticType type,
     String? languageCode,

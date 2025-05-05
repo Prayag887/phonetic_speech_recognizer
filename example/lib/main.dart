@@ -252,7 +252,9 @@ class _MyAppState extends State<MyApp> {
   Widget _buildHighlightedText() {
     if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
       // For real-time highlighting during paragraph mapping
-      return recognizer.buildRealTimeHighlightedText(_randomText, _partialText);
+      return recognizer.buildRealTimeHighlightedText(randomText: _randomText, partialText: _partialText,
+        highlightCorrectColor : Color(0xFF00BC7D), defaultTextColor: Colors.black, highlightWrongColor: Colors.red,
+        isAutoScroll: true, autoScrollSpeed: 280, fontSize: 30, lineSpace: 1.5);
     } else {
       // For normal highlighting
       List<String> words = _randomText.split(" ");

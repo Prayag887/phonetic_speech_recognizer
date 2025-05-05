@@ -24,6 +24,6 @@ void main() {
     MockPhoneticSpeechRecognizerPlatform fakePlatform = MockPhoneticSpeechRecognizerPlatform();
     PhoneticSpeechRecognizerPlatform.instance = fakePlatform;
 
-    expect(await phoneticSpeechRecognizerPlugin.getPlatformVersion(), '42');
+    expect(await PhoneticSpeechRecognizer.getPlatformVersion(), '42');
   });
 }
