@@ -31,12 +31,14 @@ class _MyAppState extends State<MyApp> {
   String _recognizedText = "Press the button to start";
   bool _isListening = false;
   double _progress = 1.0;
-  final int _timeoutDuration = 120000;
+  final int _timeoutDuration = 220000;
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
   String _randomText = "This is an apple";
   String _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
   String _partialText = "";
+  bool _isTextReceived = false;
+  bool _isRealTIme = false;
 
   PhoneticSpeechRecognizer recognizer = PhoneticSpeechRecognizer();
   // For streaming partial results
@@ -67,15 +69,14 @@ class _MyAppState extends State<MyApp> {
     setState(() {
       _isListening = false;
       _progress = 1.0;
-      _recognizedText = "Recognition has been stopped";
       _partialText = "";
     });
   }
 
+  // this is to populate the partial data for the real time data mapping
   void _listenForPartialResults() {
     // Cancel any existing subscription
     subscription?.cancel();
-
     // Start listening to the stream
     subscription = recognizer.listenToStream().listen((data) {
       setState(() {
@@ -90,9 +91,10 @@ class _MyAppState extends State<MyApp> {
     if (_isListening) return;
 
     setState(() {
+      _isTextReceived = false;
       _isListening = true;
       _progress = 1.0;
-      _recognizedText = "Listening...";
+      // _recognizedText = "Listening...";
       _partialText = "";
     });
 
@@ -105,9 +107,7 @@ class _MyAppState extends State<MyApp> {
 
     PhoneticType phoneticType;
     String languageCode;
-    String textToRecognize = _selectedType == RecognitionType.koreanNumbers
-        ? _randomNumber
-        : _randomText;
+    String textToRecognize = _selectedType == RecognitionType.koreanNumbers ? _randomNumber : _randomText;
 
     switch (_selectedType) {
       case RecognitionType.alphabets:
@@ -116,7 +116,7 @@ class _MyAppState extends State<MyApp> {
         break;
       case RecognitionType.paragraphMapping:
         phoneticType = PhoneticType.paragraphsMapping;
-        languageCode = "en-GB";
+        languageCode = "en-US";
         // Start listening to partial results
         _listenForPartialResults();
         break;
@@ -124,18 +124,17 @@ class _MyAppState extends State<MyApp> {
         phoneticType = PhoneticType.number;
         languageCode = "ne-NP";
         break;
-      // case RecognitionType.koreanNumber:
-      //   phoneticType = PhoneticType.koreanNumber;
-      //   languageCode = "ko-KR";
-      //   break;
+      case RecognitionType.koreanNumber:
+        phoneticType = PhoneticType.koreanNumber;
+        languageCode = "ko-KR";
+        break;
       case RecognitionType.japaneseAlphabet:
         phoneticType = PhoneticType.japaneseAlphabet;
         languageCode = "ja-JP";
         break;
       case RecognitionType.koreanNumbers:
-        // Extract the numeric part from the Korean number string
-        String numericPart = _randomNumber.substring(
-            _randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
+      // Extract the numeric part from the Korean number string
+        String numericPart = _randomNumber.substring(_randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
         int number = int.tryParse(numericPart) ?? 0;
         final koreanNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 21, 100};
         phoneticType = koreanNumbers.contains(number)
@@ -149,7 +148,7 @@ class _MyAppState extends State<MyApp> {
         break;
       case RecognitionType.allLanguageSupport:
         phoneticType = PhoneticType.allLanguageSupport;
-        languageCode = "ne-NP";
+        languageCode = "ja-JP";
         break;
       case RecognitionType.sentences:
       default:
@@ -166,16 +165,19 @@ class _MyAppState extends State<MyApp> {
     ).then((result) {
       setState(() {
         _recognizedText = result ?? "Recognition failed";
-
-        if(_randomText.contains(result as Pattern)){
-          _generateRandomText();
+        if(_recognizedText != null || _recognizedText.isNotEmpty){
+          _isTextReceived = true;
+        } else {
+          _isTextReceived = false;
         }
 
         // Check if recognition was successful
         if (_selectedType == RecognitionType.koreanNumbers) {
           // For Korean numbers, we need to compare with the Korean number
           String insideBrackets = _randomNumber.substring(
-              _randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
+              _randomNumber.indexOf('(') + 1,
+              _randomNumber.indexOf(')')
+          );
           if (insideBrackets.contains(_recognizedText)) {
             _generateRandomText();
           }
@@ -205,30 +207,38 @@ class _MyAppState extends State<MyApp> {
   void _generateRandomText() {
     switch (_selectedType) {
       case RecognitionType.alphabets:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(65 + (DateTime.now().millisecondsSinceEpoch % 26));
         break;
       case RecognitionType.numbers:
+        _isRealTIme = false;
         _randomText = (DateTime.now().millisecondsSinceEpoch % 100).toString();
         break;
       case RecognitionType.koreanAlphabets:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(0xAC00 + (DateTime.now().millisecondsSinceEpoch % 11172));
         break;
       case RecognitionType.japaneseAlphabet:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.koreanNumber:
+        _isRealTIme = false;
         _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.allLanguageSupport:
-        _randomText = RandomSentenceGenerator.generateRandomKoreanWords();
+        _isRealTIme = false;
+        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.koreanNumbers:
+        _isRealTIme = false;
         _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
         break;
       case RecognitionType.paragraphMapping:
-        _randomText =
-            "This is a random paragraph created for the testing purpose. The test is to be carried out for speech recognizer to see if it can "
-            "accurately detect the words that are being spoken. This is a much simpler form of paragraph. This paragraph does not contain the words that are conflicting "
+        _recognizedText = "";
+        _isRealTIme = true;
+        _randomText = "This is a random paragraph created for the testing purpose. The test is to be carried out for speech recognizer to see if it can "
+            "accurately detect the words being spoken. This is a much simpler form of paragraph. This paragraph does not contain the words that are conflicting "
             "with each others. The conflicts can appear when there are multiple words that sounds the same but are different in spellings like [RIGHT] and [WRITE]. "
             "When both words are being used then there is no way to check which of the two spellings are required to be registered.";
         break;
@@ -247,23 +257,26 @@ class _MyAppState extends State<MyApp> {
       // For normal highlighting
       List<String> words = _randomText.split(" ");
 
-      return RichText(
+      return SingleChildScrollView(child: RichText(
         text: TextSpan(
           children: List.generate(words.length, (index) {
+
             return TextSpan(
               text: "${words[index]} ",
               style: TextStyle(
-                fontSize: 18,
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                backgroundColor: Colors.transparent,
+                fontSize: 22,
+                color: Color(0xFF444444),
+                fontWeight: FontWeight.normal,
+                backgroundColor:Colors.transparent,
               ),
             );
           }),
         ),
-      );
+      ));
     }
   }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -279,35 +292,15 @@ class _MyAppState extends State<MyApp> {
                   _generateRandomText();
                 });
               },
-              itemBuilder: (BuildContext context) =>
-                  <PopupMenuEntry<RecognitionType>>[
-                const PopupMenuItem(
-                    value: RecognitionType.alphabets, child: Text('Alphabets')),
-                const PopupMenuItem(
-                    value: RecognitionType.numbers, child: Text('Numbers')),
-                const PopupMenuItem(
-                    value: RecognitionType.koreanAlphabets,
-                    child: Text('Korean Alphabets')),
-                const PopupMenuItem(
-                    value: RecognitionType.sentences, child: Text('Sentences')),
-                const PopupMenuItem(
-                    value: RecognitionType.japaneseAlphabet,
-                    child: Text('Japanese (Alphabets)')),
-                const PopupMenuItem(
-                    value: RecognitionType.koreanNumbers,
-                    child: Text('Korean (Numbers)')),
-                const PopupMenuItem(
-                  value: RecognitionType.allLanguageSupport,
-                  child: Text('Japanese (Numbers)'),
-                ),
-                const PopupMenuItem(
-                  value: RecognitionType.paragraphMapping,
-                  child: Text('Paragraphs'),
-                ),
-                const PopupMenuItem(
-                  value: RecognitionType.allLanguageSupport,
-                  child: Text('All Language (Korean)'),
-                ),
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<RecognitionType>>[
+                const PopupMenuItem(value: RecognitionType.alphabets, child: Text('Alphabets')),
+                const PopupMenuItem(value: RecognitionType.numbers, child: Text('Numbers')),
+                const PopupMenuItem(value: RecognitionType.koreanAlphabets, child: Text('Korean Alphabets')),
+                const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
+                const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese (Alphabets)')),
+                const PopupMenuItem(value: RecognitionType.koreanNumbers, child: Text('Korean (Numbers)')),
+                const PopupMenuItem(value: RecognitionType.allLanguageSupport, child: Text('Japanese (Numbers)')),
+                const PopupMenuItem(value: RecognitionType.paragraphMapping, child: Text('Paragraphs')),
               ],
             ),
           ],
@@ -318,28 +311,49 @@ class _MyAppState extends State<MyApp> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               _buildHighlightedText(),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _isListening ? null : _requestAudioPermission,
-                child:
-                    Text(_isListening ? 'Processing...' : 'Start Recognition'),
+              SizedBox(
+                height: 10,
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _isListening ? stopRecognition : null,
-                child: const Text('Stop Recognition'),
+              _isTextReceived
+                  ? Container() // If _isTextReceived is true, show nothing
+                  : Text(
+                _isListening ? "Listening..." : "",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
               ),
-              const SizedBox(height: 20),
-              LinearProgressIndicator(value: _progress),
 
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  _recognizedText,
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
+              // _selectedType == RecognitionType.koreanNumbers
+              //     ? Text(
+              //   _randomNumber,
+              //   style: TextStyle(fontSize: 22, color: Color(0xFF444444)),
+              // )
+              //     : Text(
+              //   _randomText,
+              //   style: TextStyle(fontSize: 22, color: Color(0xFF444444)),
+              // ),
+
+              const SizedBox(height: 20),
+              GestureDetector(
+                onLongPressStart: (_) => _requestAudioPermission(),
+                onLongPressEnd: (_) {
+                  if (_isRealTIme) {
+                    stopRecognition();  // Stop recognition immediately if _isRealTime is true
+                  } else {
+                    _isTextReceived ? stopRecognition() : print("Still analyzing");
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _isListening ? Colors.red : Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.mic, color: Colors.white, size: 32),
                 ),
               ),
+              SizedBox(
+                height: 10,
+              ),
+              LinearProgressIndicator(value: _progress),
             ],
           ),
         ),
