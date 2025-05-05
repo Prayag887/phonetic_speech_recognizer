@@ -86,7 +86,7 @@ class PhoneticSpeechRecognizer {
               return TextSpan(
                 text: "$originalWord ",
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: 22,
                   color: Colors.black,
                   fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
                   backgroundColor: isHighlighted ? Colors.yellow : Colors.transparent,
