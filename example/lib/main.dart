@@ -254,7 +254,7 @@ class _MyAppState extends State<MyApp> {
       // For real-time highlighting during paragraph mapping
       return recognizer.buildRealTimeHighlightedText(randomText: _randomText, partialText: _partialText,
         highlightCorrectColor : Color(0xFF00BC7D), defaultTextColor: Colors.black, highlightWrongColor: Colors.red,
-        isAutoScroll: true, autoScrollSpeed: 280, fontSize: 30, lineSpace: 1.5);
+        isAutoScroll: true, autoScrollSpeed: 300, fontSize: 30, lineSpace: 1.5, endOfScreen: 300);
     } else {
       // For normal highlighting
       List<String> words = _randomText.split(" ");
@@ -338,6 +338,7 @@ class _MyAppState extends State<MyApp> {
                 onLongPressStart: (_) => _requestAudioPermission(),
                 onLongPressEnd: (_) {
                   if (_isRealTIme) {
+                    print("error words list: ${recognizer.errorWordsIndexes}");
                     stopRecognition();  // Stop recognition immediately if _isRealTime is true
                   } else {
                     _isTextReceived ? stopRecognition() : print("Still analyzing");

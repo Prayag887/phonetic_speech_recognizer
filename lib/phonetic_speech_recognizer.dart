@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -124,6 +125,7 @@ class PhoneticSpeechRecognizer {
   };
 
 
+  late List<int> errorWordsIndexes;
 
   static const MethodChannel _channel = MethodChannel('phonetic_speech_recognizer');
 
@@ -181,6 +183,7 @@ class PhoneticSpeechRecognizer {
     required int autoScrollSpeed,
     required double fontSize,
     required double lineSpace,
+    required double endOfScreen,
   }) {
     String cleanText(String text) {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
@@ -197,6 +200,7 @@ class PhoneticSpeechRecognizer {
     final Set<int> mispronounceIndexes = {};
     final List<String> errorBuffer = [];
     final int consecutiveErrorThreshold = 3;
+    List<int> errorWordsIndexList= [];
 
     bool isHomophone(String word1, String word2) {
       if (word1 == word2) return true;
@@ -353,7 +357,7 @@ class PhoneticSpeechRecognizer {
         }
       }
     }
-    
+
     ScrollController controller = ScrollController();
 
     if (isAutoScroll) {
@@ -368,52 +372,72 @@ class PhoneticSpeechRecognizer {
     return Flexible(
       child: SingleChildScrollView(
         controller: controller,
-        child: RichText(
-          text: TextSpan(
-            children: List.generate(originalWords.length, (index) {
-              String word = originalWords[index];
-              Color wordColor;
-              FontWeight weight = FontWeight.normal;
+        child: Padding(
+          padding: EdgeInsets.only(top: endOfScreen),
+          child: RichText(
+            text: TextSpan(
+              children: List.generate(originalWords.length, (index) {
+                String word = originalWords[index];
+                Color wordColor;
+                Color borderColor;
+                Color backgroundColor;
+                FontWeight weight = FontWeight.normal;
+          
+                  if (matchedIndexes.contains(index)) {
+                    wordColor = highlightCorrectColor;
+                    borderColor = highlightCorrectColor;
+                    backgroundColor = highlightCorrectColor;
+                  } else if (mispronounceIndexes.contains(index)) {
+                    wordColor = Colors.blue;
+                    backgroundColor = Colors.blue;
+                    borderColor = Colors.blue;
+                    weight = FontWeight.bold;
+                  } else if (skippedIndexes.contains(index)) {
+                    wordColor = highlightWrongColor;
+                    backgroundColor = highlightWrongColor;
+                    borderColor = highlightWrongColor;
+                    errorWordsIndexList.add(index);
+                    weight = FontWeight.bold;
+                  } else if (index < targetIndex) {
+                    wordColor = highlightWrongColor;
+                    backgroundColor = highlightWrongColor;
+                    borderColor = highlightWrongColor;
+                    errorWordsIndexList.add(index);
+                    weight = FontWeight.bold;
+                  } else {
+                    wordColor = defaultTextColor;
+                    backgroundColor = Color(0xFFFFFFFF);
+                    borderColor = Color(0xFFFFFFFF);
+                  }
 
-              if (matchedIndexes.contains(index)) {
-                wordColor = highlightCorrectColor;
-              } else if (mispronounceIndexes.contains(index)) {
-                wordColor = Colors.blue;
-                weight = FontWeight.bold;
-              } else if (skippedIndexes.contains(index)) {
-                wordColor = highlightWrongColor;
-                weight = FontWeight.bold;
-              } else if (index < targetIndex) {
-                wordColor = highlightWrongColor;
-                weight = FontWeight.bold;
-              } else {
-                wordColor = defaultTextColor;
-              }
-
-              return WidgetSpan(
-                child: Container(
-                  margin: EdgeInsets.symmetric(vertical: 2),
-                  padding: EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: wordColor,
-                      width: 1.0,
+                // print("WRONG INDEXES: ${errorWordsIndexList}");
+                errorWordsIndexes = errorWordsIndexList;
+          
+                return WidgetSpan(
+                  child: Container(
+                    margin: EdgeInsets.symmetric(vertical: 2),
+                    padding: EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: borderColor,
+                        width: 1.0,
+                      ),
+                      color: backgroundColor.withAlpha(25),
+                      borderRadius: BorderRadius.circular(6),
                     ),
-                    color: wordColor.withAlpha(25),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Text(
-                    word,
-                    style: TextStyle(
-                      fontSize: fontSize,
-                      height: lineSpace,
-                      fontWeight: weight,
-                      color: wordColor, // Text color
+                    child: Text(
+                      word,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        height: lineSpace,
+                        fontWeight: weight,
+                        color: wordColor, // Text color
+                      ),
                     ),
                   ),
-                ),
-              );
-            }),
+                );
+              }),
+            ),
           ),
         ),
       ),
@@ -422,32 +446,25 @@ class PhoneticSpeechRecognizer {
 
 
   void startAutoScroll(ScrollController controller, int autoScrollSpeed) {
-    // Calculate total scroll extent
+    if (!controller.hasClients) return;
+
     final double maxScroll = controller.position.maxScrollExtent;
-    final double scrollAmount = 1.0; // Pixels to scroll per animation frame
+    final double currentOffset = controller.offset;
 
-    // Animation duration - lower value = faster scroll
-    final scrollDuration = Duration(milliseconds: autoScrollSpeed ~/ 10);
+    // Check if already at the end
+    if (currentOffset >= maxScroll) return;
 
-    // Create a ticker for smooth scrolling
-    Timer.periodic(scrollDuration, (timer) {
-      if (!controller.hasClients) {
-        timer.cancel();
-        return;
-      }
+    // Calculate remaining distance and animation duration
+    final double distance = maxScroll - currentOffset;
+    final int durationMs = (distance * autoScrollSpeed / 10).ceil();
+    final Duration duration = Duration(milliseconds: durationMs);
 
-      final currentPosition = controller.offset;
-      final nextPosition = currentPosition + scrollAmount;
-
-      // Check if we've reached the end
-      if (nextPosition >= maxScroll) {
-        timer.cancel();
-        return;
-      }
-
-      // Smooth scroll to next position
-      controller.jumpTo(nextPosition);
-    });
+    // Start smooth scroll animation
+    controller.animateTo(
+      maxScroll,
+      duration: duration,
+      curve: Curves.linear,
+    );
   }
 
   static Future<String?> recognize({
