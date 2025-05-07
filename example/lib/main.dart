@@ -37,6 +37,7 @@ class _MyAppState extends State<MyApp> {
   String _randomText = "This is an apple";
   String _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
   String _partialText = "";
+  String _newText = "";
   bool _isTextReceived = false;
   bool _isRealTIme = false;
 
@@ -66,10 +67,11 @@ class _MyAppState extends State<MyApp> {
     PhoneticSpeechRecognizer.stopRecognition();
     _timer?.cancel();
     subscription?.cancel();
+    _recognizedText = " " + _newText;
     setState(() {
       _isListening = false;
       _progress = 1.0;
-      _partialText = "";
+      // _partialText = "";
     });
   }
 
@@ -95,7 +97,6 @@ class _MyAppState extends State<MyApp> {
       _isListening = true;
       _progress = 1.0;
       // _recognizedText = "Listening...";
-      _partialText = "";
     });
 
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
@@ -199,7 +200,7 @@ class _MyAppState extends State<MyApp> {
         _progress = 1.0;
         // Cancel subscription when done
         subscription?.cancel();
-        _partialText = "";
+        // _partialText = "";
       });
     });
   }
@@ -250,32 +251,12 @@ class _MyAppState extends State<MyApp> {
   }
 
   Widget _buildHighlightedText() {
-    if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
       // For real-time highlighting during paragraph mapping
-      return recognizer.buildRealTimeHighlightedText(randomText: _randomText, partialText: _partialText,
+    // print("---- $_partialText,  --------- $_recognizedText");
+    _newText = "$_recognizedText $_partialText";
+      return recognizer.buildRealTimeHighlightedText(randomText: _randomText, partialText: _newText,
           highlightCorrectColor : Color(0xFF00BC7D), defaultTextColor: Colors.black, highlightWrongColor: Colors.red,
           isAutoScroll: true, autoScrollSpeed: 300, fontSize: 30, lineSpace: 1.5, endOfScreen: 300);
-    } else {
-      // For normal highlighting
-      List<String> words = _randomText.split(" ");
-
-      return SingleChildScrollView(child: RichText(
-        text: TextSpan(
-          children: List.generate(words.length, (index) {
-
-            return TextSpan(
-              text: "${words[index]} ",
-              style: TextStyle(
-                fontSize: 22,
-                color: Color(0xFF444444),
-                fontWeight: FontWeight.normal,
-                backgroundColor:Colors.transparent,
-              ),
-            );
-          }),
-        ),
-      ));
-    }
   }
 
 

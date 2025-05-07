@@ -34,6 +34,7 @@ android {
 
     compileSdk = 34
 
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -49,7 +50,7 @@ android {
     }
 
     defaultConfig {
-        minSdk = 21
+        minSdk = 24
     }
 
     dependencies {
@@ -77,4 +78,12 @@ dependencies {
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 
+    // For MediaRecorder functionality
+    implementation("androidx.core:core-ktx:1.10.1")
+
+    // For permission handling (recommended)
+    implementation("androidx.activity:activity-ktx:1.7.2")
+
+    // For storage access (recommended for API 29+)
+    implementation("androidx.documentfile:documentfile:1.0.1")
 }

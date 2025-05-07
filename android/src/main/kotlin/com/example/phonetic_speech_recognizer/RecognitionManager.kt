@@ -1,9 +1,7 @@
 package com.example.phonetic_speech_recognizer
 
-import android.annotation.TargetApi
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -17,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.*
 
 class RecognitionManager {
     private var context: Context? = null
@@ -181,7 +180,6 @@ class RecognitionManager {
         )
     }
 
-    @TargetApi(Build.VERSION_CODES.M)
     private fun startRecognition(lang: String, mapper: (String) -> Any, timeoutMillis: Int, paragraph: String?, keepListening: Boolean) {
         isListening = true
         if (speechRecognizer != null) {
@@ -205,8 +203,10 @@ class RecognitionManager {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 7)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 10000)
             }
         }
+
         timeoutHandler = Handler(ctx.mainLooper)
         val recognizedResults = mutableListOf<String>()
         val isKeepListening = keepListening // Capture for timeout handling
