@@ -251,15 +251,61 @@ class _MyAppState extends State<MyApp> {
   }
 
   Widget _buildHighlightedText() {
-      // For real-time highlighting during paragraph mapping
-    // print("---- $_partialText,  --------- $_recognizedText");
-    _newText = "$_recognizedText $_partialText";
-      return recognizer.buildRealTimeHighlightedText(randomText: _randomText, partialText: _newText,
-          highlightCorrectColor : Color(0xFF00BC7D), defaultTextColor: Colors.black, highlightWrongColor: Colors.red,
-          isAutoScroll: true, autoScrollSpeed: 300, fontSize: 30, lineSpace: 1.5, endOfScreen: 300);
+    if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
+      _newText = "$_recognizedText $_partialText";
+      return recognizer.buildRealTimeHighlightedText(randomText: _randomText,
+          partialText: _newText,
+          highlightCorrectColor: Color(0xFF00BC7D),
+          defaultTextColor: Colors.black,
+          highlightWrongColor: Colors.red,
+          isAutoScroll: true,
+          autoScrollSpeed: 300,
+          fontSize: 30,
+          lineSpace: 1.5,
+          endOfScreen: 300);
+    } else {
+      return recognizer.buildRealTimeHighlightedText(randomText: _randomText,
+          partialText: _newText,
+          highlightCorrectColor: Color(0xFF00BC7D),
+          defaultTextColor: Colors.black,
+          highlightWrongColor: Colors.red,
+          isAutoScroll: false,
+          autoScrollSpeed: 0,
+          fontSize: 30,
+          lineSpace: 1.5,
+          endOfScreen: 300);
+    }
   }
 
-
+  // Widget _buildHighlightedText() {
+  //     if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
+  //       // For real-time highlighting during paragraph mapping
+  //     print("---- $_partialText")
+  //       return recognizer.buildRealTimeHighlightedText(randomText: _randomText, partialText: _partialText,
+  //           highlightCorrectColor : Color(0xFF00BC7D), defaultTextColor: Colors.black, highlightWrongColor: Colors.red,
+  //           isAutoScroll: true, autoScrollSpeed: 300, fontSize: 30, lineSpace: 1.5, endOfScreen: 300);
+  //     } else {
+  //       // For normal highlighting
+  //       List<String> words = _randomText.split(" ");
+  //
+  //       return SingleChildScrollView(child: RichText(
+  //         text: TextSpan(
+  //           children: List.generate(words.length, (index) {
+  //
+  //             return TextSpan(
+  //               text: "${words[index]} ",
+  //               style: TextStyle(
+  //                 fontSize: 22,
+  //                 color: Color(0xFF444444),
+  //                 fontWeight: FontWeight.normal,
+  //                 backgroundColor:Colors.transparent,
+  //               ),
+  //             );
+  //           }),
+  //         ),
+  //       ));
+  //     }
+  //   }
 
   @override
   Widget build(BuildContext context) {

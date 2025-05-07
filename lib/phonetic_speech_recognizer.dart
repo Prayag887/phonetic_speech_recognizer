@@ -360,14 +360,25 @@ class PhoneticSpeechRecognizer {
 
     ScrollController controller = ScrollController();
 
-    if (isAutoScroll) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (controller.hasClients) {
-          // Start continuous auto-scrolling
+    // if (isAutoScroll) {
+    //   WidgetsBinding.instance.addPostFrameCallback((_) {
+    //     if (controller.hasClients) {
+    //       // Start continuous auto-scrolling
+    //       startAutoScroll(controller, autoScrollSpeed);
+    //     }
+    //   });
+    // }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (controller.hasClients) {
+        if (isAutoScroll && autoScrollSpeed > 0) {
           startAutoScroll(controller, autoScrollSpeed);
+        } else {
+          // Explicitly stop any ongoing scroll
+          controller.jumpTo(controller.offset);
         }
-      });
-    }
+      }
+    });
 
     return Flexible(
       child: SingleChildScrollView(
@@ -448,6 +459,12 @@ class PhoneticSpeechRecognizer {
   void startAutoScroll(ScrollController controller, int autoScrollSpeed) {
     if (!controller.hasClients) return;
 
+    if (autoScrollSpeed == 0){
+      print("it has to be paused");
+      final double currentOffset = controller.offset;
+      controller.jumpTo(currentOffset);
+      return;
+    }
     final double maxScroll = controller.position.maxScrollExtent;
     final double currentOffset = controller.offset;
 
