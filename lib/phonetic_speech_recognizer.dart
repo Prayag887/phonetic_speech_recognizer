@@ -360,15 +360,6 @@ class PhoneticSpeechRecognizer {
 
     ScrollController controller = ScrollController();
 
-    // if (isAutoScroll) {
-    //   WidgetsBinding.instance.addPostFrameCallback((_) {
-    //     if (controller.hasClients) {
-    //       // Start continuous auto-scrolling
-    //       startAutoScroll(controller, autoScrollSpeed);
-    //     }
-    //   });
-    // }
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (controller.hasClients) {
         if (isAutoScroll && autoScrollSpeed > 0) {

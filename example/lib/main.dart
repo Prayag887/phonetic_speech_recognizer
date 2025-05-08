@@ -254,29 +254,29 @@ class _MyAppState extends State<MyApp> {
     if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
       _newText = "$_recognizedText $_partialText";
       return recognizer.buildRealTimeHighlightedText(
-          randomText: _randomText,
-          partialText: _newText,
-          highlightCorrectColor: Color(0xFF00BC7D),
-          defaultTextColor: Colors.black,
-          highlightWrongColor: Colors.red,
-          isAutoScroll: true,
-          autoScrollSpeed: 300,
-          fontSize: 30,
-          lineSpace: 1.5,
-          endOfScreen: 300,
+        randomText: _randomText,
+        partialText: _newText,
+        highlightCorrectColor: Color(0xFF00BC7D),
+        defaultTextColor: Colors.black,
+        highlightWrongColor: Colors.red,
+        isAutoScroll: true,
+        autoScrollSpeed: 300,
+        fontSize: 30,
+        lineSpace: 1.5,
+        endOfScreen: 300,
       );
     } else {
       return recognizer.buildRealTimeHighlightedText(
-          randomText: _randomText,
-          partialText: _newText,
-          highlightCorrectColor: Color(0xFF00BC7D),
-          defaultTextColor: Colors.black,
-          highlightWrongColor: Colors.red,
-          isAutoScroll: false,
-          autoScrollSpeed: 0,
-          fontSize: 30,
-          lineSpace: 1.5,
-          endOfScreen: 300,
+        randomText: _randomText,
+        partialText: _newText,
+        highlightCorrectColor: Color(0xFF00BC7D),
+        defaultTextColor: Colors.black,
+        highlightWrongColor: Colors.red,
+        isAutoScroll: false,
+        autoScrollSpeed: 0,
+        fontSize: 30,
+        lineSpace: 1.5,
+        endOfScreen: 300,
       );
     }
   }
