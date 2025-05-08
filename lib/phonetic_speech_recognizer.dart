@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
@@ -125,7 +126,9 @@ class PhoneticSpeechRecognizer {
   };
 
 
-  late List<int> errorWordsIndexes;
+  List<int> errorWordsIndexes = [];
+  List<int> errorPronouncationList= [];
+  List<int> correctPronouncationList= [];
 
   static const MethodChannel _channel = MethodChannel('phonetic_speech_recognizer');
 
@@ -201,6 +204,8 @@ class PhoneticSpeechRecognizer {
     final List<String> errorBuffer = [];
     final int consecutiveErrorThreshold = 3;
     List<int> errorWordsIndexList= [];
+    List<int> errorWordsPronunciationList= [];
+    List<int> correctWordsList= [];
 
     bool isHomophone(String word1, String word2) {
       if (word1 == word2) return true;
@@ -389,22 +394,27 @@ class PhoneticSpeechRecognizer {
                   wordColor = highlightCorrectColor;
                   borderColor = highlightCorrectColor;
                   backgroundColor = highlightCorrectColor;
+                  correctWordsList.add(index);
+                  log("correct words ::::::::: ${correctWordsList.length}");
                 } else if (mispronounceIndexes.contains(index)) {
                   wordColor = Colors.blue;
                   backgroundColor = Colors.blue;
                   borderColor = Colors.blue;
                   weight = FontWeight.bold;
+                  errorWordsPronunciationList.add(index);
                 } else if (skippedIndexes.contains(index)) {
                   wordColor = highlightWrongColor;
                   backgroundColor = highlightWrongColor;
                   borderColor = highlightWrongColor;
                   errorWordsIndexList.add(index);
+                  errorWordsPronunciationList.add(index);
                   weight = FontWeight.bold;
                 } else if (index < targetIndex) {
                   wordColor = highlightWrongColor;
                   backgroundColor = highlightWrongColor;
                   borderColor = highlightWrongColor;
                   errorWordsIndexList.add(index);
+                  errorWordsPronunciationList.add(index);
                   weight = FontWeight.bold;
                 } else {
                   wordColor = defaultTextColor;
@@ -414,6 +424,8 @@ class PhoneticSpeechRecognizer {
 
                 // print("WRONG INDEXES: ${errorWordsIndexList}");
                 errorWordsIndexes = errorWordsIndexList;
+                errorPronouncationList = errorWordsPronunciationList;
+                correctPronouncationList = correctWordsList;
 
                 return WidgetSpan(
                   child: Container(
@@ -443,6 +455,195 @@ class PhoneticSpeechRecognizer {
           ),
         ),
       ),
+    );
+  }
+
+  Widget displayMistakeWords({
+    required List<int> errorWordsList,
+    required List<int> errorPronunciationList,
+    required List<int> correctPronouncationList,
+    required String randomText,
+    required int totalWords,
+    required Color defaultTextColor,
+    required Color highlightWrongColor,
+    required double fontSize,
+    required double lineSpace,
+  }) {
+    print("THIS IS ERROR LIST $errorWordsList");
+
+    int totalSpokenWords = correctPronouncationList.length + errorPronouncationList.length;
+    int totalSkippedWords = totalWords - totalSpokenWords;
+
+    int pronunciationMistakes = errorPronouncationList.length;
+    int fluencyMistakes = errorWordsList.length;
+
+    int totalErrors = pronunciationMistakes + fluencyMistakes;
+
+    int pronunciationScore = totalSpokenWords - pronunciationMistakes;
+    int fluencyScore = totalSpokenWords - fluencyMistakes;
+
+    int accuracyPercentage = (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100).toInt();
+
+    log("Total Words: $totalWords");
+    log("Total Correct: ${correctPronouncationList.length}");
+    log("Spoken: $totalSpokenWords");
+    log("Skipped: $totalSkippedWords");
+    log("Pronunciation Errors: $pronunciationMistakes");
+    log("Fluency Errors: $fluencyMistakes");
+    log("Pronunciation Score: $pronunciationScore");
+    log("Fluency Score: $fluencyScore");
+    log("Accuracy: $accuracyPercentage%");
+
+
+    // Split the text into words
+    final List<String> words = randomText.split(' ');
+
+    // Function to truncate error words
+    String _processWord(String word, bool isError) {
+      // if (isError && word.length > 3) {
+      //   int midPoint = word.length ~/ 2;
+      //   return '${word.substring(0, midPoint)}•••${word.substring(word.length - midPoint)}';
+      // }
+      return word;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Top section with progress indicators
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 1,
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // Circular progress indicator
+                SizedBox(
+                  width: 80, //progress bar circular height
+                  height: 80,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 120,
+                        height: 120,
+                        child: CircularProgressIndicator(
+                          value: accuracyPercentage/100, // 60%
+                          strokeWidth: 10,
+                          backgroundColor: Colors.grey.shade200,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.blue,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        "${accuracyPercentage}%",
+                        style: TextStyle(
+                          fontSize: 18,  // Increased font size
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 24),
+                // Metrics
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMetricRow("Pronunciation", pronunciationScore, totalSpokenWords, Colors.green),
+                      const SizedBox(height: 8),
+                      _buildMetricRow("Fluency", fluencyScore,  totalSpokenWords, Colors.blue),
+                      const SizedBox(height: 8),
+                      _buildMetricRow("Skipped", totalSkippedWords, totalWords, Colors.red),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Text content
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.2),
+                  spreadRadius: 1,
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: SingleChildScrollView(
+              child: RichText(
+                textAlign: TextAlign.left,
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    color: defaultTextColor,
+                    height: lineSpace,
+                  ),
+                  children: List.generate(words.length, (index) {
+                    bool isError = errorWordsList.contains(index);
+                    return TextSpan(
+                      text: _processWord(words[index], isError) + (index < words.length - 1 ? ' ' : ''),
+                      style: TextStyle(
+                        color: isError ? highlightWrongColor : defaultTextColor,
+                        fontWeight: isError ? FontWeight.bold : FontWeight.normal,
+                        decoration: isError ? TextDecoration.lineThrough : TextDecoration.none,
+                      ),
+                    );
+                  }),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+// Helper widget for the metrics
+  Widget _buildMetricRow(String label, int value, int totalWords, Color color) {
+    return Row(
+      children: [
+        Text(
+          "$label: ",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          "${value}/$totalWords",
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+      ],
     );
   }
 

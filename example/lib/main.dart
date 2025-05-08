@@ -31,7 +31,7 @@ class _MyAppState extends State<MyApp> {
   String _recognizedText = "Press the button to start";
   bool _isListening = false;
   double _progress = 1.0;
-  final int _timeoutDuration = 220000;
+  final int _timeoutDuration = 22000;
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
   String _randomText = "This is an apple";
@@ -91,12 +91,13 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _startRecognition() async {
     if (_isListening) return;
+    // recognizer.errorPronouncationList.clear();
+    // recognizer.errorWordsIndexes.clear();
 
     setState(() {
       _isTextReceived = false;
       _isListening = true;
       _progress = 1.0;
-      // _recognizedText = "Listening...";
     });
 
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
@@ -200,7 +201,6 @@ class _MyAppState extends State<MyApp> {
         _progress = 1.0;
         // Cancel subscription when done
         subscription?.cancel();
-        // _partialText = "";
       });
     });
   }
@@ -250,6 +250,26 @@ class _MyAppState extends State<MyApp> {
     setState(() {});
   }
 
+  int getWordCount(String text) {
+    return text.trim().split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
+  }
+
+
+  Widget _displayMistakes(){
+    int wordCount = getWordCount(_randomText);
+    return recognizer.displayMistakeWords(
+      errorWordsList: recognizer.errorWordsIndexes,
+      randomText: _randomText,
+      defaultTextColor: Colors.black,
+      highlightWrongColor: Colors.red,
+      fontSize: 18,
+      lineSpace: 1.2,
+        errorPronunciationList: recognizer.errorPronouncationList,
+        totalWords: wordCount,
+        correctPronouncationList: recognizer.correctPronouncationList
+    );
+  }
+
   Widget _buildHighlightedText() {
     if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
       _newText = "$_recognizedText $_partialText";
@@ -260,7 +280,7 @@ class _MyAppState extends State<MyApp> {
         defaultTextColor: Colors.black,
         highlightWrongColor: Colors.red,
         isAutoScroll: true,
-        autoScrollSpeed: 300,
+        autoScrollSpeed: 100,
         fontSize: 30,
         lineSpace: 1.5,
         endOfScreen: 300,
@@ -313,7 +333,12 @@ class _MyAppState extends State<MyApp> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildHighlightedText(),
+              // Use a more precise condition to check if the timer is complete
+              Expanded(
+                child: _progress <= 0.001 || (!_isListening && _isTextReceived)
+                    ? _displayMistakes()
+                    : _buildHighlightedText(),
+              ),
               SizedBox(
                 height: 10,
               ),
@@ -323,16 +348,6 @@ class _MyAppState extends State<MyApp> {
                 _isListening ? "Listening..." : "",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
               ),
-
-              // _selectedType == RecognitionType.koreanNumbers
-              //     ? Text(
-              //   _randomNumber,
-              //   style: TextStyle(fontSize: 22, color: Color(0xFF444444)),
-              // )
-              //     : Text(
-              //   _randomText,
-              //   style: TextStyle(fontSize: 22, color: Color(0xFF444444)),
-              // ),
 
               const SizedBox(height: 20),
               GestureDetector(
