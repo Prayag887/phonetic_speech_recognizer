@@ -399,7 +399,7 @@ class PhoneticSpeechRecognizer {
                   wordColor = Colors.blue;
                   backgroundColor = Colors.blue;
                   borderColor = Colors.blue;
-                  weight = FontWeight.bold;
+                  weight = FontWeight.normal;
                   errorWordsPronunciationList.add(index);
                 } else if (skippedIndexes.contains(index)) {
                   wordColor = highlightWrongColor;
@@ -407,14 +407,14 @@ class PhoneticSpeechRecognizer {
                   borderColor = highlightWrongColor;
                   errorWordsIndexList.add(index);
                   errorWordsPronunciationList.add(index);
-                  weight = FontWeight.bold;
+                  weight = FontWeight.normal;
                 } else if (index < targetIndex) {
                   wordColor = highlightWrongColor;
                   backgroundColor = highlightWrongColor;
                   borderColor = highlightWrongColor;
                   errorWordsIndexList.add(index);
                   errorWordsPronunciationList.add(index);
-                  weight = FontWeight.bold;
+                  weight = FontWeight.normal;
                 } else {
                   wordColor = defaultTextColor;
                   backgroundColor = Color(0xFFFFFFFF);
