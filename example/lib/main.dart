@@ -280,7 +280,7 @@ class _MyAppState extends State<MyApp> {
         defaultTextColor: Colors.black,
         highlightWrongColor: Colors.red,
         isAutoScroll: true,
-        autoScrollSpeed: 100,
+        autoScrollSpeed: 200,
         fontSize: 30,
         lineSpace: 1.5,
         endOfScreen: 300,

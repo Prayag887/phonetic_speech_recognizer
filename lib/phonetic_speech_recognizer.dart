@@ -376,8 +376,7 @@ class PhoneticSpeechRecognizer {
       }
     });
 
-    return Flexible(
-      child: SingleChildScrollView(
+    return SingleChildScrollView(
         controller: controller,
         child: Padding(
           padding: EdgeInsets.only(top: endOfScreen),
@@ -454,7 +453,6 @@ class PhoneticSpeechRecognizer {
             ),
           ),
         ),
-      ),
     );
   }
 
@@ -469,7 +467,6 @@ class PhoneticSpeechRecognizer {
     required double fontSize,
     required double lineSpace,
   }) {
-    print("THIS IS ERROR LIST $errorWordsList");
 
     int totalSpokenWords = correctPronouncationList.length + errorPronouncationList.length;
     int totalSkippedWords = totalWords - totalSpokenWords;
