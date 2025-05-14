@@ -196,13 +196,13 @@ class PhoneticSpeechRecognizer {
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    final int maxLookahead = 4;
-    final int maxSkipLimit = 4;
+    final int maxLookahead = 6;
+    final int maxSkipLimit = 6;
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
     final List<String> errorBuffer = [];
-    final int consecutiveErrorThreshold = 3;
+    final int consecutiveErrorThreshold = 5;
     List<int> errorWordsIndexList= [];
     List<int> errorWordsPronunciationList= [];
     List<int> correctWordsList= [];
