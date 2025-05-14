@@ -652,12 +652,7 @@ class PhoneticSpeechRecognizer {
     );
   }
 
-  static Future<String?> recognize({
-    required PhoneticType type,
-    String? languageCode,
-    required int timeout,
-    String? sentence,
-  }) async {
+  static Future<String?> recognize({required PhoneticType type, String? languageCode, required int timeout, String? sentence,}) async {
     // Validate timeout
     if (timeout < 0) {
       throw ArgumentError('Timeout must be a positive value');
@@ -698,69 +693,27 @@ class PhoneticSpeechRecognizer {
   }
 
   //this check if the mandatory words are in the recognized sentence or not
-  Widget mandatoryWords({required List<String> mandatoryWordsList, required String recognizedSentence, required Color defaultTextColor}) {
-    // convert both to lowercase
+  bool mandatoryWords({
+    required List<String> mandatoryWordsList,
+    required String recognizedSentence,
+  }) {
     final lowerCaseSentence = recognizedSentence.toLowerCase();
-    final lowerCaseMandatoryWords = mandatoryWordsList.map((word) => word.toLowerCase()).toList();
+    final lowerCaseMandatoryWords =
+    mandatoryWordsList.map((word) => word.toLowerCase()).toList();
 
-    bool allWordsPresent = true;
-    bool correctOrder = true;
+    int lastIndex = -1;
 
-    // Check if all words are present
     for (String word in lowerCaseMandatoryWords) {
-      if (!lowerCaseSentence.contains(word)) {
-        allWordsPresent = false;
-        break;
+      int currentIndex = lowerCaseSentence.indexOf(word);
+
+      if (currentIndex == -1 || currentIndex < lastIndex) {
+        return false; // Word not found or order is incorrect
       }
+
+      lastIndex = currentIndex;
     }
 
-    // Check for correct order
-    if (allWordsPresent && lowerCaseMandatoryWords.length > 1) {
-      int lastIndex = -1;
-
-      for (String word in lowerCaseMandatoryWords) {
-        int currentIndex = lowerCaseSentence.indexOf(word);
-
-        if (currentIndex <= lastIndex) {
-          correctOrder = false;
-          break;
-        }
-
-        lastIndex = currentIndex;
-      }
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: allWordsPresent && correctOrder ? Colors.green : Colors.red,
-          width: 2,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Recognized: $recognizedSentence',
-            style: TextStyle(color: defaultTextColor),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            allWordsPresent && correctOrder
-                ? 'All mandatory words present in correct order!'
-                : !allWordsPresent
-                ? 'Missing mandatory words!'
-                : 'Words present but in wrong order!',
-            style: TextStyle(
-              color: allWordsPresent && correctOrder ? Colors.green : Colors.red,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
+    return true;
   }
+
 }
