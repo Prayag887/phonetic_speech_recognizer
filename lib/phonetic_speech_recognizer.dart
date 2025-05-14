@@ -566,7 +566,7 @@ class PhoneticSpeechRecognizer {
                       const SizedBox(height: 8),
                       _buildMetricRow("Fluency", fluencyScore,  totalSpokenWords, Colors.blue),
                       const SizedBox(height: 8),
-                      _buildMetricRow("Skipped", totalSkippedWords, totalWords, Colors.red),
+                      _buildMetricRow("Mistakes", totalErrors, totalWords, Colors.red),
                     ],
                   ),
                 ),
