@@ -176,18 +176,7 @@ class PhoneticSpeechRecognizer {
   }
 
 
-  Widget buildRealTimeHighlightedText({
-    required String randomText,
-    required String partialText,
-    required Color highlightCorrectColor,
-    required Color defaultTextColor,
-    required Color highlightWrongColor,
-    required bool isAutoScroll,
-    required int autoScrollSpeed,
-    required double fontSize,
-    required double lineSpace,
-    required double endOfScreen,
-  }) {
+  Widget buildRealTimeHighlightedText({required String randomText, required String partialText, required Color highlightCorrectColor, required Color defaultTextColor, required Color highlightWrongColor, required bool isAutoScroll, required int autoScrollSpeed, required double fontSize, required double lineSpace, required double endOfScreen,}) {
     String cleanText(String text) {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
     }
@@ -456,17 +445,7 @@ class PhoneticSpeechRecognizer {
     );
   }
 
-  Widget displayMistakeWords({
-    required List<int> errorWordsList,
-    required List<int> errorPronunciationList,
-    required List<int> correctPronouncationList,
-    required String randomText,
-    required int totalWords,
-    required Color defaultTextColor,
-    required Color highlightWrongColor,
-    required double fontSize,
-    required double lineSpace,
-  }) {
+  Widget displayMistakeWords({required List<int> errorWordsList, required List<int> errorPronunciationList, required List<int> correctPronouncationList, required String randomText, required int totalWords, required Color defaultTextColor, required Color highlightWrongColor, required double fontSize, required double lineSpace,}) {
 
     int totalSpokenWords = correctPronouncationList.length + errorPronouncationList.length;
     int totalSkippedWords = totalWords - totalSpokenWords;
@@ -716,5 +695,72 @@ class PhoneticSpeechRecognizer {
           return "";
       }
     }
+  }
+
+  //this check if the mandatory words are in the recognized sentence or not
+  Widget mandatoryWords({required List<String> mandatoryWordsList, required String recognizedSentence, required Color defaultTextColor}) {
+    // convert both to lowercase
+    final lowerCaseSentence = recognizedSentence.toLowerCase();
+    final lowerCaseMandatoryWords = mandatoryWordsList.map((word) => word.toLowerCase()).toList();
+
+    bool allWordsPresent = true;
+    bool correctOrder = true;
+
+    // Check if all words are present
+    for (String word in lowerCaseMandatoryWords) {
+      if (!lowerCaseSentence.contains(word)) {
+        allWordsPresent = false;
+        break;
+      }
+    }
+
+    // Check for correct order
+    if (allWordsPresent && lowerCaseMandatoryWords.length > 1) {
+      int lastIndex = -1;
+
+      for (String word in lowerCaseMandatoryWords) {
+        int currentIndex = lowerCaseSentence.indexOf(word);
+
+        if (currentIndex <= lastIndex) {
+          correctOrder = false;
+          break;
+        }
+
+        lastIndex = currentIndex;
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: allWordsPresent && correctOrder ? Colors.green : Colors.red,
+          width: 2,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Recognized: $recognizedSentence',
+            style: TextStyle(color: defaultTextColor),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            allWordsPresent && correctOrder
+                ? 'All mandatory words present in correct order!'
+                : !allWordsPresent
+                ? 'Missing mandatory words!'
+                : 'Words present but in wrong order!',
+            style: TextStyle(
+              color: allWordsPresent && correctOrder ? Colors.green : Colors.red,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
