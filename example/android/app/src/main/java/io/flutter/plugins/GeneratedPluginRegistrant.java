@@ -36,9 +36,9 @@ public final class GeneratedPluginRegistrant {
       Log.e(TAG, "Error registering plugin permission_handler_android, com.baseflow.permissionhandler.PermissionHandlerPlugin", e);
     }
     try {
-      flutterEngine.getPlugins().add(new com.example.phonetic_speech_recognizer.PhoneticSpeechRecognizerPlugin());
+      flutterEngine.getPlugins().add(new com.prayag.phonetic_speech_recognizer.PhoneticSpeechRecognizerPlugin());
     } catch (Exception e) {
-      Log.e(TAG, "Error registering plugin phonetic_speech_recognizer, com.example.phonetic_speech_recognizer.PhoneticSpeechRecognizerPlugin", e);
+      Log.e(TAG, "Error registering plugin phonetic_speech_recognizer, com.prayag.phonetic_speech_recognizer.PhoneticSpeechRecognizerPlugin", e);
     }
   }
 }

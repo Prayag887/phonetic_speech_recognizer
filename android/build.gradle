@@ -1,4 +1,4 @@
-group = "com.example.phonetic_speech_recognizer"
+group = "com.prayag.phonetic_speech_recognizer"
 version = "1.0-SNAPSHOT"
 
 buildscript {
@@ -30,7 +30,7 @@ apply plugin: "kotlin-android"
 
 
 android {
-    namespace = "com.example.phonetic_speech_recognizer"
+    namespace = "com.prayag.phonetic_speech_recognizer"
 
     compileSdk = 34
 
@@ -79,6 +79,7 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 
     // For MediaRecorder functionality
+
     implementation("androidx.core:core-ktx:1.10.1")
 
     // For permission handling (recommended)

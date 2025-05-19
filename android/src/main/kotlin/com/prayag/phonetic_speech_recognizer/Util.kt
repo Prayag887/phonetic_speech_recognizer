@@ -1,4 +1,4 @@
-//package com.example.phonetic_speech_recognizer
+//package com.prayag.phonetic_speech_recognizer
 //
 //import com.google.firebase.crashlytics.buildtools.reloc.org.apache.commons.codec.language.DoubleMetaphone
 //import org.apache.commons.lang3.StringUtils
