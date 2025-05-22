@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:developer';
-import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -145,6 +144,7 @@ class PhoneticSpeechRecognizer {
   }
 
   static Future<bool> stopRecognition() async {
+    // await Future.delayed(Duration(seconds: 2));
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
       return result;
@@ -381,25 +381,24 @@ class PhoneticSpeechRecognizer {
                 if (matchedIndexes.contains(index)) {
                   wordColor = highlightCorrectColor;
                   borderColor = highlightCorrectColor;
-                  backgroundColor = highlightCorrectColor;
+                  // backgroundColor = highlightCorrectColor;
                   correctWordsList.add(index);
-                  log("correct words ::::::::: ${correctWordsList.length}");
                 } else if (mispronounceIndexes.contains(index)) {
-                  wordColor = Colors.blue;
-                  backgroundColor = Colors.blue;
-                  borderColor = Colors.blue;
+                  wordColor = highlightCorrectColor;
+                  // backgroundColor = Colors.blue;
+                  borderColor = highlightCorrectColor;
                   weight = FontWeight.normal;
                   errorWordsPronunciationList.add(index);
                 } else if (skippedIndexes.contains(index)) {
                   wordColor = highlightWrongColor;
-                  backgroundColor = highlightWrongColor;
+                  // backgroundColor = highlightWrongColor;
                   borderColor = highlightWrongColor;
                   errorWordsIndexList.add(index);
                   errorWordsPronunciationList.add(index);
                   weight = FontWeight.normal;
                 } else if (index < targetIndex) {
                   wordColor = highlightWrongColor;
-                  backgroundColor = highlightWrongColor;
+                  // backgroundColor = highlightWrongColor;
                   borderColor = highlightWrongColor;
                   errorWordsIndexList.add(index);
                   errorWordsPronunciationList.add(index);
@@ -424,7 +423,7 @@ class PhoneticSpeechRecognizer {
                       //   color: Colors.transparent,
                       //   width: 1.0,
                       // ),
-                      color: backgroundColor.withAlpha(25),
+                      // color: backgroundColor.withAlpha(25),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
@@ -707,7 +706,7 @@ class PhoneticSpeechRecognizer {
       int currentIndex = lowerCaseSentence.indexOf(word);
 
       if (currentIndex == -1 || currentIndex < lastIndex) {
-        return false; // Word not found or order is incorrect
+        return false; // word not found or order is incorrect
       }
 
       lastIndex = currentIndex;

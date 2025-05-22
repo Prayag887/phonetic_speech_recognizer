@@ -1,4 +1,4 @@
-package com.example.phonetic_speech_recognizer
+package com.prayag.phonetic_speech_recognizer
 
 import android.content.Context
 import android.content.Intent
@@ -61,24 +61,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     Log.d("SpeechRecognition", "onMethodCall: ${call.method}")
     when (call.method) {
       "recognize" -> {
-        if (activeResult != null) {
-//          result.error("ALREADY_ACTIVE", "Recognition already active", null)
-          isProcessing = true
-          result.error("ALREADY_ACTIVE", "Analyzing...", null)
-          return
-        } else {
-          isProcessing = false
-
-        }
-        activeResult = result
-
         val type = call.argument<String>("type")
         val languageCode = call.argument<String>("languageCode") ?: "ja-JP"
         val timeoutMillis = call.argument<Int>("timeout")!!
         val sentence = call.argument<String>("sentence") ?: ""
 
         Log.d("TAG", "THIS IS LANGUAGE CODE: $languageCode")
-
         Log.d("TAG", "onMethodCall: ----------------- $timeoutMillis ")
         when (type) {
           "alphabet" -> handleAlphabetRecognition(timeoutMillis)
@@ -149,7 +137,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       paragraph = "",
       lang = lang,
       mapper = { text ->
-        //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
         mapNumber(
           text,
           PhoneticMapping.phoneticKoreanNumberMapping
@@ -163,11 +150,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private fun handleAlphabetRecognition(timeoutMillis: Int) {
     val isConnected = isNetworkAvailable(context)
     val lang = "ne-NP"
-//    val lang = if (isConnected) "ne-NP" else "hi-IN"
     startRecognition(
       paragraph = "",
       lang = lang,
-      //mapText returns only the mapped value (english alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapText(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
       timeoutMillis = timeoutMillis,
       keepListening = false
@@ -178,7 +163,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     startRecognition(
       paragraph = "",
       lang = languageCode,
-      //mapText returns only the mapped value (english alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapNumber(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
       timeoutMillis = timeoutMillis,
       keepListening =  false
@@ -189,7 +173,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     startRecognition(
       paragraph = "",
       lang = "ne-NP",
-      //mapText returns only the mapped value (korean alphabets in this case). If it picks up the noise on top of users voice then response wont be provided
       mapper = { text -> mapText(text, PhoneticMapping.phoneticKoreanMapping) },
       timeoutMillis = timeoutMillis,
       keepListening =  false
@@ -274,7 +257,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       for (position in positions) {
         val originalWord = words[position]
         val start = paragraph.indexOf(originalWord,
-          // Start searching from after the last highlight if possible
           if (highlightedIndices.isNotEmpty())
             highlightedIndices.last()["end"] ?: 0
           else 0
@@ -336,20 +318,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         val matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         if (!matches.isNullOrEmpty()) {
           if (keepListening) {
-            // Append the first match to the accumulated results
             val firstMatch = matches.first()
             recognizedResults.add(firstMatch)
-            // this is to append the data after recognizer is restarted during the short pause
             val accumulatedText = recognizedResults.joinToString(" ")
-            // this is to correct the grammar according to the paragraph received from the flutter side
-            // TODO() faster grammar check is required for real time updates in paragraph. Somewhat achieved by the intent above
-//            val correctedText = correctRecognizedParagraph(accumulatedText, paragraph!!)
 
             eventSink?.success(mapper(accumulatedText))
-            // Restart listening for continuous input
             speechRecognizer?.startListening(intent)
           } else {
-            // Normal behavior: replace with current matches
             recognizedResults.clear()
             recognizedResults.addAll(matches)
             isListening = false
@@ -360,10 +335,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           }
         } else {
           if (keepListening) {
-            // No matches but keep listening: restart
             speechRecognizer?.startListening(intent)
           } else {
-            // No matches and not keeping listening: error
             isListening = false
             activeResult?.error("NO_MATCH", "No speech recognized", null)
             speechRecognizer?.cancel()
@@ -388,7 +361,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
               }
               eventSink?.success(mapper(fullText))
             } else {
-              // Normal behavior: update recognizedResults with partials
               recognizedResults.clear()
               recognizedResults.addAll(partialList)
               val correctedText = correctRecognizedPhrase(partialList, paragraph)
@@ -489,7 +461,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
       capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     } else {
-      @Suppress("DEPRECATION")
       connectivityManager.activeNetworkInfo?.isConnected == true
     }
   }

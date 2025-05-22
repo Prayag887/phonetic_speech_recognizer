@@ -1,4 +1,4 @@
-//package com.example.phonetic_speech_recognizer
+//package com.prayag.phonetic_speech_recognizer
 //
 //import android.content.Context
 //import android.content.Intent
