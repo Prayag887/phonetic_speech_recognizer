@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
@@ -63,11 +64,12 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  void stopRecognition() {
-    PhoneticSpeechRecognizer.stopRecognition();
+  Future<void> stopRecognition() async {
     _timer?.cancel();
+    await Future.delayed(Duration(seconds: 2));
+    _recognizedText = " $_newText";
     subscription?.cancel();
-    _recognizedText = " " + _newText;
+    PhoneticSpeechRecognizer.stopRecognition();
     setState(() {
       _isListening = false;
       _progress = 1.0;
@@ -91,8 +93,7 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _startRecognition() async {
     if (_isListening) return;
-    // recognizer.errorPronouncationList.clear();
-    // recognizer.errorWordsIndexes.clear();
+    _partialText = "";
 
     setState(() {
       _isTextReceived = false;
@@ -175,7 +176,6 @@ class _MyAppState extends State<MyApp> {
 
         // Check if recognition was successful
         if (_selectedType == RecognitionType.koreanNumbers) {
-          // For Korean numbers, we need to compare with the Korean number
           String insideBrackets = _randomNumber.substring(
               _randomNumber.indexOf('(') + 1,
               _randomNumber.indexOf(')')
@@ -273,6 +273,7 @@ class _MyAppState extends State<MyApp> {
   Widget _buildHighlightedText() {
     if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
       _newText = "$_recognizedText $_partialText";
+      print("Recognized Text: $_newText");
       return recognizer.buildRealTimeHighlightedText(
         randomText: _randomText,
         partialText: _newText,

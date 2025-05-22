@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:developer';
-import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -145,6 +144,7 @@ class PhoneticSpeechRecognizer {
   }
 
   static Future<bool> stopRecognition() async {
+    // await Future.delayed(Duration(seconds: 2));
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
       return result;
