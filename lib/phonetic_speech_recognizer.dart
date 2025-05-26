@@ -392,7 +392,7 @@ class PhoneticSpeechRecognizer {
                 } else if (skippedIndexes.contains(index)) {
                   wordColor = highlightWrongColor;
                   // backgroundColor = highlightWrongColor;
-                  borderColor = highlightWrongColor;
+                  borderColor = Colors.blue;
                   errorWordsIndexList.add(index);
                   errorWordsPronunciationList.add(index);
                   weight = FontWeight.normal;
@@ -452,7 +452,8 @@ class PhoneticSpeechRecognizer {
     int pronunciationMistakes = errorPronouncationList.length;
     int fluencyMistakes = errorWordsList.length;
 
-    int totalErrors = pronunciationMistakes + fluencyMistakes;
+    // int totalErrors = pronunciationMistakes + fluencyMistakes;
+    int totalErrors = fluencyMistakes;
 
     int pronunciationScore = totalSpokenWords - pronunciationMistakes;
     int fluencyScore = totalSpokenWords - fluencyMistakes;
@@ -542,8 +543,8 @@ class PhoneticSpeechRecognizer {
                     children: [
                       _buildMetricRow("Pronunciation", pronunciationScore, totalSpokenWords, Colors.green),
                       const SizedBox(height: 8),
-                      _buildMetricRow("Fluency", fluencyScore,  totalSpokenWords, Colors.blue),
-                      const SizedBox(height: 8),
+                      // _buildMetricRow("Fluency", fluencyScore,  totalSpokenWords, Colors.blue),
+                      // const SizedBox(height: 8),
                       _buildMetricRow("Mistakes", totalErrors, totalWords, Colors.red),
                     ],
                   ),
@@ -665,9 +666,8 @@ class PhoneticSpeechRecognizer {
         'sentence': sentence
       });
 
-      if (kDebugMode) {
+
         print("Received result: $result");
-      }
 
       if (result.isEmpty || result == "null") {
         return "";
