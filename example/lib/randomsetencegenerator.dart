@@ -3,7 +3,7 @@ import 'dart:math';
 class RandomSentenceGenerator {
   // Word lists
   static final List<String> nouns = [
-    'dog', 'cat', 'man', 'woman', 'bird', 'house', 'car', 'tree', 'computer', 'phone'
+    'curtain', 'cotton',
   ];
 
   static final List<String> verbs = [
