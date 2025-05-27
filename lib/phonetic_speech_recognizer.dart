@@ -144,7 +144,7 @@ class PhoneticSpeechRecognizer {
   }
 
   static Future<bool> stopRecognition() async {
-    // await Future.delayed(Duration(seconds: 2));
+    await Future.delayed(Duration(seconds: 2));
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
       return result;

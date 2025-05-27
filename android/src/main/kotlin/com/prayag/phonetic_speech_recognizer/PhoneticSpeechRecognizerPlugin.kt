@@ -120,7 +120,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       lang = lang,
       mapper = { text ->
         //mapText returns only the mapped value. If it picks up the noise on top of users voice then response wont be provided
-        mapNumber(
+        Mapper().mapNumber(
           text,
           PhoneticMapping.phoneticJapaneseAlphabetMapping
         )
@@ -137,7 +137,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       paragraph = "",
       lang = lang,
       mapper = { text ->
-        mapNumber(
+        Mapper().mapNumber(
           text,
           PhoneticMapping.phoneticKoreanNumberMapping
         )
@@ -153,7 +153,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     startRecognition(
       paragraph = "",
       lang = lang,
-      mapper = { text -> mapText(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
+      mapper = { text -> Mapper().mapText(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
       timeoutMillis = timeoutMillis,
       keepListening = false
     )
@@ -163,7 +163,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     startRecognition(
       paragraph = "",
       lang = languageCode,
-      mapper = { text -> mapNumber(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
+      mapper = { text -> Mapper().mapNumber(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
       timeoutMillis = timeoutMillis,
       keepListening =  false
     )
@@ -173,7 +173,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     startRecognition(
       paragraph = "",
       lang = "ne-NP",
-      mapper = { text -> mapText(text, PhoneticMapping.phoneticKoreanMapping) },
+      mapper = { text -> Mapper().mapText(text, PhoneticMapping.phoneticKoreanMapping) },
       timeoutMillis = timeoutMillis,
       keepListening =  false
     )
@@ -184,7 +184,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       paragraph = "",
       lang = "hi-IN",
       //mapNumber has to only the mapped value (number in this case). If it picks up the noise on top of users voice then response wont be provided
-      mapper = { text -> mapNumber(text, PhoneticMapping.phoneticNumbersMapping) },
+      mapper = { text -> Mapper().mapNumber(text, PhoneticMapping.phoneticNumbersMapping) },
       timeoutMillis = timeoutMillis,
       keepListening =  false
     )
@@ -396,40 +396,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     speechRecognizer?.startListening(intent)
   }
 
-  private fun mapNumber(text: String, mapping: Map<String, List<String>>): String {
-    if (text.isBlank()) {
-      return speakLoud
-    }
-    Log.d("TAG", "numbers: ------------- $text")
-    val normalizedText = text.lowercase(Locale.ROOT)
-    val reversedMapping = mutableMapOf<String, MutableList<String>>()
-    mapping.forEach { (key, values) ->
-      values.forEach { pronunciation ->
-        val normalizedPronunciation = pronunciation.lowercase(Locale.ROOT)
-        reversedMapping.getOrPut(normalizedPronunciation) { mutableListOf() }.add(key)
-      }
-    }
-    val matchedKeys = reversedMapping[normalizedText]?.distinct() ?: listOf(text.uppercase(Locale.ROOT))
-    return matchedKeys.joinToString(", ")
-  }
-
-  private fun mapText(text: String, mapping: Map<String, List<String>>): String {
-    Log.d("TAG", "texts: ------------- $text")
-    val normalizedText = text.lowercase(Locale.ROOT)
-    val matchedKeys = mapping.entries
-      .filter { (_, pronunciations) ->
-        pronunciations.any { it.lowercase(Locale.ROOT) == normalizedText }
-      }
-      .map { it.key }
-      .distinct()
-
-    return if (matchedKeys.isNotEmpty()) {
-      matchedKeys.joinToString(", ")
-    } else {
-      speakLoud // if null
-    }
-  }
-
   private fun getErrorText(errorCode: Int): String = when (errorCode) {
     SpeechRecognizer.ERROR_AUDIO -> "Audio error"
     SpeechRecognizer.ERROR_CLIENT -> "Client error"
@@ -469,75 +435,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private fun correctRecognizedPhrase(recognizedPhrases: List<String>, expectedPhrase: String): String {
     if (recognizedPhrases.isEmpty()) return ""
 
-    val doubleMetaphone = DoubleMetaphone()
-
-    // Function to get the phonetic codes from a phrase
-    fun getPhoneticCodes(text: String): List<String> {
-      return text.lowercase()
-        .replace(Regex("[^a-z\\s]"), "")  // Remove non-alphabet characters
-        .split("\\s+".toRegex()) // Split by spaces (fix for multi-word phrases)
-        .map { word ->
-          // Ensure non-null phonetic codes, fallback to word if null
-          doubleMetaphone.doubleMetaphone(word) ?: word
-        }
-    }
-
-
-    fun calculateCodeSimilarity(code1: String, code2: String): Double {
-      // Group similar sounds together
-      val soundGroups = mapOf(
-        setOf('R', 'W') to 0.8,
-        setOf('N', "NG") to 0.8,
-        setOf("EY", "EH", "AE") to 0.7,
-        setOf("CH", "JH", "GE") to 0.7
-      )
-
-      // If codes are identical, return 1.0
-      if (code1 == code2) return 1.0
-
-      // Check if codes belong to the same sound group
-      for ((group, similarity) in soundGroups) {
-        if (code1 in group && code2 in group) {
-          return similarity
-        }
-      }
-
-      // Handle partial matches
-      val minLength = kotlin.math.min(code1.length, code2.length)
-      val commonPrefix = code1.commonPrefixWith(code2)
-      if (commonPrefix.length > 0) {
-        return commonPrefix.length.toDouble() / minLength * 0.5
-      }
-
-      return 0.0
-    }
-
-
-    fun calculatePhoneticSimilarity(phrase1: String, phrase2: String): Double {
-      val phonetics1 = getPhoneticCodes(phrase1)
-      val phonetics2 = getPhoneticCodes(phrase2)
-
-      if (kotlin.math.abs(phonetics1.size - phonetics2.size) > 1) return 0.0
-
-      var totalSimilarity = 0.0
-      val maxLength = kotlin.math.max(phonetics1.size, phonetics2.size)
-
-      phonetics1.forEachIndexed { index, code1 ->
-        if (index < phonetics2.size) {
-          val code2 = phonetics2[index]
-          // Calculate similarity between individual phonetic codes
-          totalSimilarity += calculateCodeSimilarity(code1, code2)
-        }
-      }
-
-      return totalSimilarity / maxLength
-    }
     var bestMatch = recognizedPhrases[0]
     var bestSimilarity = 0.0
 
     // Iterate through all recognized phrases and calculate the best match based on similarity
     for (recognizedPhrase in recognizedPhrases) {
-      val phoneticSimilarity = calculatePhoneticSimilarity(recognizedPhrase, expectedPhrase)
+      val phoneticSimilarity = PhoneticSimilarity().calculatePhoneticSimilarity(recognizedPhrase, expectedPhrase)
 
 //      this is to check the string similarity based on 0 to 1, 1 being best match.
       val stringSimilarity = 1.0 - (StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() / kotlin.math.max(recognizedPhrase.length, expectedPhrase.length))
@@ -548,11 +451,15 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         bestSimilarity = similarity
         bestMatch = recognizedPhrase
       }
+
+      Log.d("SpeechRecognition", "Recognized: \"$recognizedPhrase\" | Phonetic Similarity: $phoneticSimilarity | String Similarity: $stringSimilarity | Combined Similarity: $similarity | Best Similarity: $bestSimilarity")
     }
 
     if (bestSimilarity >= 0.7) {
       return expectedPhrase
     }
+
+    Log.d("SpeechRecognition", "Returning best match: $bestMatch")
     return bestMatch
   }
 }
