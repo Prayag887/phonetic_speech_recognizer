@@ -21,7 +21,7 @@ class _MyAppState extends State<MyApp> {
   String _recognizedText = "Press the button to start";
   bool _isListening = false;
   double _progress = 1.0;
-  final int _timeoutDuration = 5000;
+  final int _timeoutDuration = 15000;
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
   String _randomText = "this is an apple";

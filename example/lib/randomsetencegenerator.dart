@@ -7,7 +7,7 @@ class RandomSentenceGenerator {
   ];
 
   static final List<String> verbs = [
-    'eats', 'runs', 'jumps', 'plays', 'drives', 'sees', 'talks', 'thinks', 'sings', 'reads'
+    'eats', 'runs', 'plays', 'drives', 'talks', 'thinks', 'reads'
   ];
 
   static final List<String> adjectives = [
