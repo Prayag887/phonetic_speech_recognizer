@@ -60,8 +60,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     activity = binding.activity
     activityBinding = binding
-
-    checkAndRequestPermission()
   }
 
   override fun onDetachedFromActivity() {
@@ -98,6 +96,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     Log.d("SpeechRecognition", "onMethodCall: ${call.method}")
     when (call.method) {
       "recognize" -> {
+
+        checkAndRequestPermission()
         // CRITICAL FIX: Store the result reference
         activeResult = result
 
