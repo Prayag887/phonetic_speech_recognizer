@@ -175,15 +175,32 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
   private fun stopRecognition(result: MethodChannel.Result) {
     try {
-      // Delay 2 seconds before stopping
-      Handler(Looper.getMainLooper()).postDelayed({
+      // Check if we have an active result (meaning recognition is still ongoing)
+      if (activeResult != null) {
+        // No result obtained yet, delay stopping by 1 second
+        Log.d("TAG", "stopRecognition: No result yet, delaying stop by 1 second")
+        Handler(Looper.getMainLooper()).postDelayed({
+          // Double-check if result is still not obtained after delay
+          if (activeResult != null) {
+            speechRecognizer?.cancel()
+            cleanup()
+            result.success(true)
+            Log.d("TAG", "stopRecognition: stopped after delay - no result received")
+            isListening = false
+          } else {
+            // Result was obtained during the delay, just return success
+            result.success(true)
+            Log.d("TAG", "stopRecognition: result was obtained during delay")
+          }
+        }, 1000) // 1000 milliseconds = 1 second
+      } else {
+        // Result already obtained, stop immediately
         speechRecognizer?.cancel()
         cleanup()
         result.success(true)
-        Log.d("TAG", "stopRecognition: stopped successfully")
+        Log.d("TAG", "stopRecognition: stopped immediately - result already obtained")
         isListening = false
-      }, 400)
-
+      }
     } catch (e: Exception) {
       result.error("STOP_ERROR", "Failed to stop recognition", e.message)
     }
