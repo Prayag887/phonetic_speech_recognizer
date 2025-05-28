@@ -409,7 +409,6 @@ class PhoneticSpeechRecognizer {
                   borderColor = Color(0xFFFFFFFF);
                 }
 
-                // print("WRONG INDEXES: ${errorWordsIndexList}");
                 errorWordsIndexes = errorWordsIndexList;
                 errorPronouncationList = errorWordsPronunciationList;
                 correctPronouncationList = correctWordsList;
@@ -628,7 +627,6 @@ class PhoneticSpeechRecognizer {
     if (!controller.hasClients) return;
 
     if (autoScrollSpeed == 0){
-      print("it has to be paused");
       final double currentOffset = controller.offset;
       controller.jumpTo(currentOffset);
       return;
@@ -666,8 +664,6 @@ class PhoneticSpeechRecognizer {
         'sentence': sentence
       });
 
-
-        print("Received result: $result");
 
       if (result.isEmpty || result == "null") {
         return "";

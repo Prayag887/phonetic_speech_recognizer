@@ -18,9 +18,9 @@ class LevenshteinDistance {
                 val cost = if (s1[i - 1] == s2[j - 1]) 0 else 1
 
                 matrix[i][j] = minOf(
-                    matrix[i - 1][j] + 1,      // Deletion
-                    matrix[i][j - 1] + 1,      // Insertion
-                    matrix[i - 1][j - 1] + cost // Substitution
+                    matrix[i - 1][j] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j - 1] + cost
                 )
             }
         }

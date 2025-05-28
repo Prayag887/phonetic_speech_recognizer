@@ -51,14 +51,14 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _requestAudioPermission() async {
-    PermissionStatus status = await Permission.microphone.request();
-    if (status.isGranted) {
+    // PermissionStatus status = await Permission.microphone.request();
+    // if (status.isGranted) {
       _startRecognition();
-    } else {
-      setState(() {
-        _recognizedText = "Permission denied. Can't start recognition.";
-      });
-    }
+    // } else {
+    //   setState(() {
+    //     _recognizedText = "Permission denied. Can't start recognition.";
+    //   });
+    // }
   }
 
   void stopRecognition() {
