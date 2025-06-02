@@ -31,6 +31,7 @@ class _MyAppState extends State<MyApp> {
   String _recognizedText = "Press the button to start";
   bool _isListening = false;
   double _progress = 1.0;
+  double _confidence = 0.0;
   final int _timeoutDuration = 120000;
   Timer? _timer;
   RecognitionType _selectedType = RecognitionType.sentences;
@@ -51,7 +52,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _requestAudioPermission() async {
-      _startRecognition();
+    _startRecognition();
   }
 
   void stopRecognition() {
@@ -62,6 +63,7 @@ class _MyAppState extends State<MyApp> {
       _isListening = false;
       _progress = 1.0;
       _partialText = "";
+      // Don't reset confidence here - keep the last received value
     });
   }
 
@@ -83,8 +85,10 @@ class _MyAppState extends State<MyApp> {
       _isTextReceived = false;
       _isListening = true;
       _progress = 1.0;
-      // Don't reset _recognizedText here, keep the previous result visible
       _partialText = "";
+      // Only reset confidence at the start of new recognition
+      _confidence = 0.0;
+      _recognizedText = "";
     });
 
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
@@ -92,10 +96,7 @@ class _MyAppState extends State<MyApp> {
         _progress -= (100 / _timeoutDuration);
         if (_progress <= 0) {
           timer.cancel();
-          // Auto-stop when timeout reaches
-          if (_isListening) {
-            stopRecognition();
-          }
+          if (_isListening) stopRecognition();
         }
       });
     });
@@ -150,43 +151,68 @@ class _MyAppState extends State<MyApp> {
         break;
     }
 
+    bool sendKeyOnly = _selectedType == RecognitionType.alphabets ||
+        _selectedType == RecognitionType.numbers ||
+        _selectedType == RecognitionType.paragraphMapping;
+
     try {
       final result = await PhoneticSpeechRecognizer.recognize(
         languageCode: languageCode,
         type: phoneticType,
         timeout: _timeoutDuration,
         sentence: textToRecognize,
+        sendKeyOnly: sendKeyOnly,
       );
 
       setState(() {
-        _recognizedText = result ?? "Recognition failed";
-        _isTextReceived = _recognizedText.isNotEmpty;
+        if (!sendKeyOnly && result is Map) {
+          if (result.isNotEmpty) {
+            final confidenceStr = result['confidence'] ?? 0.0;
+            final recognizedValue = result['text']?.toString() ?? '';
 
-        // Check if recognition was successful and generate new text
-        if (_selectedType == RecognitionType.koreanNumbers) {
-          String insideBrackets = _randomNumber.substring(
-              _randomNumber.indexOf('(') + 1,
-              _randomNumber.indexOf(')')
-          );
-          if (insideBrackets.contains(_recognizedText)) {
-            _generateRandomText();
+            _recognizedText = recognizedValue;
+            _confidence = confidenceStr;
+
+            // Compare recognized text with expected text (_randomText)
+            if (_recognizedText == _randomText) {
+              _generateRandomText();
+            }
+          } else {
+            _recognizedText = "Recognition failed";
+            _confidence = 0.0;
           }
         } else {
-          if (_recognizedText == _randomText) {
-            _generateRandomText();
+          // When sendKeyOnly is true, result is just string
+          _recognizedText = result?.toString() ?? "Recognition failed";
+          if (result != null && result.toString().isNotEmpty) {
+            _confidence = 1.0;
+          } else {
+            _confidence = 0.0;
+          }
+
+          if (_selectedType == RecognitionType.koreanNumbers) {
+            String insideBrackets = _randomNumber.substring(
+                _randomNumber.indexOf('(') + 1,
+                _randomNumber.indexOf(')')
+            );
+            if (insideBrackets.contains(_recognizedText)) {
+              _generateRandomText();
+            }
+          } else {
+            if (_recognizedText == _randomText) {
+              _generateRandomText();
+            }
           }
         }
+        _isTextReceived = _recognizedText.isNotEmpty;
       });
 
-      // Auto-stop recognition after getting result (except for real-time modes)
-      if (!_isRealTIme) {
-        stopRecognition();
-      }
-
+      if (!_isRealTIme) stopRecognition();
     } catch (error) {
       setState(() {
         _recognizedText = "Error: $error";
         _isTextReceived = false;
+        _confidence = 0.0;
       });
       stopRecognition();
     }
@@ -241,16 +267,16 @@ class _MyAppState extends State<MyApp> {
   Widget _buildHighlightedText() {
     if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
       return recognizer.buildRealTimeHighlightedText(
-          randomText: _randomText,
-          partialText: _partialText,
-          highlightCorrectColor: Colors.green,
-          defaultTextColor: Colors.black,
-          highlightWrongColor: Colors.red,
-          isAutoScroll: true,
-          autoScrollSpeed: 1,
-          fontSize: 18,
-          lineSpace: 1.5,
-          endOfScreen: 0.5
+        randomText: _randomText,
+        partialText: _partialText,
+        highlightCorrectColor: Colors.green,
+        defaultTextColor: Colors.black,
+        highlightWrongColor: Colors.red,
+        isAutoScroll: true,
+        autoScrollSpeed: 1,
+        fontSize: 18,
+        lineSpace: 1.5,
+        endOfScreen: 0.5,
       );
     } else {
       List<String> words = _randomText.split(" ");
@@ -291,48 +317,78 @@ class _MyAppState extends State<MyApp> {
                 const PopupMenuItem(value: RecognitionType.numbers, child: Text('Numbers')),
                 const PopupMenuItem(value: RecognitionType.koreanAlphabets, child: Text('Korean Alphabets')),
                 const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
-                const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese (Alphabets)')),
-                const PopupMenuItem(value: RecognitionType.koreanNumbers, child: Text('Korean (Numbers)')),
-                const PopupMenuItem(value: RecognitionType.allLanguageSupport, child: Text('Japanese (Numbers)')),
-                const PopupMenuItem(value: RecognitionType.paragraphMapping, child: Text('Paragraphs')),
+                const PopupMenuItem(value: RecognitionType.koreanNumber, child: Text('Korean Number')),
+                const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese Alphabet')),
+                const PopupMenuItem(value: RecognitionType.allLanguageSupport, child: Text('All Language Support')),
+                const PopupMenuItem(value: RecognitionType.koreanNumbers, child: Text('Korean Numbers')),
+                const PopupMenuItem(value: RecognitionType.paragraphMapping, child: Text('Paragraph Mapping')),
               ],
             ),
           ],
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(20.0),
+        body: Container(
+          padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildHighlightedText(),
-              const SizedBox(height: 10),
-              // Always show listening status when listening
-              if (_isListening)
-                Text(
-                  "Listening...",
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: _buildHighlightedText(),
                 ),
-              const SizedBox(height: 10),
-              // Always show the recognized text
-              Text(
-                _recognizedText,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 20),
-              GestureDetector(
-                onLongPressStart: (_) => _requestAudioPermission(),
-                onLongPressEnd: (_) => stopRecognition(),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: _isListening ? Colors.red : Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.mic, color: Colors.white, size: 32),
-                ),
+              Text(
+                _isListening ? "Listening..." : "Tap to start recognition",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 10),
               LinearProgressIndicator(value: _progress),
+              const SizedBox(height: 20),
+              Text(
+                "Recognized Text:",
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              Text(
+                _recognizedText,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "Confidence: ${_confidence.toStringAsFixed(2)}",
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.green),
+              ),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () {
+                  if (_isListening) {
+                    stopRecognition();
+                  } else {
+                    _requestAudioPermission();
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                  decoration: BoxDecoration(
+                    color: _isListening ? Colors.red : Colors.blue,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        spreadRadius: 2,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    _isListening ? "Stop" : "Start",
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

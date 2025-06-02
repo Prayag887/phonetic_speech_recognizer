@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -650,40 +651,66 @@ class PhoneticSpeechRecognizer {
     );
   }
 
-  static Future<String?> recognize({required PhoneticType type, String? languageCode, required int timeout, String? sentence,}) async {
-    // Validate timeout
+  static Future<dynamic> recognize({
+    required PhoneticType type,
+    String? languageCode,
+    required int timeout,
+    String? sentence,
+    bool sendKeyOnly = true,
+  }) async {
     if (timeout < 0) {
       throw ArgumentError('Timeout must be a positive value');
     }
 
     try {
-      final String result = await _channel.invokeMethod('recognize', {
+      final dynamic raw = await _channel.invokeMethod('recognize', {
         'type': type.toString().split('.').last,
         'languageCode': languageCode,
         'timeout': timeout,
-        'sentence': sentence
+        'sentence': sentence,
       });
 
+      if (raw == null) return "";
 
-      if (result.isEmpty || result == "null") {
-        return "";
+      // Case 1: raw is a String
+      if (raw is String) {
+        if (sendKeyOnly) {
+          print("THIS IS STRING ONLY: $raw");
+          return raw;
+        } else {
+          return {'text': raw, 'confidence': null};
+        }
       }
-      return result;
+
+      // Case 2: raw is a Map
+      if (raw is Map) {
+        final Map<String, double> result = raw.map(
+              (key, value) => MapEntry(key.toString(), (value as num).toDouble()),
+        );
+
+        if (result.isEmpty) return "";
+
+        final entry = result.entries.first;
+        final String text = entry.key;
+        final double confidence = entry.value;
+
+        if (sendKeyOnly) {
+          print("THIS IS TEXT ONLY: $text");
+          return text;
+        } else {
+          print("THIS IS TEXT: $text CONFIDENCE: $confidence");
+          return {'text': text, 'confidence': confidence};
+        }
+      }
+
+      // If result type is not handled
+      print("Unexpected result type: ${raw.runtimeType}");
+      return "";
     } on PlatformException catch (e) {
       if (kDebugMode) {
         print("Speech Recognition Error: ${e.code} - ${e.message}");
       }
-      // You might want to handle specific error codes differently
-      switch (e.code) {
-        case 'TIMEOUT':
-          return "";
-        case 'SPEECH_ERROR':
-          return "";
-        case 'ALREADY_ACTIVE':
-          return "";
-        default:
-          return "";
-      }
+      return "";
     }
   }
 
