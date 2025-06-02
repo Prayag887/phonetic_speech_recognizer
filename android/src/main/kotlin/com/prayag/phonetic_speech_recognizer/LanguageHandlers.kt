@@ -30,7 +30,7 @@ class LanguageHandlers(private val context: Context) {
         pluginInstance?.startRecognition(
             paragraph = "",
             lang = lang,
-            mapper = { text -> Mapper().mapText(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
+            mapper = { text -> Mapper().mapText(text.keys.first(), PhoneticMapping.phoneticNepaliToEnglishMapping) },
             timeoutMillis = timeoutMillis,
             keepListening = false
         )
@@ -48,7 +48,7 @@ class LanguageHandlers(private val context: Context) {
         pluginInstance?.startRecognition(
             paragraph = "",
             lang = languageCode,
-            mapper = { text -> Mapper().mapNumber(text, PhoneticMapping.phoneticNepaliToEnglishMapping) },
+            mapper = { text -> Mapper().mapNumber(text.keys.first(), PhoneticMapping.phoneticNepaliToEnglishMapping) },
             timeoutMillis = timeoutMillis,
             keepListening = false
         )
@@ -65,7 +65,7 @@ class LanguageHandlers(private val context: Context) {
         pluginInstance?.startRecognition(
             paragraph = "",
             lang = "ne-NP",
-            mapper = { text -> Mapper().mapText(text, PhoneticMapping.phoneticKoreanMapping) },
+            mapper = { text -> Mapper().mapText(text.keys.first(), PhoneticMapping.phoneticKoreanMapping) },
             timeoutMillis = timeoutMillis,
             keepListening = false
         )
@@ -82,7 +82,7 @@ class LanguageHandlers(private val context: Context) {
         pluginInstance?.startRecognition(
             paragraph = "",
             lang = "hi-IN",
-            mapper = { text -> Mapper().mapNumber(text, PhoneticMapping.phoneticNumbersMapping) },
+            mapper = { text -> Mapper().mapNumber(text.keys.first(), PhoneticMapping.phoneticNumbersMapping) },
             timeoutMillis = timeoutMillis,
             keepListening = false
         )
@@ -108,7 +108,7 @@ class LanguageHandlers(private val context: Context) {
             paragraph = "",
             lang = languageCode,
             mapper = { text ->
-                if (languageCode == "en-US") correctRecognizedPhrase(listOf(text), sentence) else text
+                if (languageCode == "en-US") correctRecognizedPhrase(listOf(text.keys.first()), sentence) else text
             },
             timeoutMillis = timeoutMillis,
             keepListening = false
@@ -138,7 +138,7 @@ class LanguageHandlers(private val context: Context) {
             lang = languageCode,
             mapper = { text ->
                 if (languageCode == "en-US") {
-                    pluginInstance?.updateHighlightedText(text, words, paragraph)
+                    pluginInstance?.updateHighlightedText(text.keys.first(), words, paragraph)
                 }
                 text
             },
@@ -161,7 +161,7 @@ class LanguageHandlers(private val context: Context) {
             lang = lang,
             mapper = { text ->
                 Mapper().mapNumber(
-                    text,
+                    text.keys.first(),
                     PhoneticMapping.phoneticJapaneseAlphabetMapping
                 )
             },
@@ -184,7 +184,7 @@ class LanguageHandlers(private val context: Context) {
             lang = lang,
             mapper = { text ->
                 Mapper().mapNumber(
-                    text,
+                    text.keys.first(),
                     PhoneticMapping.phoneticKoreanNumberMapping
                 )
             },
@@ -208,21 +208,25 @@ class LanguageHandlers(private val context: Context) {
     }
 
     // Helper method for correcting recognized phrases (you'll need to implement this)
-    fun correctRecognizedPhrase(recognizedPhrases: List<String>, expectedPhrase: String): String {
-        if (recognizedPhrases.isEmpty()) return ""
+    fun correctRecognizedPhrase(
+        recognizedPhrases: List<String>,
+        expectedPhrase: String
+    ): Map<String, Double> {
+        if (recognizedPhrases.isEmpty()) return mapOf("" to 0.0)
 
         var bestMatch = recognizedPhrases[0]
         var bestSimilarity = 0.0
 
-        // Iterate through all recognized phrases and calculate the best match based on similarity
         for (recognizedPhrase in recognizedPhrases) {
             val phoneticSimilarity = PhoneticSimilarity().calculatePhoneticSimilarity(recognizedPhrase, expectedPhrase)
 
-//      this is to check the string similarity based on 0 to 1, 1 being best match.
-            val stringSimilarity = 1.0 - (StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() / kotlin.math.max(recognizedPhrase.length, expectedPhrase.length))
-            val similarity = (phoneticSimilarity + stringSimilarity) / 2.0  // Combine both phonetic and string similarity
+            val stringSimilarity = 1.0 - (
+                    StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() /
+                            kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
+                    )
 
-            // Keep track of the best match
+            val similarity = (phoneticSimilarity + stringSimilarity) / 2.0
+
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
                 bestMatch = recognizedPhrase
@@ -231,12 +235,13 @@ class LanguageHandlers(private val context: Context) {
             Log.d("SpeechRecognition", "Recognized: \"$recognizedPhrase\" | Phonetic Similarity: $phoneticSimilarity | String Similarity: $stringSimilarity | Combined Similarity: $similarity | Best Similarity: $bestSimilarity")
         }
 
-        if (bestSimilarity >= 0.7) {
-            Log.d("SpeechRecognition", "Returning expectedPhrase match: $expectedPhrase")
-            return expectedPhrase
+        return if (bestSimilarity >= 0.7) {
+            Log.d("SpeechRecognition", "Returning expectedPhrase match: $expectedPhrase with similarity $bestSimilarity")
+            mapOf(expectedPhrase to bestSimilarity)
+        } else {
+            Log.d("SpeechRecognition", "Returning best match: $bestMatch with similarity $bestSimilarity")
+            mapOf(bestMatch to bestSimilarity)
         }
-
-        Log.d("SpeechRecognition", "Returning best match: $bestMatch")
-        return bestMatch
     }
+
 }

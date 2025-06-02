@@ -173,39 +173,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
-//  private fun stopRecognition(result: MethodChannel.Result) {
-//    try {
-//      // Check if we have an active result (meaning recognition is still ongoing)
-//      if (activeResult != null) {
-//        // No result obtained yet, delay stopping by 1 second
-//        Log.d("TAG", "stopRecognition: No result yet, delaying stop by 1 second")
-//        Handler(Looper.getMainLooper()).postDelayed({
-//          // Double-check if result is still not obtained after delay
-//          if (activeResult != null) {
-//            speechRecognizer?.cancel()
-//            cleanup()
-//            result.success(true)
-//            Log.d("TAG", "stopRecognition: stopped after delay - no result received")
-//            isListening = false
-//          } else {
-//            // Result was obtained during the delay, just return success
-//            result.success(true)
-//            Log.d("TAG", "stopRecognition: result was obtained during delay")
-//          }
-//        }, 1000) // 1000 milliseconds = 1 second
-//      } else {
-//        // Result already obtained, stop immediately
-//        speechRecognizer?.cancel()
-//        cleanup()
-//        result.success(true)
-//        Log.d("TAG", "stopRecognition: stopped immediately - result already obtained")
-//        isListening = false
-//      }
-//    } catch (e: Exception) {
-//      result.error("STOP_ERROR", "Failed to stop recognition", e.message)
-//    }
-//  }
-
   fun updateHighlightedText(spokenText: String, words: List<String>, paragraph: String): Map<String, Any> {
     val highlightedIndices = mutableListOf<Map<String, Int>>()
     val spokenWords = spokenText.lowercase(Locale.ENGLISH).split(" ").filter { it.isNotEmpty() }
@@ -241,7 +208,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     return mapOf("highlights" to highlightedIndices.sortedBy { it["start"] })
   }
 
-  fun startRecognition(lang: String, mapper: (String) -> Any, timeoutMillis: Int, paragraph: String = "", keepListening: Boolean) {
+  fun startRecognition(lang: String, mapper: (Map<String, Double>) -> Any, timeoutMillis: Int, paragraph: String = "", keepListening: Boolean) {
     // Set processing flags
     isProcessing = true
     isListening = true
@@ -275,9 +242,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     timeoutRunnable = Runnable {
       try {
         val finalResult = if (isKeepListening) {
-          recognizedResults.joinToString(" ") // Join all accumulated results
+          mapOf(recognizedResults.joinToString(" ") to 0.0 ) // Join all accumulated results
         } else {
-          recognizedResults.firstOrNull() ?: ""
+          mapOf((recognizedResults.firstOrNull() ?: "") to 0.0)
         }
         activeResult?.success(mapper(finalResult))
       } catch (e: Exception) {
@@ -297,7 +264,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             if (keepListening) {
               val firstMatch = matches.first()
               recognizedResults.add(firstMatch)
-              val accumulatedText = recognizedResults.joinToString(" ")
+              val accumulatedText = mapOf(recognizedResults.joinToString(" ") to 0.0)
 
               eventSink?.success(mapper(accumulatedText))
               speechRecognizer?.startListening(intent)
@@ -305,7 +272,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
               recognizedResults.clear()
               recognizedResults.addAll(matches)
               isListening = false
-              val finalResult = mapper(matches.first())
+              val mappedMatches = mapOf(matches.first() to 0.0) // change to the real value later
+              val finalResult = mapper(mappedMatches)
               Log.d("SpeechRecognition", "Sending final result: $finalResult")
               activeResult?.success(finalResult)
               speechRecognizer?.cancel()
@@ -336,9 +304,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
                 val currentPartial = partialList.firstOrNull { paragraph.contains(it) } ?: partialList.first()
                 val accumulatedText = recognizedResults.joinToString(" ")
                 val fullText = if (accumulatedText.isNotEmpty()) {
-                  "$accumulatedText $currentPartial"
+                  mapOf("$accumulatedText $currentPartial" to 0.0)
                 } else {
-                  currentPartial
+                  mapOf(currentPartial to 0.0)
                 }
                 eventSink?.success(mapper(fullText))
               } else {
