@@ -225,7 +225,8 @@ class LanguageHandlers(private val context: Context) {
                             kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
                     )
 
-            val similarity = (phoneticSimilarity + stringSimilarity) / 2.0
+            val similarity = (phoneticSimilarity * 0.6)  + (stringSimilarity * 0.4)
+//            val similarity = (phoneticSimilarity  + stringSimilarity) / 2.0 // this is exactly half, but we need more phonetic similarity and less string similarity
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity

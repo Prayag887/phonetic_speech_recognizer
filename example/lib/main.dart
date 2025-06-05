@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'dart:async';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
@@ -40,6 +42,8 @@ class _MyAppState extends State<MyApp> {
   String _partialText = "";
   bool _isTextReceived = false;
   bool _isRealTIme = false;
+  Ticker? _ticker;
+  String _latestPartialText = '';
 
   PhoneticSpeechRecognizer recognizer = PhoneticSpeechRecognizer();
   StreamSubscription? subscription;
@@ -69,13 +73,27 @@ class _MyAppState extends State<MyApp> {
 
   void _listenForPartialResults() {
     subscription?.cancel();
+    _ticker?.dispose();
+
+    // Step 1: Capture stream data into a buffer
     subscription = recognizer.listenToStream().listen((data) {
-      setState(() {
-        _partialText = data;
-      });
+      _latestPartialText = data;
     }, onError: (error) {
-      print("Stream error: $error");
+      if (kDebugMode) {
+        print("Stream error: $error");
+      }
     });
+
+    // Step 2: Poll buffer at 30 FPS
+    _ticker = Ticker((_) {
+      if (_partialText != _latestPartialText) {
+        setState(() {
+          _partialText = _latestPartialText;
+        });
+      }
+    });
+
+    _ticker!.start();
   }
 
   Future<void> _startRecognition() async {

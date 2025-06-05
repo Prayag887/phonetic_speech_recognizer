@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:developer';
-import 'dart:ffi';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -145,7 +144,7 @@ class PhoneticSpeechRecognizer {
   }
 
   static Future<bool> stopRecognition() async {
-    await Future.delayed(Duration(seconds: 2));
+    await Future.delayed(Duration(seconds: 1));
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
       return result;
@@ -675,7 +674,7 @@ class PhoneticSpeechRecognizer {
       // Case 1: raw is a String
       if (raw is String) {
         if (sendKeyOnly) {
-          print("THIS IS STRING ONLY: $raw");
+
           return raw;
         } else {
           return {'text': raw, 'confidence': null};
@@ -695,16 +694,12 @@ class PhoneticSpeechRecognizer {
         final double confidence = entry.value;
 
         if (sendKeyOnly) {
-          print("THIS IS TEXT ONLY: $text");
           return text;
         } else {
-          print("THIS IS TEXT: $text CONFIDENCE: $confidence");
           return {'text': text, 'confidence': confidence};
         }
       }
 
-      // If result type is not handled
-      print("Unexpected result type: ${raw.runtimeType}");
       return "";
     } on PlatformException catch (e) {
       if (kDebugMode) {
