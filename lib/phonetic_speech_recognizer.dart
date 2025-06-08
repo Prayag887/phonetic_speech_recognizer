@@ -5,125 +5,189 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'double_metaphone.dart';
+
 enum PhoneticType { alphabet, koreanAlphabet, number, englishWordsOrSentence, japaneseAlphabet, koreanNumber, allLanguageSupport, paragraphsMapping }
 
 class PhoneticSpeechRecognizer {
   // Homophones dictionary - add more as needed
   final Map<String, List<String>> homophones = {
-    'accept': ['except'],
-    'affect': ['effect'],
-    'aisle': ['isle', "I'll"],
-    'aloud': ['allowed'],
-    'allowed': ['aloud'],
-    'ate': ['eight'],
-    'bare': ['bear'],
-    'bean': ['been'],
-    'been': ['bin'],
-    'blew': ['blue'],
-    'blue': ['blew'],
-    'brake': ['break'],
-    'break': ['brake'],
-    'buy': ['by', 'bye'],
-    'by': ['buy', 'bye'],
-    'bye': ['buy', 'by'],
-    'cell': ['sell'],
-    'cent': ['scent', 'sent'],
-    'dear': ['deer'],
-    'days': ['daze'],
-    'deer': ['dear'],
-    'die': ['dye'],
-    'dye': ['die'],
-    'eight': ['ate'],
-    'effect': ['affect'],
-    'except': ['accept'],
-    'fair': ['fare'],
-    'fare': ['fair'],
-    'fir': ['fur'],
-    'flour': ['flower'],
-    'flower': ['flour'],
-    'for': ['fore', 'four'],
-    'fore': ['for', 'four'],
-    'four': ['for', 'fore'],
-    'fur': ['fir'],
-    'hear': ['here'],
-    'here': ['hear'],
-    'hole': ['whole'],
-    'hour': ['our'],
-    'idle': ['idol'],
-    'idol': ['idle'],
-    'I\'ll': ['aisle', 'isle'],
-    'isle': ['aisle', 'I\'ll'],
-    'knew': ['new'],
-    'knows': ['nose'],
-    'mail': ['male'],
-    'maid': ['made'],
-    'male': ['mail'],
-    'made': ['maid'],
-    'meat': ['meet'],
-    'meet': ['meat'],
-    'morning': ['mourning'],
-    'mourning': ['morning'],
-    'new': ['knew'],
-    'nose': ['knows'],
-    'our': ['hour'],
-    'pair': ['pare', 'pear'],
-    'pare': ['pair', 'pear'],
-    'peace': ['piece'],
-    'pear': ['pair', 'pare'],
-    'piece': ['peace'],
-    'principal': ['principle'],
-    'principle': ['principal'],
-    'rain': ['rein', 'reign'],
-    'recogniser': ['recognizer'],
-    'recognizer': ['recogniser'],
-    'rein': ['rain', 'reign'],
-    'reign': ['rain', 'rein'],
-    'right': ['rite', 'write'],
-    'rite': ['right', 'write'],
-    'roll': ['role'],
-    'role': ['roll'],
-    'scene': ['seen'],
-    'scent': ['cent', 'sent'],
-    'sea': ['see'],
-    'see': ['sea'],
-    'sell': ['cell'],
-    'sent': ['cent', 'scent'],
-    'spirit': ['speech', 'speed'],
-    'speech': ['spirit', 'speed', 'spit'],
-    'some': ['sum'],
-    'steel': ['steal'],
-    'steal': ['steel'],
-    'suite': ['sweet'],
-    'sum': ['some'],
-    'sweet': ['suite'],
-    'tail': ['tale'],
-    'tale': ['tail'],
-    'their': ['there', "they're"],
-    'there': ['their', "they're"],
-    "they're": ['their', 'there'],
-    'threw': ['through', 'thru'],
-    'through': ['threw', 'thru'],
-    'thru': ['threw', 'through'],
-    'to': ['too', 'two'],
-    'too': ['to', 'two'],
-    'two': ['to', 'too'],
-    'wait': ['weight'],
-    'way': ['weigh'],
-    'wear': ['ware', 'where'],
-    'weather': ['whether'],
-    'weigh': ['way'],
-    'weight': ['wait'],
-    'whether': ['weather'],
-    'where': ['wear', 'ware'],
-    'whole': ['hole'],
-    'wood': ['would'],
-    'won': ['one'],
-    'would': ['wood'],
-    'write': ['right', 'rite'],
-    'you\'re': ['your'],
-    'your': ['you\'re']
+  'accept': ['except'],
+  'affect': ['effect'],
+  'aisle': ['isle', "I'll"],
+  'aloud': ['allowed'],
+  'allowed': ['aloud'],
+  'ate': ['eight', 'hate'],
+  'bare': ['bear'],
+  'bean': ['been'],
+  'been': ['bin'],
+  'blew': ['blue'],
+  'blue': ['blew'],
+  'brake': ['break'],
+  'break': ['brake'],
+  'buy': ['by', 'bye'],
+  'by': ['buy', 'bye'],
+  'bye': ['buy', 'by'],
+  'cell': ['sell'],
+  'cent': ['scent', 'sent'],
+  'dear': ['deer'],
+  'days': ['daze'],
+  'deer': ['dear'],
+  'die': ['dye'],
+  'dye': ['die'],
+  'eight': ['ate'],
+  'effect': ['affect'],
+  'except': ['accept'],
+  'fair': ['fare'],
+  'fare': ['fair'],
+  'fir': ['fur'],
+  'flour': ['flower'],
+  'flower': ['flour'],
+  'for': ['fore', 'four'],
+  'fore': ['for', 'four'],
+  'four': ['for', 'fore'],
+  'fur': ['fir'],
+  'hear': ['here'],
+  'here': ['hear'],
+  'hole': ['whole'],
+  'hour': ['our'],
+  'idle': ['idol'],
+  'idol': ['idle'],
+  'I\'ll': ['aisle', 'isle'],
+  'isle': ['aisle', 'I\'ll'],
+  'knew': ['new'],
+  'knows': ['nose'],
+  'mail': ['male'],
+  'maid': ['made'],
+  'male': ['mail'],
+  'made': ['maid'],
+  'meat': ['meet'],
+  'meet': ['meat'],
+  'morning': ['mourning'],
+  'mourning': ['morning'],
+  'new': ['knew'],
+  'nose': ['knows'],
+  'our': ['hour'],
+  'pair': ['pare', 'pear'],
+  'pare': ['pair', 'pear'],
+  'peace': ['piece'],
+  'pear': ['pair', 'pare'],
+  'piece': ['peace'],
+  'principal': ['principle'],
+  'principle': ['principal'],
+  'rain': ['rein', 'reign'],
+  'raise': ['rays'],
+  'rays': ['raise'],
+  'recogniser': ['recognizer'],
+  'recognizer': ['recogniser'],
+  'rein': ['rain', 'reign'],
+  'reign': ['rain', 'rein'],
+  'right': ['rite', 'write'],
+  'rite': ['right', 'write'],
+  'roll': ['role'],
+  'role': ['roll'],
+  'scene': ['seen'],
+  'scent': ['cent', 'sent'],
+  'sea': ['see'],
+  'see': ['sea'],
+  'sell': ['cell'],
+  'sent': ['cent', 'scent'],
+  'sita': ['cheetah'],
+  'cheetah': ['sita'],
+  'spirit': ['speech', 'speed'],
+  'speech': ['spirit', 'speed', 'spit'],
+  'some': ['sum'],
+  'source': ['shores'],
+  'shores': ['source'],
+  'steel': ['steal'],
+  'steal': ['steel'],
+  'suite': ['sweet'],
+  'sum': ['some'],
+  'sweet': ['suite'],
+  'tail': ['tale'],
+  'tale': ['tail'],
+  'their': ['there', "they're"],
+  'there': ['their', "they're"],
+  "they're": ['their', 'there'],
+  'threw': ['through', 'thru'],
+  'through': ['threw', 'thru'],
+  'thru': ['threw', 'through'],
+  'to': ['too', 'two'],
+  'too': ['to', 'two'],
+  'two': ['to', 'too'],
+  'wait': ['weight'],
+  'way': ['weigh'],
+  'wear': ['ware', 'where'],
+  'weather': ['whether'],
+  'weigh': ['way'],
+  'weight': ['wait'],
+  'whether': ['weather'],
+  'where': ['wear', 'ware'],
+  'whole': ['hole'],
+  'wood': ['would'],
+  'won': ['one'],
+  'would': ['wood'],
+  'write': ['right', 'rite'],
+  'you\'re': ['your'],
+  'your': ['you\'re'],
+
+  'began': ['begin'],
+  'begin': ['began'],
+
+  'I': ['a'],
+  'a': ['I'],
+
+  'lives': ['leaves'],
+  'leaves': ['lives'],
+  'come': ['came', 'become'],
+  'become': ['come', 'came'],
+
+  'fewa lake': ['favorite', 'fever', 'few'],
+  'favorite': ['fewa lake', 'fever', 'few'],
+
+  'baglung': ['baglong', 'pagaloon', 'bag'],
+  'nawaraj': ['nawaz', 'navraj', 'navbharat'],
+  'gorkha': ['gorka', 'gurkha'],
+
+  'enquired': ['and quiet', 'and quite', 'and quit'],
+  'and quiet': ['enquired', 'and quite', 'and quit'],
+  'and quite': ['and quiet', 'enquired', 'and quit'],
+  'and quit': ['and quiet', 'enquired', 'enquired'],
+
+  'parts' : ['paths'],
+  'paths' : ['parts'],
+  'hate' : ['ate', 'eight'],
+
+  'clean' : ['green'],
+  'green' : ['clean'],
+
+  'walk' : ['walked'],
+  'walked' : ['walk'],
+  'watched' : ['watch'],
+  'watch' : ['watched'],
+
+
+  'hill': ['little'],
+  'little': ['hill'],
+
+  'goal': ['core'],
+  'core': ['goal'],
+
+  'accurately': ['security'],
+  'security': ['accurately'],
   };
 
+
+  // Function words that should always be highlighted as correct
+  static const Set<String> functionWords = {
+    'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+    'should', 'may', 'might', 'can', 'shall', 'must', 'i', 'you', 'he',
+    'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my',
+    'your', 'his', 'its', 'our', 'their', 'this', 'that', 'these',
+    'those', 'not', 'no', 'yes'
+  };
 
   List<int> errorWordsIndexes = [];
   List<int> errorPronouncationList= [];
@@ -176,25 +240,38 @@ class PhoneticSpeechRecognizer {
   }
 
 
-  Widget buildRealTimeHighlightedText({required String randomText, required String partialText, required Color highlightCorrectColor, required Color defaultTextColor, required Color highlightWrongColor, required bool isAutoScroll, required int autoScrollSpeed, required double fontSize, required double lineSpace, required double endOfScreen,}) {
+  Widget buildRealTimeHighlightedText({
+    required String randomText,
+    required String partialText,
+    required Color highlightCorrectColor,
+    required Color defaultTextColor,
+    required Color highlightWrongColor,
+    required bool isAutoScroll,
+    required int autoScrollSpeed,
+    required double fontSize,
+    required double lineSpace,
+    required double endOfScreen,
+  }) {
     String cleanText(String text) {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
     }
+
+    // print("Arjun → ${DoubleMetaphone.encode("arjun")}");
 
     List<String> originalWords = randomText.split(RegExp(r'\s+'));
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    final int maxLookahead = 6;
-    final int maxSkipLimit = 6;
+    final int maxLookahead = 2;
+    final int maxSkipLimit = 2;
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
     final List<String> errorBuffer = [];
     final int consecutiveErrorThreshold = 5;
-    List<int> errorWordsIndexList= [];
-    List<int> errorWordsPronunciationList= [];
-    List<int> correctWordsList= [];
+    List<int> errorWordsIndexList = [];
+    List<int> errorWordsPronunciationList = [];
+    List<int> correctWordsList = [];
 
     bool isHomophone(String word1, String word2) {
       if (word1 == word2) return true;
@@ -204,6 +281,22 @@ class PhoneticSpeechRecognizer {
       }
 
       return false;
+    }
+
+    bool isMetaphoneMatch(String word1, String word2) {
+      // Get metaphone codes for both words
+      List<String> metaphone1 = DoubleMetaphone.encode(word1);
+      List<String> metaphone2 = DoubleMetaphone.encode(word2);
+
+      // Check if either primary or secondary metaphones match
+      return (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[0]) ||
+          (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[1]) ||
+          (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[1]) ||
+          (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[0]);
+    }
+
+    bool isFunctionWord(String word) {
+      return functionWords.contains(word.toLowerCase());
     }
 
     double wordSimilarity(String word1, String word2) {
@@ -240,11 +333,27 @@ class PhoneticSpeechRecognizer {
     }
 
     bool isExactMatch(String word1, String word2) {
-      return word1 == word2 || isHomophone(word1, word2);
+      // Function words are always considered exact matches if they're function words
+      if (isFunctionWord(word1) && isFunctionWord(word2)) {
+        return true;
+      }
+
+      // Check exact match, homophone, or metaphone match
+      return word1 == word2 ||
+          isHomophone(word1, word2) ||
+          isMetaphoneMatch(word1, word2);
     }
 
     bool isSimilarMatch(String word1, String word2) {
-      if (isHomophone(word1, word2)) return false;
+      // Function words should not be considered similar matches (they're either exact or wrong)
+      if (isFunctionWord(word1) || isFunctionWord(word2)) {
+        return false;
+      }
+
+      // Don't consider homophones or metaphone matches as similar (they're exact)
+      if (isHomophone(word1, word2) || isMetaphoneMatch(word1, word2)) {
+        return false;
+      }
 
       if (word1.length >= 4 && word2.length >= 4) {
         double similarity = wordSimilarity(word1, word2);
@@ -254,7 +363,13 @@ class PhoneticSpeechRecognizer {
     }
 
     bool wordsMatch(String word1, String word2) {
+      // Function words always match if both are function words
+      if (isFunctionWord(word1) && isFunctionWord(word2)) {
+        return true;
+      }
+
       if (isExactMatch(word1, word2)) return true;
+
       if (word1.length >= 4 && word2.length >= 4) {
         return wordSimilarity(word1, word2) > 0.75;
       }
@@ -287,7 +402,7 @@ class PhoneticSpeechRecognizer {
       bool found = false;
 
       for (int i = targetIndex; i < targetIndex + maxLookahead && i < targetWords.length; i++) {
-        // Check for exact match or homophone
+        // Check for exact match (including homophones, metaphones, and function words)
         if (isExactMatch(targetWords[i], partialWord)) {
           matchedIndexes.add(i);
           targetIndex = i + 1;
@@ -295,7 +410,7 @@ class PhoneticSpeechRecognizer {
           errorBuffer.clear();
           break;
         }
-        // Check for similar match (mispronunciation)
+        // Check for similar match (mispronunciation) - but not for function words
         else if (isSimilarMatch(targetWords[i], partialWord)) {
           mispronounceIndexes.add(i);
           targetIndex = i + 1;
@@ -398,7 +513,6 @@ class PhoneticSpeechRecognizer {
                   weight = FontWeight.normal;
                 } else if (index < targetIndex) {
                   wordColor = highlightWrongColor;
-                  // backgroundColor = highlightWrongColor;
                   borderColor = highlightWrongColor;
                   errorWordsIndexList.add(index);
                   errorWordsPronunciationList.add(index);

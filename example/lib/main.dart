@@ -40,6 +40,7 @@ class _MyAppState extends State<MyApp> {
   String _randomText = "This is an apple";
   String _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
   String _partialText = "";
+  String _newText = "";
   bool _isTextReceived = false;
   bool _isRealTIme = false;
   Ticker? _ticker;
@@ -269,10 +270,8 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.paragraphMapping:
         _recognizedText = "";
         _isRealTIme = true;
-        _randomText = "This is a random paragraph created for the testing purpose. The test is to be carried out for speech recognizer to see if it can "
-            "accurately detect the words being spoken. This is a much simpler form of paragraph. This paragraph does not contain the words that are conflicting "
-            "with each others. The conflicts can appear when there are multiple words that sounds the same but are different in spellings like [RIGHT] and [WRITE]. "
-            "When both words are being used then there is no way to check which of the two spellings are required to be registered.";
+        _randomText = "This is a test paragraph for speech recognition. The goal is to check if it can detect spoken words accurately. It's a simple paragraph without confusing words. Conflicts happen when similar sounding words like [RIGHT] and [WRITE] are used. In such cases, it's hard to know which spelling is correct."
+       " I visited Bandipur, a small hill town. The streets were clean with old houses and stone paths. I saw mountain views while walking around. People were friendly and smiling. I ate local food and watched the sunset. Bandipur was quiet and peaceful.";
         break;
       default:
         _isRealTIme = false;
@@ -284,36 +283,53 @@ class _MyAppState extends State<MyApp> {
 
   Widget _buildHighlightedText() {
     if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
+      _newText = "$_recognizedText $_partialText";
+      print("Recognized Text: $_newText");
       return recognizer.buildRealTimeHighlightedText(
         randomText: _randomText,
-        partialText: _partialText,
-        highlightCorrectColor: Colors.green,
+        partialText: _newText,
+        highlightCorrectColor: Color(0xFF00BC7D),
         defaultTextColor: Colors.black,
         highlightWrongColor: Colors.red,
         isAutoScroll: true,
-        autoScrollSpeed: 1,
-        fontSize: 18,
+        autoScrollSpeed: 200,
+        fontSize: 30,
         lineSpace: 1.5,
-        endOfScreen: 0.5,
+        endOfScreen: 300,
       );
     } else {
-      List<String> words = _randomText.split(" ");
-      return RichText(
-        text: TextSpan(
-          children: List.generate(words.length, (index) {
-            return TextSpan(
-              text: "${words[index]} ",
-              style: const TextStyle(
-                fontSize: 18,
-                color: Colors.black,
-                fontWeight: FontWeight.bold,
-                backgroundColor: Colors.transparent,
-              ),
-            );
-          }),
-        ),
+      return recognizer.buildRealTimeHighlightedText(
+        randomText: _randomText,
+        partialText: _newText,
+        highlightCorrectColor: Color(0xFF00BC7D),
+        defaultTextColor: Colors.black,
+        highlightWrongColor: Colors.red,
+        isAutoScroll: false,
+        autoScrollSpeed: 0,
+        fontSize: 30,
+        lineSpace: 1.5,
+        endOfScreen: 300,
       );
     }
+  }
+
+  int getWordCount(String text) {
+    return text.trim().split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
+  }
+
+  Widget _displayMistakes(){
+    int wordCount = getWordCount(_randomText);
+    return recognizer.displayMistakeWords(
+        errorWordsList: recognizer.errorWordsIndexes,
+        randomText: _randomText,
+        defaultTextColor: Colors.black,
+        highlightWrongColor: Colors.red,
+        fontSize: 18,
+        lineSpace: 1.2,
+        errorPronunciationList: recognizer.errorPronouncationList,
+        totalWords: wordCount,
+        correctPronouncationList: recognizer.correctPronouncationList
+    );
   }
 
   @override
@@ -335,78 +351,59 @@ class _MyAppState extends State<MyApp> {
                 const PopupMenuItem(value: RecognitionType.numbers, child: Text('Numbers')),
                 const PopupMenuItem(value: RecognitionType.koreanAlphabets, child: Text('Korean Alphabets')),
                 const PopupMenuItem(value: RecognitionType.sentences, child: Text('Sentences')),
-                const PopupMenuItem(value: RecognitionType.koreanNumber, child: Text('Korean Number')),
-                const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese Alphabet')),
-                const PopupMenuItem(value: RecognitionType.allLanguageSupport, child: Text('All Language Support')),
-                const PopupMenuItem(value: RecognitionType.koreanNumbers, child: Text('Korean Numbers')),
-                const PopupMenuItem(value: RecognitionType.paragraphMapping, child: Text('Paragraph Mapping')),
+                const PopupMenuItem(value: RecognitionType.japaneseAlphabet, child: Text('Japanese (Alphabets)')),
+                const PopupMenuItem(value: RecognitionType.koreanNumbers, child: Text('Korean (Numbers)')),
+                const PopupMenuItem(value: RecognitionType.allLanguageSupport, child: Text('Japanese (Numbers)')),
+                const PopupMenuItem(value: RecognitionType.paragraphMapping, child: Text('Paragraphs')),
               ],
             ),
           ],
         ),
-        body: Container(
-          padding: const EdgeInsets.all(16),
+        body: Padding(
+          padding: const EdgeInsets.all(20.0),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              // Use a more precise condition to check if the timer is complete
               Expanded(
-                child: SingleChildScrollView(
-                  child: _buildHighlightedText(),
-                ),
+                child: _progress <= 0.001 || (!_isListening && _isTextReceived)
+                    ? _displayMistakes()
+                    : _buildHighlightedText(),
               ),
-              const SizedBox(height: 20),
-              Text(
-                _isListening ? "Listening..." : "Tap to start recognition",
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              SizedBox(
+                height: 10,
               ),
-              const SizedBox(height: 10),
-              LinearProgressIndicator(value: _progress),
-              const SizedBox(height: 20),
-              Text(
-                "Recognized Text:",
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              _isTextReceived
+                  ? Container() // If _isTextReceived is true, show nothing
+                  : Text(
+                _isListening ? "Listening..." : "",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
               ),
-              Text(
-                _recognizedText,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                "Confidence: ${_confidence.toStringAsFixed(2)}",
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.green),
-              ),
+
               const SizedBox(height: 20),
               GestureDetector(
-                onTap: () {
-                  if (_isListening) {
-                    stopRecognition();
+                onLongPressStart: (_) => _requestAudioPermission(),
+                onLongPressEnd: (_) {
+                  if (_isRealTIme) {
+                    print("error words list: ${recognizer.errorWordsIndexes}");
+                    stopRecognition();  // Stop recognition immediately if _isRealTime is true
                   } else {
-                    _requestAudioPermission();
+                    _isTextReceived ? stopRecognition() : print("Still analyzing");
                   }
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 32),
+                  padding: EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: _isListening ? Colors.red : Colors.blue,
-                    borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        spreadRadius: 2,
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    shape: BoxShape.circle,
                   ),
-                  child: Text(
-                    _isListening ? "Stop" : "Start",
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: Icon(Icons.mic, color: Colors.white, size: 32),
                 ),
               ),
+              SizedBox(
+                height: 10,
+              ),
+              LinearProgressIndicator(value: _progress),
             ],
           ),
         ),
