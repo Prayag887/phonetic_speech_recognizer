@@ -319,16 +319,18 @@ class PhoneticSpeechRecognizer {
     }
 
     // Debug prints
-    print('SUMMARY:');
-    print('Original words: $originalWords');
-    print('Target words: $targetWords');
-    print('Matched indexes: $matchedIndexes');
-    print('Mispronounce indexes: $mispronounceIndexes');
-    print('Skipped indexes: $skippedIndexes');
-    print('Target index: $targetIndex');
-    print('Correct words list: $correctWordsList');
-    print('Error pronunciation list: $errorWordsPronunciationList');
-    print('Error words index list: $errorWordsIndexList');
+    if (kDebugMode) {
+      print('SUMMARY:');
+      print('Original words: $originalWords');
+      print('Target words: $targetWords');
+      print('Matched indexes: $matchedIndexes');
+      print('Mispronounce indexes: $mispronounceIndexes');
+      print('Skipped indexes: $skippedIndexes');
+      print('Target index: $targetIndex');
+      print('Correct words list: $correctWordsList');
+      print('Error pronunciation list: $errorWordsPronunciationList');
+      print('Error words index list: $errorWordsIndexList');
+    }
 
     // Set global variables
     errorWordsIndexes = errorWordsIndexList;
