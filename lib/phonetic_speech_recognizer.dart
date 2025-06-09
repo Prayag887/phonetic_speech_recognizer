@@ -407,7 +407,10 @@ class PhoneticSpeechRecognizer {
     int pronunciationScore = totalSpokenWords - pronunciationMistakes;
     int fluencyScore = totalSpokenWords - fluencyMistakes;
 
-    int accuracyPercentage = (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100).toInt();
+    double accuracyPercentageDouble = (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100);
+
+    int accuracyPercentage = accuracyPercentageDouble > 0 ? accuracyPercentageDouble.toInt() : 0;
+    // (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100).toInt();
 
 
     // Split the text into words

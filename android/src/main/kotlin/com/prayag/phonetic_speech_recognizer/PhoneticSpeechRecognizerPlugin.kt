@@ -133,14 +133,19 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       "stopRecognition" -> {
-        if (isProcessing) {
-          stopRecognition(result)
-        } else {
-          Log.d("TAG", "Still analyzing")
-          Handler(Looper.getMainLooper()).postDelayed({
-            stopRecognition(result)
-          }, 100)
-        }
+
+        stopRecognition(result)
+
+
+//        if (isProcessing) {
+//          stopRecognition(result)
+//        } else {
+//          Log.d("TAG", "Still analyzing")
+//          Handler(Looper.getMainLooper()).postDelayed({
+//            stopRecognition(result)
+//          }, 100)
+//          stopRecognition(result)
+//        }
       }
 
       "isListening" -> {
