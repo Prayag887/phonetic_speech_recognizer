@@ -64,8 +64,17 @@ class PhoneticSpeechRecognizer {
 
   Stream<String> listenToStream() {
     return getDataStream().map((dynamic data) {
-      // Ensure the data is returned as a String
-      return data != null ? data.toString() : "";
+      if (data != null && data is Map) {
+        // Return the first key as a String, or modify as needed
+        return data.keys.first.toString();
+
+        // Or if you want all keys joined together:
+        // return data.keys.map((key) => key.toString()).join(', ');
+
+        // Or if you expect only one key:
+        // return data.keys.single.toString();
+      }
+      return "";
     });
   }
 
