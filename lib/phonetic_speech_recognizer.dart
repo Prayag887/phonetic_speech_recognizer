@@ -37,7 +37,7 @@ class PhoneticSpeechRecognizer {
       return version;
     } on PlatformException catch (e) {
       if (kDebugMode) {
-        print("Error: ${e.message}");
+        log("Error: ${e.message}");
       }
       return null;
     }
@@ -303,33 +303,33 @@ class PhoneticSpeechRecognizer {
     for (int index = 0; index < originalWords.length; index++) {
       if (matchedIndexes.contains(index)) {
         correctWordsList.add(index);
-        print('Correct word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+        log('Correct word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       } else if (mispronounceIndexes.contains(index)) {
         errorWordsPronunciationList.add(index);
-        print(' Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+        log(' Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       } else if (skippedIndexes.contains(index)) {
         errorWordsIndexList.add(index);
         errorWordsPronunciationList.add(index);
-        print('Skipped word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+        log('Skipped word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       } else if (index < targetIndex) {
         errorWordsIndexList.add(index);
         errorWordsPronunciationList.add(index);
-        print('Error word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+        log('Error word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       }
     }
 
-    // Debug prints
+    // Debug logs
     if (kDebugMode) {
-      print('SUMMARY:');
-      print('Original words: $originalWords');
-      print('Target words: $targetWords');
-      print('Matched indexes: $matchedIndexes');
-      print('Mispronounce indexes: $mispronounceIndexes');
-      print('Skipped indexes: $skippedIndexes');
-      print('Target index: $targetIndex');
-      print('Correct words list: $correctWordsList');
-      print('Error pronunciation list: $errorWordsPronunciationList');
-      print('Error words index list: $errorWordsIndexList');
+      log('SUMMARY:');
+      log('Original words: $originalWords');
+      log('Target words: $targetWords');
+      log('Matched indexes: $matchedIndexes');
+      log('Mispronounce indexes: $mispronounceIndexes');
+      log('Skipped indexes: $skippedIndexes');
+      log('Target index: $targetIndex');
+      log('Correct words list: $correctWordsList');
+      log('Error pronunciation list: $errorWordsPronunciationList');
+      log('Error words index list: $errorWordsIndexList');
     }
 
     // Set global variables
@@ -659,7 +659,7 @@ class PhoneticSpeechRecognizer {
       return "";
     } on PlatformException catch (e) {
       if (kDebugMode) {
-        print("Speech Recognition Error: ${e.code} - ${e.message}");
+        log("Speech Recognition Error: ${e.code} - ${e.message}");
       }
       return "";
     }

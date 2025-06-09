@@ -96,7 +96,7 @@ class _MyAppState extends State<MyApp> {
       _latestPartialText = data;
     }, onError: (error) {
       if (kDebugMode) {
-        print("Stream error: $error");
+        log("Stream error: $error");
       }
     });
 
@@ -302,7 +302,7 @@ class _MyAppState extends State<MyApp> {
                       builder: (context, isListening, child) {
                         if (selectedType == RecognitionType.paragraphMapping && isListening) {
                           _newTextNotifier.value = "$recognizedText $partialText";
-                          print("Recognized Text: ${_newTextNotifier.value}");
+                          log("Recognized Text: ${_newTextNotifier.value}");
                           return recognizer.buildRealTimeHighlightedText(
                             randomText: randomText,
                             partialText: _newTextNotifier.value,
@@ -444,10 +444,10 @@ class _MyAppState extends State<MyApp> {
                         onLongPressStart: (_) => _requestAudioPermission(),
                         onLongPressEnd: (_) {
                           if (_isRealTimeNotifier.value) {
-                            print("error words list: ${recognizer.errorWordsIndexes}");
+                            log("error words list: ${recognizer.errorWordsIndexes}");
                             stopRecognition();  // Stop recognition immediately if _isRealTime is true
                           } else {
-                            isTextReceived ? stopRecognition() : print("Still analyzing");
+                            isTextReceived ? stopRecognition() : log("Still analyzing");
                           }
                         },
                         child: Container(
