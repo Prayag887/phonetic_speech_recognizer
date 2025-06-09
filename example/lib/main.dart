@@ -316,6 +316,12 @@ class _MyAppState extends State<MyApp> {
                             fontSize: 30,
                             lineSpace: 1.5,
                             endOfScreen: 300,
+
+                            callback: ({correctPronouncationListLength, errorPronouncationListLength, errorWordsIndexesLength}) {
+                              log("Correct Pronouncation List Length: $correctPronouncationListLength");
+                              log("Error Pronouncation List Length: $errorPronouncationListLength");
+                              log("Error Words Indexes Length: $errorWordsIndexesLength");
+                            },
                           );
                         } else {
                           return recognizer.buildRealTimeHighlightedText(
@@ -329,6 +335,11 @@ class _MyAppState extends State<MyApp> {
                             fontSize: 30,
                             lineSpace: 1.5,
                             endOfScreen: 300,
+                            callback: ({correctPronouncationListLength, errorPronouncationListLength, errorWordsIndexesLength}) {
+                              log("Correct Pronouncation List Length:::::::::: $correctPronouncationListLength");
+                              log("Error Pronouncation List Length: $errorPronouncationListLength");
+                              log("Error Words Indexes Length: $errorWordsIndexesLength");
+                            },
                           );
                         }
                       },

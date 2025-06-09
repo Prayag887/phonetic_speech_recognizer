@@ -96,6 +96,7 @@ class PhoneticSpeechRecognizer {
     required double fontSize,
     required double lineSpace,
     required double endOfScreen,
+    required void Function({int? correctPronouncationListLength, int? errorPronouncationListLength, int? errorWordsIndexesLength}) callback,
   }) {
     String cleanText(String text) {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
@@ -336,6 +337,12 @@ class PhoneticSpeechRecognizer {
     errorWordsIndexes = errorWordsIndexList;
     errorPronouncationList = errorWordsPronunciationList;
     correctPronouncationList = correctWordsList;
+
+    callback(
+      errorWordsIndexesLength: errorWordsIndexList.length,
+      errorPronouncationListLength: errorWordsPronunciationList.length,
+      correctPronouncationListLength: correctWordsList.length
+    );
 
     ScrollController controller = ScrollController();
 
