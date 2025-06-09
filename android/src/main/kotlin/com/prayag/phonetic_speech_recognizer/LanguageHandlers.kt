@@ -91,7 +91,7 @@ class LanguageHandlers(private val context: Context) {
     fun handleWordsRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
         Log.d("SpeechRecognition", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
         if (languageCode == null) {
-            logln("this is sentence $sentence")
+            println("this is sentence $sentence")
             pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
             pluginInstance?.activeResult = null
             return
@@ -118,7 +118,7 @@ class LanguageHandlers(private val context: Context) {
     fun handleParagraphMapping(languageCode: String?, timeoutMillis: Int, paragraph: String) {
         Log.d("SpeechRecognition", "PARAGRAPH FROM FLUTTER SIDE: \"$paragraph\"")
         if (languageCode == null) {
-            logln("this is paragraph $paragraph")
+            println("this is paragraph $paragraph")
             pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
             pluginInstance?.activeResult = null
             return
