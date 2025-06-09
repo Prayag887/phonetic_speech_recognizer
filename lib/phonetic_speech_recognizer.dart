@@ -408,8 +408,7 @@ class PhoneticSpeechRecognizer {
     int fluencyScore = totalSpokenWords - fluencyMistakes;
 
     double accuracyPercentageDouble = (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100);
-
-    int accuracyPercentage = accuracyPercentageDouble > 0 ? accuracyPercentageDouble.toInt() : 0;
+    int accuracyPercentage = (accuracyPercentageDouble > 0) ? accuracyPercentageDouble.toInt() : 0;
     // (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100).toInt();
 
 
