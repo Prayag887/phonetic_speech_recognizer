@@ -275,8 +275,7 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.paragraphMapping:
         _recognizedTextNotifier.value = "";
         _isRealTimeNotifier.value = true;
-        _randomTextNotifier.value = "This is a test paragraph for speech recognition. The goal is to check if it can detect spoken words accurately. It's a simple paragraph without confusing words. Conflicts happen when similar sounding words like [RIGHT] and [WRITE] are used. In such cases, it's hard to know which spelling is correct."
-            " I visited Bandipur, a small hill town. The streets were clean with old houses and stone paths. I saw mountain views while walking around. People were friendly and smiling. I ate local food and watched the sunset. Bandipur was quiet and peaceful.";
+        _randomTextNotifier.value = "Hello";
         break;
       default:
         _isRealTimeNotifier.value = false;

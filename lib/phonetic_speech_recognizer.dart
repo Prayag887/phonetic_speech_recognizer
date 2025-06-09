@@ -101,8 +101,6 @@ class PhoneticSpeechRecognizer {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
     }
 
-    // print("bandipur → ${DoubleMetaphone.encode("bandipur")}");
-
     List<String> originalWords = randomText.split(RegExp(r'\s+'));
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
@@ -113,7 +111,9 @@ class PhoneticSpeechRecognizer {
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
     final List<String> errorBuffer = [];
-    final int consecutiveErrorThreshold = 5;
+    final int consecutiveErrorThreshold = 2;
+
+    // Initialize lists outside the UI rendering
     List<int> errorWordsIndexList = [];
     List<int> errorWordsPronunciationList = [];
     List<int> correctWordsList = [];
@@ -129,11 +129,9 @@ class PhoneticSpeechRecognizer {
     }
 
     bool isMetaphoneMatch(String word1, String word2) {
-      // Get metaphone codes for both words
       List<String> metaphone1 = DoubleMetaphone.encode(word1);
       List<String> metaphone2 = DoubleMetaphone.encode(word2);
 
-      // Check if either primary or secondary metaphones match
       return (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[0]) ||
           (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[1]) ||
           (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[1]) ||
@@ -178,24 +176,20 @@ class PhoneticSpeechRecognizer {
     }
 
     bool isExactMatch(String word1, String word2) {
-      // Function words are always considered exact matches if they're function words
       if (isFunctionWord(word1) && isFunctionWord(word2)) {
         return true;
       }
 
-      // Check exact match, homophone, or metaphone match
       return word1 == word2 ||
           isHomophone(word1, word2) ||
           isMetaphoneMatch(word1, word2);
     }
 
     bool isSimilarMatch(String word1, String word2) {
-      // Function words should not be considered similar matches (they're either exact or wrong)
       if (isFunctionWord(word1) || isFunctionWord(word2)) {
         return false;
       }
 
-      // Don't consider homophones or metaphone matches as similar (they're exact)
       if (isHomophone(word1, word2) || isMetaphoneMatch(word1, word2)) {
         return false;
       }
@@ -208,7 +202,6 @@ class PhoneticSpeechRecognizer {
     }
 
     bool wordsMatch(String word1, String word2) {
-      // Function words always match if both are function words
       if (isFunctionWord(word1) && isFunctionWord(word2)) {
         return true;
       }
@@ -247,7 +240,6 @@ class PhoneticSpeechRecognizer {
       bool found = false;
 
       for (int i = targetIndex; i < targetIndex + maxLookahead && i < targetWords.length; i++) {
-        // Check for exact match (including homophones, metaphones, and function words)
         if (isExactMatch(targetWords[i], partialWord)) {
           matchedIndexes.add(i);
           targetIndex = i + 1;
@@ -255,7 +247,6 @@ class PhoneticSpeechRecognizer {
           errorBuffer.clear();
           break;
         }
-        // Check for similar match (mispronunciation) - but not for function words
         else if (isSimilarMatch(targetWords[i], partialWord)) {
           mispronounceIndexes.add(i);
           targetIndex = i + 1;
@@ -276,15 +267,12 @@ class PhoneticSpeechRecognizer {
             int skipCount = newIndex - oldTargetIndex;
 
             if (skipCount <= maxSkipLimit) {
-              // Process the matched pattern words
               for (int j = 0; j < errorBuffer.length; j++) {
-                // Check if it's exact match or similar
                 if (isExactMatch(errorBuffer[j], targetWords[newIndex + j])) {
                   matchedIndexes.add(newIndex + j);
                 } else if (isSimilarMatch(errorBuffer[j], targetWords[newIndex + j])) {
                   mispronounceIndexes.add(newIndex + j);
                 } else {
-                  // This shouldn't happen with wordsMatch, but just in case
                   matchedIndexes.add(newIndex + j);
                 }
               }
@@ -298,7 +286,6 @@ class PhoneticSpeechRecognizer {
               targetIndex = newIndex + errorBuffer.length;
               errorBuffer.clear();
             } else {
-              // Skip not allowed, keep sliding window
               while (errorBuffer.length > consecutiveErrorThreshold - 1) {
                 errorBuffer.removeAt(0);
               }
@@ -312,6 +299,42 @@ class PhoneticSpeechRecognizer {
       }
     }
 
+    // Process the lists ONCE after matching logic is complete
+    for (int index = 0; index < originalWords.length; index++) {
+      if (matchedIndexes.contains(index)) {
+        correctWordsList.add(index);
+        print('Correct word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+      } else if (mispronounceIndexes.contains(index)) {
+        errorWordsPronunciationList.add(index);
+        print(' Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+      } else if (skippedIndexes.contains(index)) {
+        errorWordsIndexList.add(index);
+        errorWordsPronunciationList.add(index);
+        print('Skipped word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+      } else if (index < targetIndex) {
+        errorWordsIndexList.add(index);
+        errorWordsPronunciationList.add(index);
+        print('Error word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+      }
+    }
+
+    // Debug prints
+    print('SUMMARY:');
+    print('Original words: $originalWords');
+    print('Target words: $targetWords');
+    print('Matched indexes: $matchedIndexes');
+    print('Mispronounce indexes: $mispronounceIndexes');
+    print('Skipped indexes: $skippedIndexes');
+    print('Target index: $targetIndex');
+    print('Correct words list: $correctWordsList');
+    print('Error pronunciation list: $errorWordsPronunciationList');
+    print('Error words index list: $errorWordsIndexList');
+
+    // Set global variables
+    errorWordsIndexes = errorWordsIndexList;
+    errorPronouncationList = errorWordsPronunciationList;
+    correctPronouncationList = correctWordsList;
+
     ScrollController controller = ScrollController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -319,86 +342,66 @@ class PhoneticSpeechRecognizer {
         if (isAutoScroll && autoScrollSpeed > 0) {
           startAutoScroll(controller, autoScrollSpeed);
         } else {
-          // Explicitly stop any ongoing scroll
           controller.jumpTo(controller.offset);
         }
       }
     });
 
     return SingleChildScrollView(
-        controller: controller,
-        child: Padding(
-          padding: EdgeInsets.only(top: endOfScreen),
-          child: RichText(
-            text: TextSpan(
-              children: List.generate(originalWords.length, (index) {
-                String word = originalWords[index];
-                Color wordColor;
-                Color borderColor;
-                Color backgroundColor;
-                FontWeight weight = FontWeight.normal;
+      controller: controller,
+      child: Padding(
+        padding: EdgeInsets.only(top: endOfScreen),
+        child: RichText(
+          text: TextSpan(
+            children: List.generate(originalWords.length, (index) {
+              String word = originalWords[index];
+              Color wordColor;
+              Color borderColor;
+              Color backgroundColor = Color(0xFFFFFFFF);
+              FontWeight weight = FontWeight.normal;
 
-                if (matchedIndexes.contains(index)) {
-                  wordColor = highlightCorrectColor;
-                  borderColor = highlightCorrectColor;
-                  // backgroundColor = highlightCorrectColor;
-                  correctWordsList.add(index);
-                } else if (mispronounceIndexes.contains(index)) {
-                  wordColor = highlightCorrectColor;
-                  // backgroundColor = Colors.blue;
-                  borderColor = highlightCorrectColor;
-                  weight = FontWeight.normal;
-                  errorWordsPronunciationList.add(index);
-                } else if (skippedIndexes.contains(index)) {
-                  wordColor = highlightWrongColor;
-                  // backgroundColor = highlightWrongColor;
-                  borderColor = Colors.blue;
-                  errorWordsIndexList.add(index);
-                  errorWordsPronunciationList.add(index);
-                  weight = FontWeight.normal;
-                } else if (index < targetIndex) {
-                  wordColor = highlightWrongColor;
-                  borderColor = highlightWrongColor;
-                  errorWordsIndexList.add(index);
-                  errorWordsPronunciationList.add(index);
-                  weight = FontWeight.normal;
-                } else {
-                  wordColor = defaultTextColor;
-                  backgroundColor = Color(0xFFFFFFFF);
-                  borderColor = Color(0xFFFFFFFF);
-                }
+              if (matchedIndexes.contains(index)) {
+                wordColor = highlightCorrectColor;
+                borderColor = highlightCorrectColor;
+              } else if (mispronounceIndexes.contains(index)) {
+                wordColor = highlightCorrectColor;
+                borderColor = highlightCorrectColor;
+                weight = FontWeight.normal;
+              } else if (skippedIndexes.contains(index)) {
+                wordColor = highlightWrongColor;
+                borderColor = Colors.blue;
+                weight = FontWeight.normal;
+              } else if (index < targetIndex) {
+                wordColor = highlightWrongColor;
+                borderColor = highlightWrongColor;
+                weight = FontWeight.normal;
+              } else {
+                wordColor = defaultTextColor;
+                borderColor = Color(0xFFFFFFFF);
+              }
 
-                errorWordsIndexes = errorWordsIndexList;
-                errorPronouncationList = errorWordsPronunciationList;
-                correctPronouncationList = correctWordsList;
-
-                return WidgetSpan(
-                  child: Container(
-                    margin: EdgeInsets.symmetric(vertical: 2),
-                    padding: EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      // border: Border.all(
-                      //   color: Colors.transparent,
-                      //   width: 1.0,
-                      // ),
-                      // color: backgroundColor.withAlpha(25),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      word,
-                      style: TextStyle(
-                        fontSize: fontSize,
-                        height: lineSpace,
-                        fontWeight: weight,
-                        color: wordColor, // Text color
-                      ),
+              return WidgetSpan(
+                child: Container(
+                  margin: EdgeInsets.symmetric(vertical: 2),
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    word,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      height: lineSpace,
+                      fontWeight: weight,
+                      color: wordColor,
                     ),
                   ),
-                );
-              }),
-            ),
+                ),
+              );
+            }),
           ),
         ),
+      ),
     );
   }
 
