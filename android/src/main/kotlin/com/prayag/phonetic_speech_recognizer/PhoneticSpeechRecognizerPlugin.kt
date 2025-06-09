@@ -83,7 +83,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     activityBinding = null
   }
 
-  // EventChannel.StreamHandler implementation
   override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
     eventSink = events
   }
@@ -96,9 +95,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     Log.d("SpeechRecognition", "onMethodCall: ${call.method}")
     when (call.method) {
       "recognize" -> {
-
         checkAndRequestPermission()
-        // CRITICAL FIX: Store the result reference
+        // Store the result reference
         activeResult = result
 
         val type = call.argument<String>("type")
@@ -106,11 +104,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         val timeoutMillis = call.argument<Int>("timeout")!!
         val sentence = call.argument<String>("sentence") ?: ""
 
-        Log.d("TAG", "THIS IS LANGUAGE CODE: $languageCode")
-        Log.d("TAG", "onMethodCall: ----------------- $timeoutMillis ")
-
         try {
-          // Use the single instance of languageHandlers instead of creating new ones
           when (type) {
             "alphabet" -> languageHandlers.handleAlphabetRecognition(timeoutMillis)
             "koreanAlphabet" -> languageHandlers.handleKoreanAlphabetRecognition(timeoutMillis)
@@ -132,21 +126,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         }
       }
 
-      "stopRecognition" -> {
-
-        stopRecognition(result)
-
-
-//        if (isProcessing) {
-//          stopRecognition(result)
-//        } else {
-//          Log.d("TAG", "Still analyzing")
-//          Handler(Looper.getMainLooper()).postDelayed({
-//            stopRecognition(result)
-//          }, 100)
-//          stopRecognition(result)
-//        }
-      }
+      "stopRecognition" -> { stopRecognition(result) }
 
       "isListening" -> {
         result.success(isListening)  // Return whether the mic is active
@@ -160,9 +140,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     val permission = Manifest.permission.RECORD_AUDIO
     if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
       ActivityCompat.requestPermissions(activity!!, arrayOf(permission), 1001)
-    } else {
-      Log.d("PhoneticPlugin", "Permission already granted.")
-    }
+    } else { Log.d("PhoneticPlugin", "Permission already granted.") }
   }
 
 
@@ -173,9 +151,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       result.success(true)
       Log.d("TAG", "stopRecognition: stopped successfully")
       isListening = false
-    } catch (e: Exception) {
-      result.error("STOP_ERROR", "Failed to stop recognition", e.message)
-    }
+    } catch (e: Exception) { result.error("STOP_ERROR", "Failed to stop recognition", e.message) }
   }
 
   fun updateHighlightedText(spokenText: String, words: List<String>, paragraph: String): Map<String, Any> {
@@ -320,16 +296,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
                 val correctedText = languageHandlers.correctRecognizedPhrase(partialList, paragraph)
                 eventSink?.success(mapper(correctedText))
               }
-            } catch (e: Exception) {
-              Log.e("SpeechRecognition", "Error processing partial results", e)
-            }
+            } catch (e: Exception) { Log.e("SpeechRecognition", "Error processing partial results", e) }
           }
         }
       }
 
       override fun onError(error: Int) {
-        Log.d("SpeechRecognition", "onError called with error: ${getErrorText(error)}")
-
         if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
                   error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
                   error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
