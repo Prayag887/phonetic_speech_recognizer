@@ -9,11 +9,8 @@ import io.flutter.plugin.common.MethodChannel
 import org.apache.commons.lang3.StringUtils
 
 class LanguageHandlers(private val context: Context) {
-
-    // Reference to the main plugin instance to access activeResult
     private var pluginInstance: PhoneticSpeechRecognizerPlugin? = null
 
-    // Method to set the plugin instance
     fun setPluginInstance(plugin: PhoneticSpeechRecognizerPlugin) {
         pluginInstance = plugin
     }
@@ -37,7 +34,6 @@ class LanguageHandlers(private val context: Context) {
     }
 
     fun handleAllLanguages(timeoutMillis: Int, languageCode: String) {
-        Log.d("TAG", "handleAllLanguages: ------------------- $languageCode")
         val isConnected = isNetworkAvailable(context)
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
@@ -207,7 +203,7 @@ class LanguageHandlers(private val context: Context) {
         }
     }
 
-    // Helper method for correcting recognized phrases (you'll need to implement this)
+    // Helper method for correcting recognized phrases based on phonetic similarity
     fun correctRecognizedPhrase(
         recognizedPhrases: List<String>,
         expectedPhrase: String
@@ -226,23 +222,17 @@ class LanguageHandlers(private val context: Context) {
                     )
 
             val similarity = (phoneticSimilarity * 0.6)  + (stringSimilarity * 0.4)
-//            val similarity = (phoneticSimilarity  + stringSimilarity) / 2.0 // this is exactly half, but we need more phonetic similarity and less string similarity
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
                 bestMatch = recognizedPhrase
             }
-
-            Log.d("SpeechRecognition", "Recognized: \"$recognizedPhrase\" | Phonetic Similarity: $phoneticSimilarity | String Similarity: $stringSimilarity | Combined Similarity: $similarity | Best Similarity: $bestSimilarity")
-        }
+       }
 
         return if (bestSimilarity >= 0.7) {
-            Log.d("SpeechRecognition", "Returning expectedPhrase match: $expectedPhrase with similarity $bestSimilarity")
             mapOf(expectedPhrase to bestSimilarity)
         } else {
-            Log.d("SpeechRecognition", "Returning best match: $bestMatch with similarity $bestSimilarity")
             mapOf(bestMatch to bestSimilarity)
         }
     }
-
 }
