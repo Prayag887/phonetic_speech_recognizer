@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'dart:async';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
 import 'package:phonetic_speech_recognizer_example/randomsetencegenerator.dart';
 
@@ -30,19 +29,21 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  String _recognizedText = "Press the button to start";
-  bool _isListening = false;
-  double _progress = 1.0;
-  double _confidence = 0.0;
+  // ValueNotifiers for state management
+  final ValueNotifier<String> _recognizedTextNotifier = ValueNotifier<String>("Press the button to start");
+  final ValueNotifier<bool> _isListeningNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(1.0);
+  final ValueNotifier<double> _confidenceNotifier = ValueNotifier<double>(0.0);
+  final ValueNotifier<RecognitionType> _selectedTypeNotifier = ValueNotifier<RecognitionType>(RecognitionType.sentences);
+  final ValueNotifier<String> _randomTextNotifier = ValueNotifier<String>("This is an apple");
+  final ValueNotifier<String> _randomNumberNotifier = ValueNotifier<String>(RandomSentenceGenerator.generateSerialKoreanNumber());
+  final ValueNotifier<String> _partialTextNotifier = ValueNotifier<String>("");
+  final ValueNotifier<String> _newTextNotifier = ValueNotifier<String>("");
+  final ValueNotifier<bool> _isTextReceivedNotifier = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _isRealTimeNotifier = ValueNotifier<bool>(false);
+
   final int _timeoutDuration = 120000;
   Timer? _timer;
-  RecognitionType _selectedType = RecognitionType.sentences;
-  String _randomText = "This is an apple";
-  String _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
-  String _partialText = "";
-  String _newText = "";
-  bool _isTextReceived = false;
-  bool _isRealTIme = false;
   Ticker? _ticker;
   String _latestPartialText = '';
 
@@ -53,6 +54,21 @@ class _MyAppState extends State<MyApp> {
   void dispose() {
     _timer?.cancel();
     subscription?.cancel();
+    _ticker?.dispose();
+
+    // Dispose all ValueNotifiers
+    _recognizedTextNotifier.dispose();
+    _isListeningNotifier.dispose();
+    _progressNotifier.dispose();
+    _confidenceNotifier.dispose();
+    _selectedTypeNotifier.dispose();
+    _randomTextNotifier.dispose();
+    _randomNumberNotifier.dispose();
+    _partialTextNotifier.dispose();
+    _newTextNotifier.dispose();
+    _isTextReceivedNotifier.dispose();
+    _isRealTimeNotifier.dispose();
+
     super.dispose();
   }
 
@@ -64,12 +80,11 @@ class _MyAppState extends State<MyApp> {
     PhoneticSpeechRecognizer.stopRecognition();
     _timer?.cancel();
     subscription?.cancel();
-    setState(() {
-      _isListening = false;
-      _progress = 1.0;
-      _partialText = "";
-      // Don't reset confidence here - keep the last received value
-    });
+    _ticker?.dispose();
+
+    _isListeningNotifier.value = false;
+    _progressNotifier.value = 1.0;
+    _partialTextNotifier.value = "";
   }
 
   void _listenForPartialResults() {
@@ -87,10 +102,8 @@ class _MyAppState extends State<MyApp> {
 
     // Step 2: Poll buffer at 30 FPS
     _ticker = Ticker((_) {
-      if (_partialText != _latestPartialText) {
-        setState(() {
-          _partialText = _latestPartialText;
-        });
+      if (_partialTextNotifier.value != _latestPartialText) {
+        _partialTextNotifier.value = _latestPartialText;
       }
     });
 
@@ -98,40 +111,36 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _startRecognition() async {
-    if (_isListening) return;
+    if (_isListeningNotifier.value) return;
 
-    setState(() {
-      _isTextReceived = false;
-      _isListening = true;
-      _progress = 1.0;
-      _partialText = "";
-      // Only reset confidence at the start of new recognition
-      _confidence = 0.0;
-      _recognizedText = "";
-    });
+    _isTextReceivedNotifier.value = false;
+    _isListeningNotifier.value = true;
+    _progressNotifier.value = 1.0;
+    _partialTextNotifier.value = "";
+    // reset confidence at the start of new recognition
+    _confidenceNotifier.value = 0.0;
+    _recognizedTextNotifier.value = "";
 
     _timer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
-      setState(() {
-        _progress -= (100 / _timeoutDuration);
-        if (_progress <= 0) {
-          timer.cancel();
-          if (_isListening) stopRecognition();
-        }
-      });
+      _progressNotifier.value -= (100 / _timeoutDuration);
+      if (_progressNotifier.value <= 0) {
+        timer.cancel();
+        if (_isListeningNotifier.value) stopRecognition();
+      }
     });
 
     PhoneticType phoneticType;
     String languageCode;
-    String textToRecognize = _selectedType == RecognitionType.koreanNumbers ? _randomNumber : _randomText;
+    String textToRecognize = _selectedTypeNotifier.value == RecognitionType.koreanNumbers ? _randomNumberNotifier.value : _randomTextNotifier.value;
 
-    switch (_selectedType) {
+    switch (_selectedTypeNotifier.value) {
       case RecognitionType.alphabets:
         phoneticType = PhoneticType.alphabet;
         languageCode = "en-US";
         break;
       case RecognitionType.paragraphMapping:
         phoneticType = PhoneticType.paragraphsMapping;
-        languageCode = "en-US";
+        languageCode = "en-GB";
         _listenForPartialResults();
         break;
       case RecognitionType.numbers:
@@ -147,7 +156,7 @@ class _MyAppState extends State<MyApp> {
         languageCode = "ja-JP";
         break;
       case RecognitionType.koreanNumbers:
-        String numericPart = _randomNumber.substring(_randomNumber.indexOf('(') + 1, _randomNumber.indexOf(')'));
+        String numericPart = _randomNumberNotifier.value.substring(_randomNumberNotifier.value.indexOf('(') + 1, _randomNumberNotifier.value.indexOf(')'));
         int number = int.tryParse(numericPart) ?? 0;
         final koreanNumbers = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 20, 21, 100};
         phoneticType = koreanNumbers.contains(number)
@@ -170,9 +179,9 @@ class _MyAppState extends State<MyApp> {
         break;
     }
 
-    bool sendKeyOnly = _selectedType == RecognitionType.alphabets ||
-        _selectedType == RecognitionType.numbers ||
-        _selectedType == RecognitionType.paragraphMapping;
+    bool sendKeyOnly = _selectedTypeNotifier.value == RecognitionType.alphabets ||
+        _selectedTypeNotifier.value == RecognitionType.numbers ||
+        _selectedTypeNotifier.value == RecognitionType.paragraphMapping;
 
     try {
       final result = await PhoneticSpeechRecognizer.recognize(
@@ -183,134 +192,154 @@ class _MyAppState extends State<MyApp> {
         sendKeyOnly: sendKeyOnly,
       );
 
-      setState(() {
-        if (!sendKeyOnly && result is Map) {
-          if (result.isNotEmpty) {
-            final confidenceStr = result['confidence'] ?? 0.0;
-            final recognizedValue = result['text']?.toString() ?? '';
+      if (!sendKeyOnly && result is Map) {
+        if (result.isNotEmpty) {
+          final confidenceStr = result['confidence'] ?? 0.0;
+          final recognizedValue = result['text']?.toString() ?? '';
 
-            _recognizedText = recognizedValue;
-            _confidence = confidenceStr;
+          _recognizedTextNotifier.value = recognizedValue;
+          _confidenceNotifier.value = confidenceStr;
 
-            // Compare recognized text with expected text (_randomText)
-            if (_recognizedText == _randomText) {
-              _generateRandomText();
-            }
-          } else {
-            _recognizedText = "Recognition failed";
-            _confidence = 0.0;
+          // Compare recognized text with expected text (text from question like sentence or paragraph)(_randomText)
+          if (_recognizedTextNotifier.value == _randomTextNotifier.value) {
+            _generateRandomText();
           }
         } else {
-          // When sendKeyOnly is true, result is just string
-          _recognizedText = result?.toString() ?? "Recognition failed";
-          if (result != null && result.toString().isNotEmpty) {
-            _confidence = 1.0;
-          } else {
-            _confidence = 0.0;
-          }
+          _recognizedTextNotifier.value = "Recognition failed";
+          _confidenceNotifier.value = 0.0;
+        }
+      } else {
+        // When sendKeyOnly is true, result is just string
+        _recognizedTextNotifier.value = result?.toString() ?? "Recognition failed";
+        if (result != null && result.toString().isNotEmpty) {
+          _confidenceNotifier.value = 1.0;
+        } else {
+          _confidenceNotifier.value = 0.0;
+        }
 
-          if (_selectedType == RecognitionType.koreanNumbers) {
-            String insideBrackets = _randomNumber.substring(
-                _randomNumber.indexOf('(') + 1,
-                _randomNumber.indexOf(')')
-            );
-            if (insideBrackets.contains(_recognizedText)) {
-              _generateRandomText();
-            }
-          } else {
-            if (_recognizedText == _randomText) {
-              _generateRandomText();
-            }
+        if (_selectedTypeNotifier.value == RecognitionType.koreanNumbers) {
+          String insideBrackets = _randomNumberNotifier.value.substring(
+              _randomNumberNotifier.value.indexOf('(') + 1,
+              _randomNumberNotifier.value.indexOf(')')
+          );
+          if (insideBrackets.contains(_recognizedTextNotifier.value)) {
+            _generateRandomText();
+          }
+        } else {
+          if (_recognizedTextNotifier.value == _randomTextNotifier.value) {
+            _generateRandomText();
           }
         }
-        _isTextReceived = _recognizedText.isNotEmpty;
-      });
+      }
+      _isTextReceivedNotifier.value = _recognizedTextNotifier.value.isNotEmpty;
 
-      if (!_isRealTIme) stopRecognition();
+      if (!_isRealTimeNotifier.value) stopRecognition();
     } catch (error) {
-      setState(() {
-        _recognizedText = "Error: $error";
-        _isTextReceived = false;
-        _confidence = 0.0;
-      });
+      _recognizedTextNotifier.value = "Error: $error";
+      _isTextReceivedNotifier.value = false;
+      _confidenceNotifier.value = 0.0;
       stopRecognition();
     }
   }
 
   void _generateRandomText() {
-    switch (_selectedType) {
+    switch (_selectedTypeNotifier.value) {
       case RecognitionType.alphabets:
-        _isRealTIme = false;
-        _randomText = String.fromCharCode(65 + (DateTime.now().millisecondsSinceEpoch % 26));
+        _isRealTimeNotifier.value = false;
+        _randomTextNotifier.value = String.fromCharCode(65 + (DateTime.now().millisecondsSinceEpoch % 26));
         break;
       case RecognitionType.numbers:
-        _isRealTIme = false;
-        _randomText = (DateTime.now().millisecondsSinceEpoch % 100).toString();
+        _isRealTimeNotifier.value = false;
+        _randomTextNotifier.value = (DateTime.now().millisecondsSinceEpoch % 100).toString();
         break;
       case RecognitionType.koreanAlphabets:
-        _isRealTIme = false;
-        _randomText = String.fromCharCode(0xAC00 + (DateTime.now().millisecondsSinceEpoch % 11172));
+        _isRealTimeNotifier.value = false;
+        _randomTextNotifier.value = String.fromCharCode(0xAC00 + (DateTime.now().millisecondsSinceEpoch % 11172));
         break;
       case RecognitionType.japaneseAlphabet:
-        _isRealTIme = false;
-        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
+        _isRealTimeNotifier.value = false;
+        _randomTextNotifier.value = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.koreanNumber:
-        _isRealTIme = false;
-        _randomText = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
+        _isRealTimeNotifier.value = false;
+        _randomTextNotifier.value = String.fromCharCode(0x30A0 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.allLanguageSupport:
-        _isRealTIme = false;
-        _randomText = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
+        _isRealTimeNotifier.value = false;
+        _randomTextNotifier.value = String.fromCharCode(0x3040 + (DateTime.now().millisecondsSinceEpoch % 96));
         break;
       case RecognitionType.koreanNumbers:
-        _isRealTIme = false;
-        _randomNumber = RandomSentenceGenerator.generateSerialKoreanNumber();
+        _isRealTimeNotifier.value = false;
+        _randomNumberNotifier.value = RandomSentenceGenerator.generateSerialKoreanNumber();
         break;
       case RecognitionType.paragraphMapping:
-        _recognizedText = "";
-        _isRealTIme = true;
-        _randomText = "This is a test paragraph for speech recognition. The goal is to check if it can detect spoken words accurately. It's a simple paragraph without confusing words. Conflicts happen when similar sounding words like [RIGHT] and [WRITE] are used. In such cases, it's hard to know which spelling is correct."
-       " I visited Bandipur, a small hill town. The streets were clean with old houses and stone paths. I saw mountain views while walking around. People were friendly and smiling. I ate local food and watched the sunset. Bandipur was quiet and peaceful.";
+        _recognizedTextNotifier.value = "";
+        _isRealTimeNotifier.value = true;
+        _randomTextNotifier.value = "This is a test paragraph for speech recognition. The goal is to check if it can detect spoken words accurately. It's a simple paragraph without confusing words. Conflicts happen when similar sounding words like [RIGHT] and [WRITE] are used. In such cases, it's hard to know which spelling is correct."
+            " I visited Bandipur, a small hill town. The streets were clean with old houses and stone paths. I saw mountain views while walking around. People were friendly and smiling. I ate local food and watched the sunset. Bandipur was quiet and peaceful.";
         break;
       default:
-        _isRealTIme = false;
-        _randomText = RandomSentenceGenerator.generateSentence();
+        _isRealTimeNotifier.value = false;
+        _randomTextNotifier.value = RandomSentenceGenerator.generateSentence();
         break;
     }
-    setState(() {});
   }
 
   Widget _buildHighlightedText() {
-    if (_selectedType == RecognitionType.paragraphMapping && _isListening) {
-      _newText = "$_recognizedText $_partialText";
-      print("Recognized Text: $_newText");
-      return recognizer.buildRealTimeHighlightedText(
-        randomText: _randomText,
-        partialText: _newText,
-        highlightCorrectColor: Color(0xFF00BC7D),
-        defaultTextColor: Colors.black,
-        highlightWrongColor: Colors.red,
-        isAutoScroll: true,
-        autoScrollSpeed: 200,
-        fontSize: 30,
-        lineSpace: 1.5,
-        endOfScreen: 300,
-      );
-    } else {
-      return recognizer.buildRealTimeHighlightedText(
-        randomText: _randomText,
-        partialText: _newText,
-        highlightCorrectColor: Color(0xFF00BC7D),
-        defaultTextColor: Colors.black,
-        highlightWrongColor: Colors.red,
-        isAutoScroll: false,
-        autoScrollSpeed: 0,
-        fontSize: 30,
-        lineSpace: 1.5,
-        endOfScreen: 300,
-      );
-    }
+    return ValueListenableBuilder<String>(
+      valueListenable: _partialTextNotifier,
+      builder: (context, partialText, child) {
+        return ValueListenableBuilder<String>(
+          valueListenable: _recognizedTextNotifier,
+          builder: (context, recognizedText, child) {
+            return ValueListenableBuilder<String>(
+              valueListenable: _randomTextNotifier,
+              builder: (context, randomText, child) {
+                return ValueListenableBuilder<RecognitionType>(
+                  valueListenable: _selectedTypeNotifier,
+                  builder: (context, selectedType, child) {
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: _isListeningNotifier,
+                      builder: (context, isListening, child) {
+                        if (selectedType == RecognitionType.paragraphMapping && isListening) {
+                          _newTextNotifier.value = "$recognizedText $partialText";
+                          print("Recognized Text: ${_newTextNotifier.value}");
+                          return recognizer.buildRealTimeHighlightedText(
+                            randomText: randomText,
+                            partialText: _newTextNotifier.value,
+                            highlightCorrectColor: Color(0xFF00BC7D),
+                            defaultTextColor: Colors.black,
+                            highlightWrongColor: Colors.red,
+                            isAutoScroll: true,
+                            autoScrollSpeed: 200,
+                            fontSize: 30,
+                            lineSpace: 1.5,
+                            endOfScreen: 300,
+                          );
+                        } else {
+                          return recognizer.buildRealTimeHighlightedText(
+                            randomText: randomText,
+                            partialText: _newTextNotifier.value,
+                            highlightCorrectColor: Color(0xFF00BC7D),
+                            defaultTextColor: Colors.black,
+                            highlightWrongColor: Colors.red,
+                            isAutoScroll: false,
+                            autoScrollSpeed: 0,
+                            fontSize: 30,
+                            lineSpace: 1.5,
+                            endOfScreen: 300,
+                          );
+                        }
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
   }
 
   int getWordCount(String text) {
@@ -318,17 +347,22 @@ class _MyAppState extends State<MyApp> {
   }
 
   Widget _displayMistakes(){
-    int wordCount = getWordCount(_randomText);
-    return recognizer.displayMistakeWords(
-        errorWordsList: recognizer.errorWordsIndexes,
-        randomText: _randomText,
-        defaultTextColor: Colors.black,
-        highlightWrongColor: Colors.red,
-        fontSize: 18,
-        lineSpace: 1.2,
-        errorPronunciationList: recognizer.errorPronouncationList,
-        totalWords: wordCount,
-        correctPronouncationList: recognizer.correctPronouncationList
+    return ValueListenableBuilder<String>(
+      valueListenable: _randomTextNotifier,
+      builder: (context, randomText, child) {
+        int wordCount = getWordCount(randomText);
+        return recognizer.displayMistakeWords(
+            errorWordsList: recognizer.errorWordsIndexes,
+            randomText: randomText,
+            defaultTextColor: Colors.black,
+            highlightWrongColor: Colors.red,
+            fontSize: 18,
+            lineSpace: 1.2,
+            errorPronunciationList: recognizer.errorPronouncationList,
+            totalWords: wordCount,
+            correctPronouncationList: recognizer.correctPronouncationList
+        );
+      },
     );
   }
 
@@ -341,10 +375,8 @@ class _MyAppState extends State<MyApp> {
           actions: [
             PopupMenuButton<RecognitionType>(
               onSelected: (RecognitionType type) {
-                setState(() {
-                  _selectedType = type;
-                  _generateRandomText();
-                });
+                _selectedTypeNotifier.value = type;
+                _generateRandomText();
               },
               itemBuilder: (BuildContext context) => <PopupMenuEntry<RecognitionType>>[
                 const PopupMenuItem(value: RecognitionType.alphabets, child: Text('Alphabets')),
@@ -366,44 +398,79 @@ class _MyAppState extends State<MyApp> {
             children: [
               // Use a more precise condition to check if the timer is complete
               Expanded(
-                child: _progress <= 0.001 || (!_isListening && _isTextReceived)
-                    ? _displayMistakes()
-                    : _buildHighlightedText(),
-              ),
-              SizedBox(
-                height: 10,
-              ),
-              _isTextReceived
-                  ? Container() // If _isTextReceived is true, show nothing
-                  : Text(
-                _isListening ? "Listening..." : "",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
-              ),
-
-              const SizedBox(height: 20),
-              GestureDetector(
-                onLongPressStart: (_) => _requestAudioPermission(),
-                onLongPressEnd: (_) {
-                  if (_isRealTIme) {
-                    print("error words list: ${recognizer.errorWordsIndexes}");
-                    stopRecognition();  // Stop recognition immediately if _isRealTime is true
-                  } else {
-                    _isTextReceived ? stopRecognition() : print("Still analyzing");
-                  }
-                },
-                child: Container(
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: _isListening ? Colors.red : Colors.blue,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.mic, color: Colors.white, size: 32),
+                child: ValueListenableBuilder<double>(
+                  valueListenable: _progressNotifier,
+                  builder: (context, progress, child) {
+                    return ValueListenableBuilder<bool>(
+                      valueListenable: _isListeningNotifier,
+                      builder: (context, isListening, child) {
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: _isTextReceivedNotifier,
+                          builder: (context, isTextReceived, child) {
+                            return progress <= 0.001 || (!isListening && isTextReceived)
+                                ? _displayMistakes()
+                                : _buildHighlightedText();
+                          },
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
-              SizedBox(
-                height: 10,
+              SizedBox(height: 10),
+              ValueListenableBuilder<bool>(
+                valueListenable: _isTextReceivedNotifier,
+                builder: (context, isTextReceived, child) {
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: _isListeningNotifier,
+                    builder: (context, isListening, child) {
+                      return isTextReceived
+                          ? Container() // If _isTextReceived is true, show nothing
+                          : Text(
+                        isListening ? "Listening..." : "",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
+                      );
+                    },
+                  );
+                },
               ),
-              LinearProgressIndicator(value: _progress),
+              const SizedBox(height: 20),
+              ValueListenableBuilder<bool>(
+                valueListenable: _isListeningNotifier,
+                builder: (context, isListening, child) {
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: _isTextReceivedNotifier,
+                    builder: (context, isTextReceived, child) {
+                      return GestureDetector(
+                        onLongPressStart: (_) => _requestAudioPermission(),
+                        onLongPressEnd: (_) {
+                          if (_isRealTimeNotifier.value) {
+                            print("error words list: ${recognizer.errorWordsIndexes}");
+                            stopRecognition();  // Stop recognition immediately if _isRealTime is true
+                          } else {
+                            isTextReceived ? stopRecognition() : print("Still analyzing");
+                          }
+                        },
+                        child: Container(
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: isListening ? Colors.red : Colors.blue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.mic, color: Colors.white, size: 32),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              SizedBox(height: 10),
+              ValueListenableBuilder<double>(
+                valueListenable: _progressNotifier,
+                builder: (context, progress, child) {
+                  return LinearProgressIndicator(value: progress);
+                },
+              ),
             ],
           ),
         ),

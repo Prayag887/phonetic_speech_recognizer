@@ -1,12 +1,12 @@
 
 class Homophones {
-  final Map<String, List<String>> homophones = {
+  static final Map<String, List<String>> homophones = {
     'accept': ['except'],
     'affect': ['effect'],
     'aisle': ['isle', "I'll"],
     'aloud': ['allowed'],
     'allowed': ['aloud'],
-    'ate': ['eight'],
+    'ate': ['eight', 'hate'],
     'bare': ['bear'],
     'bean': ['been'],
     'been': ['bin'],
@@ -65,6 +65,8 @@ class Homophones {
     'principal': ['principle'],
     'principle': ['principal'],
     'rain': ['rein', 'reign'],
+    'raise': ['rays'],
+    'rays': ['raise'],
     'recogniser': ['recognizer'],
     'recognizer': ['recogniser'],
     'rein': ['rain', 'reign'],
@@ -116,6 +118,51 @@ class Homophones {
     'would': ['wood'],
     'write': ['right', 'rite'],
     'you\'re': ['your'],
-    'your': ['you\'re']
+    'your': ['you\'re'],
+
+    'began': ['begin'],
+    'begin': ['began'],
+
+    'I': ['a'],
+    'a': ['I'],
+
+    'lives': ['leaves'],
+    'leaves': ['lives'],
+    'come': ['came', 'become'],
+    'become': ['come', 'came'],
+
+    'fewa lake': ['favorite', 'fever', 'few'],
+    'favorite': ['fewa lake', 'fever', 'few'],
+
+    'baglung': ['baglong', 'pagaloon', 'bag'],
+    'nawaraj': ['nawaz', 'navraj', 'navbharat'],
+    'gorkha': ['gorka', 'gurkha'],
+
+    'enquired': ['and quiet', 'and quite', 'and quit'],
+    'and quiet': ['enquired', 'and quite', 'and quit'],
+    'and quite': ['and quiet', 'enquired', 'and quit'],
+    'and quit': ['and quiet', 'enquired', 'enquired'],
+
+    'parts' : ['paths'],
+    'paths' : ['parts'],
+    'hate' : ['ate', 'eight'],
+
+    'clean' : ['green'],
+    'green' : ['clean'],
+
+    'walk' : ['walked'],
+    'walked' : ['walk'],
+    'watched' : ['watch'],
+    'watch' : ['watched'],
+
+
+    'hill': ['little'],
+    'little': ['hill'],
+
+    'goal': ['core'],
+    'core': ['goal'],
+
+    'accurately': ['security'],
+    'security': ['accurately'],
   };
 }
