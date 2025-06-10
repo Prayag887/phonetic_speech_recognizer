@@ -16,13 +16,7 @@ class PhoneticSpeechRecognizer {
 
   // Function words that should always be highlighted as correct
   static const Set<String> functionWords = {
-    'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-    'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-    'should', 'may', 'might', 'can', 'shall', 'must', 'i', 'you', 'he',
-    'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them', 'my',
-    'your', 'his', 'its', 'our', 'their', 'this', 'that', 'these',
-    'those', 'not', 'no', 'yes'
+    'a', 'an', 'the'
   };
 
   List<int> errorWordsIndexes = [];
@@ -65,13 +59,12 @@ class PhoneticSpeechRecognizer {
   Stream<String> listenToStream() {
     return getDataStream().map((dynamic data) {
       if (data != null && data is Map) {
-        // Return the first key as a String, or modify as needed
         return data.keys.first.toString();
 
-        // Or if you want all keys joined together:
+        // Or  keys joined together:
         // return data.keys.map((key) => key.toString()).join(', ');
 
-        // Or if you expect only one key:
+        // Or if expect only one key:
         // return data.keys.single.toString();
       }
       return "";
@@ -114,18 +107,15 @@ class PhoneticSpeechRecognizer {
     final List<String> errorBuffer = [];
     final int consecutiveErrorThreshold = 2;
 
-    // Initialize lists outside the UI rendering
     List<int> errorWordsIndexList = [];
     List<int> errorWordsPronunciationList = [];
     List<int> correctWordsList = [];
 
     bool isHomophone(String word1, String word2) {
       if (word1 == word2) return true;
-
       if (homophones.containsKey(word1)) {
         return homophones[word1]!.contains(word2);
       }
-
       return false;
     }
 
@@ -235,6 +225,7 @@ class PhoneticSpeechRecognizer {
     }
 
     int targetIndex = 0;
+    int lastProcessedIndex = -1; // ADDED: Track the last word we actually processed
 
     for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
       String partialWord = partialWords[partialIndex];
@@ -243,6 +234,7 @@ class PhoneticSpeechRecognizer {
       for (int i = targetIndex; i < targetIndex + maxLookahead && i < targetWords.length; i++) {
         if (isExactMatch(targetWords[i], partialWord)) {
           matchedIndexes.add(i);
+          lastProcessedIndex = i; // ADDED: Update last processed
           targetIndex = i + 1;
           found = true;
           errorBuffer.clear();
@@ -250,6 +242,7 @@ class PhoneticSpeechRecognizer {
         }
         else if (isSimilarMatch(targetWords[i], partialWord)) {
           mispronounceIndexes.add(i);
+          lastProcessedIndex = i; // ADDED: Update last processed
           targetIndex = i + 1;
           found = true;
           errorBuffer.clear();
@@ -284,6 +277,7 @@ class PhoneticSpeechRecognizer {
                 }
               }
 
+              lastProcessedIndex = newIndex + errorBuffer.length - 1; // ADDED: Update last processed
               targetIndex = newIndex + errorBuffer.length;
               errorBuffer.clear();
             } else {
@@ -300,22 +294,18 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    // Process the lists ONCE after matching logic is complete
+    // FIXED: Only process words that were actually encountered in partial text
     for (int index = 0; index < originalWords.length; index++) {
       if (matchedIndexes.contains(index)) {
         correctWordsList.add(index);
         log('Correct word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       } else if (mispronounceIndexes.contains(index)) {
         errorWordsPronunciationList.add(index);
-        log(' Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+        log('Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       } else if (skippedIndexes.contains(index)) {
         errorWordsIndexList.add(index);
         errorWordsPronunciationList.add(index);
         log('Skipped word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
-      } else if (index < targetIndex) {
-        errorWordsIndexList.add(index);
-        errorWordsPronunciationList.add(index);
-        log('Error word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       }
     }
 
@@ -327,7 +317,7 @@ class PhoneticSpeechRecognizer {
       log('Matched indexes: $matchedIndexes');
       log('Mispronounce indexes: $mispronounceIndexes');
       log('Skipped indexes: $skippedIndexes');
-      log('Target index: $targetIndex');
+      log('Last processed index: $lastProcessedIndex');
       log('Correct words list: $correctWordsList');
       log('Error pronunciation list: $errorWordsPronunciationList');
       log('Error words index list: $errorWordsIndexList');
@@ -339,9 +329,9 @@ class PhoneticSpeechRecognizer {
     correctPronouncationList = correctWordsList;
 
     callback(
-      errorWordsIndexesLength: errorWordsIndexList.length,
-      errorPronouncationListLength: errorWordsPronunciationList.length,
-      correctPronouncationListLength: correctWordsList.length
+        errorWordsIndexesLength: errorWordsIndexList.length,
+        errorPronouncationListLength: errorWordsPronunciationList.length,
+        correctPronouncationListLength: correctWordsList.length
     );
 
     ScrollController controller = ScrollController();

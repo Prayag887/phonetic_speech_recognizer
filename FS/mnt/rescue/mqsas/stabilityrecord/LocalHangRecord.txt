@@ -1,0 +1,22 @@
+---------- miui HANG records ----------
+record time      :2025-05-30 17:31:20
+HANG Reason      :APP_ANR
+miui version     :V816.0.8.0.TGCMIXM
+process          :com.hamropatro
+dgt              :313b216a58f3db28309151a622d769b7
+zygotepid        :763
+------------------------------------
+record time      :2025-06-01 14:17:49
+HANG Reason      :APP_ANR
+miui version     :V816.0.8.0.TGCMIXM
+process          :com.hamropatro
+dgt              :5adcdfad8cf17539a60072cbb792078f
+zygotepid        :763
+------------------------------------
+record time      :2025-06-07 09:09:46
+HANG Reason      :APP_ANR
+miui version     :V816.0.8.0.TGCMIXM
+process          :com.hamropatro
+dgt              :ac454e2e55f8f5b91446b5754e5fe4e2
+zygotepid        :763
+------------------------------------
