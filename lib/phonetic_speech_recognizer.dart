@@ -16,7 +16,7 @@ class PhoneticSpeechRecognizer {
 
   // Function words that should always be highlighted as correct
   static const Set<String> functionWords = {
-    'a', 'an', 'the', "i"
+    'a', 'an', 'the', "i", "was", "were", "old"
   };
 
   List<int> errorWordsIndexes = [];
@@ -93,13 +93,23 @@ class PhoneticSpeechRecognizer {
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
+    //dont search for words that are farther than 2 words away
     final int maxLookahead = 2;
+    //dont let the users skip more than 2 words ahead
     final int maxSkipLimit = 2;
+    //populated after checking double metaphones and  homophones
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
     final List<String> errorBuffer = [];
+    //if more tham 2 words are consecutively wrong, then skip
     final int consecutiveErrorThreshold = 2;
+
+
+    //to check the current targetted words
+    int targetIndex = 0;
+    //to check the last spoken word at the end of the partial text
+    int lastProcessedIndex = -1;
 
     List<int> errorWordsIndexList = [];
     List<int> errorWordsPronunciationList = [];
@@ -217,9 +227,6 @@ class PhoneticSpeechRecognizer {
       }
       return -1;
     }
-
-    int targetIndex = 0;
-    int lastProcessedIndex = -1;
 
     for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
       String partialWord = partialWords[partialIndex];
