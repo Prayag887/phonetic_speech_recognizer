@@ -277,7 +277,7 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.paragraphMapping:
         _recognizedTextNotifier.value = "";
         _isRealTimeNotifier.value = true;
-        _randomTextNotifier.value = "Last summer, I visited Pokhara, and it was ramailo from start to finish! I woke up early to see the surya rise over the Himalaya, painting Fewa Lake in golden hues. After a cup of chiya at a lake side cafe, I rented a sano boat and rowed to the Barahi Mandir, feeling the hawa cool against my face. The didi who owned the boat shop even gave me a sasto price because I spoke a little Nepali.";
+        _randomTextNotifier.value = "Last summer, I visited Pokhara, and it was ramailo from start to finish! I woke up early to see the surya rise over the Himalaya, painting Fewa Lake in golden light. After a cup of chiya at a lake side cafe, I rented a sano boat and rowed to the Barahi Mandir, feeling the hawa cool against my face. The didi who owned the boat shop even gave me a sasto price because I spoke a little Nepali.";
         break;
       default:
         _isRealTimeNotifier.value = false;

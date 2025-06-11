@@ -16,7 +16,7 @@ class PhoneticSpeechRecognizer {
 
   // Function words that should always be highlighted as correct
   static const Set<String> functionWords = {
-    'a', 'an', 'the'
+    'a', 'an', 'the', "i"
   };
 
   List<int> errorWordsIndexes = [];
@@ -60,12 +60,6 @@ class PhoneticSpeechRecognizer {
     return getDataStream().map((dynamic data) {
       if (data != null && data is Map) {
         return data.keys.first.toString();
-
-        // Or  keys joined together:
-        // return data.keys.map((key) => key.toString()).join(', ');
-
-        // Or if expect only one key:
-        // return data.keys.single.toString();
       }
       return "";
     });
@@ -225,7 +219,7 @@ class PhoneticSpeechRecognizer {
     }
 
     int targetIndex = 0;
-    int lastProcessedIndex = -1; // ADDED: Track the last word we actually processed
+    int lastProcessedIndex = -1;
 
     for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
       String partialWord = partialWords[partialIndex];
@@ -234,7 +228,7 @@ class PhoneticSpeechRecognizer {
       for (int i = targetIndex; i < targetIndex + maxLookahead && i < targetWords.length; i++) {
         if (isExactMatch(targetWords[i], partialWord)) {
           matchedIndexes.add(i);
-          lastProcessedIndex = i; // ADDED: Update last processed
+          lastProcessedIndex = i;
           targetIndex = i + 1;
           found = true;
           errorBuffer.clear();
@@ -242,7 +236,7 @@ class PhoneticSpeechRecognizer {
         }
         else if (isSimilarMatch(targetWords[i], partialWord)) {
           mispronounceIndexes.add(i);
-          lastProcessedIndex = i; // ADDED: Update last processed
+          lastProcessedIndex = i;
           targetIndex = i + 1;
           found = true;
           errorBuffer.clear();
@@ -277,7 +271,7 @@ class PhoneticSpeechRecognizer {
                 }
               }
 
-              lastProcessedIndex = newIndex + errorBuffer.length - 1; // ADDED: Update last processed
+              lastProcessedIndex = newIndex + errorBuffer.length - 1;
               targetIndex = newIndex + errorBuffer.length;
               errorBuffer.clear();
             } else {
@@ -294,7 +288,44 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    // FIXED: Only process words that were actually encountered in partial text
+    // NEW: Auto-highlight skipped functional words between matched words
+    void autoHighlightFunctionalWords() {
+      List<int> allMatchedIndexes = [...matchedIndexes, ...mispronounceIndexes];
+      allMatchedIndexes.sort();
+
+      for (int i = 0; i < allMatchedIndexes.length - 1; i++) {
+        int currentIndex = allMatchedIndexes[i];
+        int nextIndex = allMatchedIndexes[i + 1];
+
+        // Check all words between current and next matched word
+        for (int j = currentIndex + 1; j < nextIndex; j++) {
+          if (isFunctionWord(targetWords[j]) && !matchedIndexes.contains(j) && !mispronounceIndexes.contains(j)) {
+            matchedIndexes.add(j);
+            // Remove from skipped if it was there
+            skippedIndexes.remove(j);
+          }
+        }
+      }
+
+      // Also check for functional words at the beginning if we have matches
+      if (allMatchedIndexes.isNotEmpty) {
+        int firstMatchedIndex = allMatchedIndexes.first;
+        for (int i = 0; i < firstMatchedIndex; i++) {
+          if (isFunctionWord(targetWords[i]) && !matchedIndexes.contains(i) && !mispronounceIndexes.contains(i)) {
+            // Only highlight if it's very close to the first matched word (within 2 positions)
+            if (firstMatchedIndex - i <= 2) {
+              matchedIndexes.add(i);
+              skippedIndexes.remove(i);
+            }
+          }
+        }
+      }
+    }
+
+    // Call the new function to auto-highlight functional words
+    autoHighlightFunctionalWords();
+
+    // Process all words for final categorization
     for (int index = 0; index < originalWords.length; index++) {
       if (matchedIndexes.contains(index)) {
         correctWordsList.add(index);
@@ -309,19 +340,16 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    // Debug logs
-    if (kDebugMode) {
-      log('SUMMARY:');
-      log('Original words: $originalWords');
-      log('Target words: $targetWords');
-      log('Matched indexes: $matchedIndexes');
-      log('Mispronounce indexes: $mispronounceIndexes');
-      log('Skipped indexes: $skippedIndexes');
-      log('Last processed index: $lastProcessedIndex');
-      log('Correct words list: $correctWordsList');
-      log('Error pronunciation list: $errorWordsPronunciationList');
-      log('Error words index list: $errorWordsIndexList');
-    }
+    log('SUMMARY:');
+    log('Original words: $originalWords');
+    log('Target words: $targetWords');
+    log('Matched indexes: $matchedIndexes');
+    log('Mispronounce indexes: $mispronounceIndexes');
+    log('Skipped indexes: $skippedIndexes');
+    log('Last processed index: $lastProcessedIndex');
+    log('Correct words list: $correctWordsList');
+    log('Error pronunciation list: $errorWordsPronunciationList');
+    log('Error words index list: $errorWordsIndexList');
 
     // Set global variables
     errorWordsIndexes = errorWordsIndexList;
