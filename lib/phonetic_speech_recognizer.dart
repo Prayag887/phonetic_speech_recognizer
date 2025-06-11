@@ -106,7 +106,7 @@ class PhoneticSpeechRecognizer {
     final int consecutiveErrorThreshold = 2;
 
 
-    //to check the current targetted words
+    //to check the current targeted words
     int targetIndex = 0;
     //to check the last spoken word at the end of the partial text
     int lastProcessedIndex = -1;
@@ -208,6 +208,22 @@ class PhoneticSpeechRecognizer {
       }
       return false;
     }
+
+    /// Finds the starting index of the first occurrence of the given pattern
+    /// in the target words list, starting from the specified index.
+    ///
+    /// This function compares each word in the pattern with corresponding words
+    /// in the target words list using the `wordsMatch` method. A match is
+    /// considered successful if all words in the pattern match with a contiguous
+    /// sequence of words in the target words list.
+    ///
+    /// Returns the starting index of the match if found, or -1 if the pattern
+    /// is not found in the target words list.
+    ///
+    /// - Parameters:
+    ///   - pattern: A list of words to find in the target words list.
+    ///   - startIndex: The index in the target words list to start the search from.
+    /// - Returns: The starting index of the first matching occurrence, or -1 if no match is found.
 
     int findPatternInTarget(List<String> pattern, int startIndex) {
       if (pattern.isEmpty) return -1;
