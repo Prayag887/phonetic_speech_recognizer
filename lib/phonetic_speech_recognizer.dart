@@ -334,22 +334,26 @@ class PhoneticSpeechRecognizer {
     /// enough to the first matched word, they are also highlighted.
     void autoHighlightFunctionalWords() {
       if (lastProcessedIndex < 0) return;
+
       List<int> allMatchedIndexes = [...matchedIndexes, ...mispronounceIndexes];
       allMatchedIndexes.sort();
 
+      // Only process functional words up to lastProcessedIndex
       for (int i = 0; i < allMatchedIndexes.length - 1; i++) {
         int currentIndex = allMatchedIndexes[i];
         int nextIndex = allMatchedIndexes[i + 1];
 
-        // Check all words between current and next matched word
-        for (int j = currentIndex + 1; j < nextIndex; j++) {
+        // Only check up to lastProcessedIndex
+        int endCheck = nextIndex > lastProcessedIndex ? lastProcessedIndex + 1 : nextIndex;
+
+        for (int j = currentIndex + 1; j < endCheck; j++) {
           if (isFunctionWord(targetWords[j]) && !matchedIndexes.contains(j) && !mispronounceIndexes.contains(j)) {
             matchedIndexes.add(j);
-            // Remove from skipped if it was there
             skippedIndexes.remove(j);
           }
         }
       }
+
 
       // Also check for functional words at the beginning if we have matches
       if (allMatchedIndexes.isNotEmpty) {
