@@ -244,6 +244,14 @@ class PhoneticSpeechRecognizer {
       return -1;
     }
 
+
+    /// Iterate through the partial words and try to find a match in the target words list.
+    /// If a match is found, add the index to the matchedIndexes list and move the targetIndex forward.
+    /// If a similar match is found, add the index to the mispronounceIndexes list and move the targetIndex forward.
+    /// If no match is found, add the partial word to the error buffer and check if the buffer has reached the
+    /// consecutive error threshold. If it has, try to find a match of the entire buffer in the target words list.
+    /// If a match is found, add the indexes to the matchedIndexes list and move the targetIndex forward.
+    /// If no match is found, remove the oldest word from the buffer until the buffer is no longer at the threshold.
     for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
       String partialWord = partialWords[partialIndex];
       bool found = false;
@@ -311,8 +319,21 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    // NEW: Auto-highlight skipped functional words between matched words
+
+    /// NEW: Auto-highlight skipped functional words between matched words
+    /// Automatically highlight functional words between matched words.
+    ///
+    /// This function goes through all matched words and checks if there are any
+    /// functional words between them. If there are, and they are not already
+    /// matched or mispronounced, they are added to the matched list and removed
+    /// from the skipped list. This is done to highlight functional words that are
+    /// close to the correct words, even if they are not part of the correct phrase.
+    ///
+    /// This function also checks for functional words at the beginning of the
+    /// target phrase, if there are any matches. If there are, and they are close
+    /// enough to the first matched word, they are also highlighted.
     void autoHighlightFunctionalWords() {
+      if (lastProcessedIndex < 0) return;
       List<int> allMatchedIndexes = [...matchedIndexes, ...mispronounceIndexes];
       allMatchedIndexes.sort();
 
@@ -363,16 +384,16 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    // log('SUMMARY:');
-    // log('Original words: $originalWords');
-    // log('Target words: $targetWords');
-    // log('Matched indexes: $matchedIndexes');
-    // log('Mispronounce indexes: $mispronounceIndexes');
-    // log('Skipped indexes: $skippedIndexes');
-    // log('Last processed index: $lastProcessedIndex');
-    // log('Correct words list: $correctWordsList');
-    // log('Error pronunciation list: $errorWordsPronunciationList');
-    // log('Error words index list: $errorWordsIndexList');
+    log('SUMMARY:');
+    log('Original words: $originalWords');
+    log('Target words: $targetWords');
+    log('Matched indexes: $matchedIndexes');
+    log('Mispronounce indexes: $mispronounceIndexes');
+    log('Skipped indexes: $skippedIndexes');
+    log('Last processed index: $lastProcessedIndex');
+    log('Correct words list: $correctWordsList');
+    log('Error pronunciation list: $errorWordsPronunciationList');
+    log('Error words index list: $errorWordsIndexList');
 
     // Set global variables
     errorWordsIndexes = errorWordsIndexList;

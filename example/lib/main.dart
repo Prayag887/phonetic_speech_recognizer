@@ -454,7 +454,7 @@ class _MyAppState extends State<MyApp> {
                     valueListenable: _isTextReceivedNotifier,
                     builder: (context, isTextReceived, child) {
                       return GestureDetector(
-                        onLongPressStart: (_) => _requestAudioPermission(),
+                        onTapDown: (_) => _requestAudioPermission(),
                         onLongPressEnd: (_) {
                           if (_isRealTimeNotifier.value) {
                             log("error words list: ${recognizer.errorWordsIndexes}");
