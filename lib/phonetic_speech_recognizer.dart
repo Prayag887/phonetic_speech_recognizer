@@ -16,7 +16,7 @@ class PhoneticSpeechRecognizer {
 
   // Function words that should always be highlighted as correct
   static const Set<String> functionWords = {
-    'a', 'an', 'the', "i", "was", "were", "old"
+    'a', 'an',"i"
   };
 
   List<int> errorWordsIndexes = [];
@@ -93,32 +93,34 @@ class PhoneticSpeechRecognizer {
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    // Configuration constants
-    const int maxLookahead = 2;
-    const int maxSkipLimit = 2;
-    const int consecutiveErrorThreshold = 2;
-    const double similarityThreshold = 0.75;
-
-    // Tracking sets and lists
+    //dont search for words that are farther than 2 words away
+    final int maxLookahead = 2;
+    //dont let the users skip more than 2 words ahead
+    final int maxSkipLimit = 2;
+    //populated after checking double metaphones and  homophones
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
     final List<String> errorBuffer = [];
+    //if more tham 2 words are consecutively wrong, then skip
+    final int consecutiveErrorThreshold = 2;
 
-    // Progress tracking
+
+    //to check the current targeted words
     int targetIndex = 0;
+    //to check the last spoken word at the end of the partial text
     int lastProcessedIndex = -1;
-    int actuallyProcessedWords = 0;
 
-    // Result lists
     List<int> errorWordsIndexList = [];
     List<int> errorWordsPronunciationList = [];
     List<int> correctWordsList = [];
 
-    // Optimized word matching functions
     bool isHomophone(String word1, String word2) {
       if (word1 == word2) return true;
-      return homophones.containsKey(word1) && homophones[word1]!.contains(word2);
+      if (homophones.containsKey(word1)) {
+        return homophones[word1]!.contains(word2);
+      }
+      return false;
     }
 
     bool isMetaphoneMatch(String word1, String word2) {
@@ -169,7 +171,6 @@ class PhoneticSpeechRecognizer {
     }
 
     bool isExactMatch(String word1, String word2) {
-      // Function words are always considered exact matches with each other
       if (isFunctionWord(word1) && isFunctionWord(word2)) {
         return true;
       }
@@ -180,36 +181,54 @@ class PhoneticSpeechRecognizer {
     }
 
     bool isSimilarMatch(String word1, String word2) {
-      // Don't apply similarity matching to function words
       if (isFunctionWord(word1) || isFunctionWord(word2)) {
         return false;
       }
 
-      // Don't consider already exact matches as similar
       if (isHomophone(word1, word2) || isMetaphoneMatch(word1, word2)) {
         return false;
       }
 
-      // Only check similarity for words of sufficient length
       if (word1.length >= 4 && word2.length >= 4) {
         double similarity = wordSimilarity(word1, word2);
-        return similarity > similarityThreshold && similarity < 1.0;
+        return similarity > 0.75 && similarity < 1.0;
       }
       return false;
     }
 
     bool wordsMatch(String word1, String word2) {
+      if (isFunctionWord(word1) && isFunctionWord(word2)) {
+        return true;
+      }
+
       if (isExactMatch(word1, word2)) return true;
+
       if (word1.length >= 4 && word2.length >= 4) {
-        return wordSimilarity(word1, word2) > similarityThreshold;
+        return wordSimilarity(word1, word2) > 0.75;
       }
       return false;
     }
 
+    /// Finds the starting index of the first occurrence of the given pattern
+    /// in the target words list, starting from the specified index.
+    ///
+    /// This function compares each word in the pattern with corresponding words
+    /// in the target words list using the `wordsMatch` method. A match is
+    /// considered successful if all words in the pattern match with a contiguous
+    /// sequence of words in the target words list.
+    ///
+    /// Returns the starting index of the match if found, or -1 if the pattern
+    /// is not found in the target words list.
+    ///
+    /// - Parameters:
+    ///   - pattern: A list of words to find in the target words list.
+    ///   - startIndex: The index in the target words list to start the search from.
+    /// - Returns: The starting index of the first matching occurrence, or -1 if no match is found.
+
     int findPatternInTarget(List<String> pattern, int startIndex) {
       if (pattern.isEmpty) return -1;
 
-      for (int i = startIndex; i <= targetWords.length - pattern.length; i++) {
+      for (int i = 0; i <= targetWords.length - pattern.length; i++) {
         bool match = true;
         for (int j = 0; j < pattern.length; j++) {
           if (!wordsMatch(pattern[j], targetWords[i + j])) {
@@ -217,83 +236,126 @@ class PhoneticSpeechRecognizer {
             break;
           }
         }
-        if (match) return i;
+
+        if (match) {
+          return i;
+        }
       }
       return -1;
     }
 
-    void processErrorBuffer() {
-      if (errorBuffer.length < consecutiveErrorThreshold) return;
 
-      int newIndex = findPatternInTarget(errorBuffer, targetIndex);
+    /// Iterate through the partial words and try to find a match in the target words list.
+    /// If a match is found, add the index to the matchedIndexes list and move the targetIndex forward.
+    /// If a similar match is found, add the index to the mispronounceIndexes list and move the targetIndex forward.
+    /// If no match is found, add the partial word to the error buffer and check if the buffer has reached the
+    /// consecutive error threshold. If it has, try to find a match of the entire buffer in the target words list.
+    /// If a match is found, add the indexes to the matchedIndexes list and move the targetIndex forward.
+    // If no match is found, remove the oldest word from the buffer until the buffer is no longer at the threshold.
+    for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
+      String partialWord = partialWords[partialIndex];
+      bool found = false;
 
-      if (newIndex >= 0) {
-        int skipCount = newIndex - targetIndex;
+      for (int i = targetIndex; i < targetIndex + maxLookahead && i < targetWords.length; i++) {
+        if (isExactMatch(targetWords[i], partialWord)) {
+          matchedIndexes.add(i);
+          lastProcessedIndex = i;
+          targetIndex = i + 1;
+          found = true;
+          errorBuffer.clear();
+          break;
+        }
+        else if (isSimilarMatch(targetWords[i], partialWord)) {
+          mispronounceIndexes.add(i);
+          lastProcessedIndex = i;
+          targetIndex = i + 1;
+          found = true;
+          errorBuffer.clear();
+          break;
+        }
+      }
 
-        if (skipCount <= maxSkipLimit) {
-          // Mark skipped words
-          for (int i = targetIndex; i < newIndex; i++) {
-            skippedIndexes.add(i);
-          }
+      if (!found) {
+        errorBuffer.add(partialWord);
 
-          // Process error buffer words
-          for (int j = 0; j < errorBuffer.length; j++) {
-            int targetIdx = newIndex + j;
-            if (isExactMatch(errorBuffer[j], targetWords[targetIdx])) {
-              matchedIndexes.add(targetIdx);
-            } else if (isSimilarMatch(errorBuffer[j], targetWords[targetIdx])) {
-              mispronounceIndexes.add(targetIdx);
+        if (errorBuffer.length >= consecutiveErrorThreshold) {
+          int newIndex = findPatternInTarget(errorBuffer, 0);
+
+          if (newIndex >= 0) {
+            int oldTargetIndex = targetIndex;
+            int skipCount = newIndex - oldTargetIndex;
+
+            if (skipCount <= maxSkipLimit) {
+              for (int j = 0; j < errorBuffer.length; j++) {
+                if (isExactMatch(errorBuffer[j], targetWords[newIndex + j])) {
+                  matchedIndexes.add(newIndex + j);
+                } else if (isSimilarMatch(errorBuffer[j], targetWords[newIndex + j])) {
+                  mispronounceIndexes.add(newIndex + j);
+                } else {
+                  matchedIndexes.add(newIndex + j);
+                }
+              }
+
+              if (skipCount > 0) {
+                for (int i = oldTargetIndex; i < newIndex; i++) {
+                  skippedIndexes.add(i);
+                }
+              }
+
+              lastProcessedIndex = newIndex + errorBuffer.length - 1;
+              targetIndex = newIndex + errorBuffer.length;
+              errorBuffer.clear();
             } else {
-              matchedIndexes.add(targetIdx); // Force match for pattern
+              while (errorBuffer.length > consecutiveErrorThreshold - 1) {
+                errorBuffer.removeAt(0);
+              }
+            }
+          } else {
+            while (errorBuffer.length > consecutiveErrorThreshold - 1) {
+              errorBuffer.removeAt(0);
             }
           }
-
-          lastProcessedIndex = newIndex + errorBuffer.length - 1;
-          targetIndex = newIndex + errorBuffer.length;
-          actuallyProcessedWords += errorBuffer.length;
-          errorBuffer.clear();
-        } else {
-          // Remove oldest word if skip limit exceeded
-          errorBuffer.removeAt(0);
         }
-      } else {
-        // No pattern found, remove oldest word
-        errorBuffer.removeAt(0);
       }
     }
 
-    void autoHighlightFunctionalWords() {
-      if (lastProcessedIndex < 0) return;
 
+    /// NEW: Auto-highlight skipped functional words between matched words
+    /// Automatically highlight functional words between matched words.
+    ///
+    /// This function goes through all matched words and checks if there are any
+    /// functional words between them. If there are, and they are not already
+    /// matched or mispronounced, they are added to the matched list and removed
+    /// from the skipped list. This is done to highlight functional words that are
+    /// close to the correct words, even if they are not part of the correct phrase.
+    ///
+    /// This function also checks for functional words at the beginning of the
+    /// target phrase, if there are any matches. If there are, and they are close
+    /// enough to the first matched word, they are also highlighted.
+    void autoHighlightFunctionalWords() {
       List<int> allMatchedIndexes = [...matchedIndexes, ...mispronounceIndexes];
       allMatchedIndexes.sort();
 
-      // Only highlight functional words between matched words and within processed range
       for (int i = 0; i < allMatchedIndexes.length - 1; i++) {
         int currentIndex = allMatchedIndexes[i];
         int nextIndex = allMatchedIndexes[i + 1];
 
-        // Don't go beyond what was actually processed
-        if (currentIndex > lastProcessedIndex) break;
-        int endCheck = nextIndex > lastProcessedIndex ? lastProcessedIndex + 1 : nextIndex;
-
-        for (int j = currentIndex + 1; j < endCheck; j++) {
-          if (isFunctionWord(targetWords[j]) &&
-              !matchedIndexes.contains(j) &&
-              !mispronounceIndexes.contains(j)) {
+        // Check all words between current and next matched word
+        for (int j = currentIndex + 1; j < nextIndex; j++) {
+          if (isFunctionWord(targetWords[j]) && !matchedIndexes.contains(j) && !mispronounceIndexes.contains(j)) {
             matchedIndexes.add(j);
+            // Remove from skipped if it was there
             skippedIndexes.remove(j);
           }
         }
       }
 
-      // Highlight functional words at the beginning if close to first match
+      // Also check for functional words at the beginning if we have matches
       if (allMatchedIndexes.isNotEmpty) {
         int firstMatchedIndex = allMatchedIndexes.first;
-        for (int i = 0; i < firstMatchedIndex && i <= lastProcessedIndex; i++) {
-          if (isFunctionWord(targetWords[i]) &&
-              !matchedIndexes.contains(i) &&
-              !mispronounceIndexes.contains(i)) {
+        for (int i = 0; i < firstMatchedIndex; i++) {
+          if (isFunctionWord(targetWords[i]) && !matchedIndexes.contains(i) && !mispronounceIndexes.contains(i)) {
+            // Only highlight if it's very close to the first matched word (within 2 positions)
             if (firstMatchedIndex - i <= 2) {
               matchedIndexes.add(i);
               skippedIndexes.remove(i);
@@ -303,79 +365,44 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    // Main processing loop - only process actual partial words
-    for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
-      String partialWord = partialWords[partialIndex];
-      bool found = false;
-
-      // Look ahead within the target words
-      for (int i = targetIndex; i < targetIndex + maxLookahead && i < targetWords.length; i++) {
-        if (isExactMatch(targetWords[i], partialWord)) {
-          matchedIndexes.add(i);
-          lastProcessedIndex = i;
-          targetIndex = i + 1;
-          actuallyProcessedWords++;
-          found = true;
-          errorBuffer.clear();
-          break;
-        } else if (isSimilarMatch(targetWords[i], partialWord)) {
-          mispronounceIndexes.add(i);
-          lastProcessedIndex = i;
-          targetIndex = i + 1;
-          actuallyProcessedWords++;
-          found = true;
-          errorBuffer.clear();
-          break;
-        }
-      }
-
-      if (!found) {
-        errorBuffer.add(partialWord);
-        processErrorBuffer();
-      }
-    }
-
-    // Auto-highlight functional words within processed range
+    // Call the new function to auto-highlight functional words
     autoHighlightFunctionalWords();
 
-    // Final categorization - only process words up to what was actually spoken
-    int maxProcessedIndex = lastProcessedIndex >= 0 ? lastProcessedIndex : -1;
-
+    // Process all words for final categorization
     for (int index = 0; index < originalWords.length; index++) {
       if (matchedIndexes.contains(index)) {
         correctWordsList.add(index);
+        log('Correct word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       } else if (mispronounceIndexes.contains(index)) {
         errorWordsPronunciationList.add(index);
+        log('Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       } else if (skippedIndexes.contains(index)) {
         errorWordsIndexList.add(index);
         errorWordsPronunciationList.add(index);
+        log('Skipped word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
       }
-      // Don't categorize words beyond what was processed
     }
 
-    // Logging for debugging
-    log('SUMMARY:');
-    log('Partial words (${partialWords.length}): $partialWords');
-    log('Target words: $targetWords');
-    log('Actually processed words: $actuallyProcessedWords');
-    log('Last processed index: $lastProcessedIndex');
-    log('Matched indexes: $matchedIndexes');
-    log('Mispronounce indexes: $mispronounceIndexes');
-    log('Skipped indexes: $skippedIndexes');
-    log('Correct words list: $correctWordsList');
-    log('Error pronunciation list: $errorWordsPronunciationList');
-    log('Error words index list: $errorWordsIndexList');
+    // log('SUMMARY:');
+    // log('Original words: $originalWords');
+    // log('Target words: $targetWords');
+    // log('Matched indexes: $matchedIndexes');
+    // log('Mispronounce indexes: $mispronounceIndexes');
+    // log('Skipped indexes: $skippedIndexes');
+    // log('Last processed index: $lastProcessedIndex');
+    // log('Correct words list: $correctWordsList');
+    // log('Error pronunciation list: $errorWordsPronunciationList');
+    // log('Error words index list: $errorWordsIndexList');
 
     // Set global variables
     errorWordsIndexes = errorWordsIndexList;
     errorPronouncationList = errorWordsPronunciationList;
     correctPronouncationList = correctWordsList;
 
-    // Callback with results
     callback(
-      errorWordsIndexesLength: errorWordsIndexList.length,
-      errorPronouncationListLength: errorWordsPronunciationList.length,
-      correctPronouncationListLength: correctWordsList.length,
+        errorWordsIndexesLength: errorWordsIndexList.length,
+        errorPronouncationListLength: errorWordsPronunciationList.length,
+        correctPronouncationListLength: correctWordsList.length
     );
 
     ScrollController controller = ScrollController();
@@ -399,26 +426,28 @@ class PhoneticSpeechRecognizer {
             children: List.generate(originalWords.length, (index) {
               String word = originalWords[index];
               Color wordColor;
+              Color borderColor;
+              Color backgroundColor = Color(0xFFFFFFFF);
               FontWeight weight = FontWeight.normal;
 
               if (matchedIndexes.contains(index)) {
                 wordColor = highlightCorrectColor;
-                // borderColor = highlightCorrectColor;
+                borderColor = highlightCorrectColor;
               } else if (mispronounceIndexes.contains(index)) {
                 wordColor = highlightCorrectColor;
-                // borderColor = highlightCorrectColor;
+                borderColor = highlightCorrectColor;
                 weight = FontWeight.normal;
               } else if (skippedIndexes.contains(index)) {
                 wordColor = highlightWrongColor;
-                // borderColor = Colors.blue;
+                borderColor = Colors.blue;
                 weight = FontWeight.normal;
               } else if (index < targetIndex) {
                 wordColor = highlightWrongColor;
-                // borderColor = highlightWrongColor;
+                borderColor = highlightWrongColor;
                 weight = FontWeight.normal;
               } else {
                 wordColor = defaultTextColor;
-                // borderColor = Color(0xFFFFFFFF);
+                borderColor = Color(0xFFFFFFFF);
               }
 
               return WidgetSpan(
