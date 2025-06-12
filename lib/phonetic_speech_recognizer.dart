@@ -363,16 +363,16 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    log('SUMMARY:');
-    log('Original words: $originalWords');
-    log('Target words: $targetWords');
-    log('Matched indexes: $matchedIndexes');
-    log('Mispronounce indexes: $mispronounceIndexes');
-    log('Skipped indexes: $skippedIndexes');
-    log('Last processed index: $lastProcessedIndex');
-    log('Correct words list: $correctWordsList');
-    log('Error pronunciation list: $errorWordsPronunciationList');
-    log('Error words index list: $errorWordsIndexList');
+    // log('SUMMARY:');
+    // log('Original words: $originalWords');
+    // log('Target words: $targetWords');
+    // log('Matched indexes: $matchedIndexes');
+    // log('Mispronounce indexes: $mispronounceIndexes');
+    // log('Skipped indexes: $skippedIndexes');
+    // log('Last processed index: $lastProcessedIndex');
+    // log('Correct words list: $correctWordsList');
+    // log('Error pronunciation list: $errorWordsPronunciationList');
+    // log('Error words index list: $errorWordsIndexList');
 
     // Set global variables
     errorWordsIndexes = errorWordsIndexList;

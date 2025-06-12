@@ -318,9 +318,9 @@ class _MyAppState extends State<MyApp> {
                             endOfScreen: 300,
 
                             callback: ({correctPronouncationListLength, errorPronouncationListLength, errorWordsIndexesLength}) {
-                              log("Correct Pronouncation List Length: $correctPronouncationListLength");
-                              log("Error Pronouncation List Length: $errorPronouncationListLength");
-                              log("Error Words Indexes Length: $errorWordsIndexesLength");
+                              // log("Correct Pronouncation List Length: $correctPronouncationListLength");
+                              // log("Error Pronouncation List Length: $errorPronouncationListLength");
+                              // log("Error Words Indexes Length: $errorWordsIndexesLength");
                             },
                           );
                         } else {
@@ -336,9 +336,9 @@ class _MyAppState extends State<MyApp> {
                             lineSpace: 1.5,
                             endOfScreen: 300,
                             callback: ({correctPronouncationListLength, errorPronouncationListLength, errorWordsIndexesLength}) {
-                              log("Correct Pronouncation List Length:::::::::: $correctPronouncationListLength");
-                              log("Error Pronouncation List Length: $errorPronouncationListLength");
-                              log("Error Words Indexes Length: $errorWordsIndexesLength");
+                              // log("Correct Pronouncation List Length:::::::::: $correctPronouncationListLength");
+                              // log("Error Pronouncation List Length: $errorPronouncationListLength");
+                              // log("Error Words Indexes Length: $errorWordsIndexesLength");
                             },
                           );
                         }

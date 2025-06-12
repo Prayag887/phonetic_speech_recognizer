@@ -164,5 +164,8 @@ class Homophones {
 
     'accurately': ['security'],
     'security': ['accurately'],
+
+    'saw': ['sub'],
+    'sub': ['saw'],
   };
 }
