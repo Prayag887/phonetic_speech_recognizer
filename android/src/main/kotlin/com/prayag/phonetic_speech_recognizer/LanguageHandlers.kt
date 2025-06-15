@@ -9,6 +9,10 @@ import io.flutter.plugin.common.MethodChannel
 import org.apache.commons.lang3.StringUtils
 import java.net.HttpURLConnection
 import java.net.URL
+import android.os.Handler
+import android.os.Looper
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 class LanguageHandlers(private val context: Context) {
     private var pluginInstance: PhoneticSpeechRecognizerPlugin? = null
@@ -223,7 +227,7 @@ class LanguageHandlers(private val context: Context) {
                             kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
                     )
 
-            val similarity = (phoneticSimilarity * 0.6)  + (stringSimilarity * 0.4)
+            val similarity = (phoneticSimilarity * 0.5)  + (stringSimilarity * 0.5)
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity

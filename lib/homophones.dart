@@ -167,5 +167,9 @@ class Homophones {
 
     'saw': ['sub'],
     'sub': ['saw'],
+
+    'quote': ['coat', 'court'],
+    'coat': ['quote', 'court'],
+    'court': ['coat', 'quote'],
   };
 }
