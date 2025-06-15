@@ -732,15 +732,21 @@ class PhoneticSpeechRecognizer {
     }
   }
 
-  //this checks if the mandatory words are in the recognized sentence or not
+
+  /// Checks if the recognized sentence contains mandatory words.
+  ///
+  /// If [andCase] is true, all words in [mandatoryWordsList] must be present
+  /// in the [recognizedSentence] in order. If [andCase] is false, at least one
+  /// word from [mandatoryWordsList] must be present in the [recognizedSentence].
+  ///
+  /// If [andCase] is false, atleast one word in [mandatoryWordsList] must be present
   bool mandatoryWords({
     required List<String> mandatoryWordsList,
     required String recognizedSentence,
     bool andCase = true
   }) {
     final lowerCaseSentence = recognizedSentence.toLowerCase();
-    final lowerCaseMandatoryWords =
-    mandatoryWordsList.map((word) => word.toLowerCase()).toList();
+    final lowerCaseMandatoryWords = mandatoryWordsList.map((word) => word.toLowerCase()).toList();
 
     if (andCase) {
       // AND case: All words must be present in order
