@@ -277,7 +277,8 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.paragraphMapping:
         _recognizedTextNotifier.value = "";
         _isRealTimeNotifier.value = true;
-        _randomTextNotifier.value = "I visited Bandipur, a small hill town. The streets were clean with old houses and stone paths. I walked around and saw beautiful views of the mountains. People were friendly and smiling. I ate local food and watched the sunset from the hill. Bandipur was peaceful and quiet.";
+        // _randomTextNotifier.value = "I visited Bandipur, a small hill town. The streets were clean with old houses and stone paths. I walked around and saw beautiful views of the mountains. People were friendly and smiling. I ate local food and watched the sunset from the hill. Bandipur was peaceful and quiet.";
+        _randomTextNotifier.value = "I went to Rara Lake in Mugu. It took a long time to reach, but it was worth it. The blue water of the lake was very clear and beautiful. The mountains around the lake made it look like a painting. I sat near the lake and felt very calm and happy.";
         break;
       default:
         _isRealTimeNotifier.value = false;

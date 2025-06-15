@@ -385,7 +385,6 @@ class PhoneticSpeechRecognizer {
 
     log('SUMMARY:');
     log('Original words: $originalWords');
-    log('Target words: $targetWords');
     log('Matched indexes: $matchedIndexes');
     log('Mispronounce indexes: $mispronounceIndexes');
     log('Skipped indexes: $skippedIndexes');
@@ -733,7 +732,7 @@ class PhoneticSpeechRecognizer {
     }
   }
 
-  //this check if the mandatory words are in the recognized sentence or not
+  //this checks if the mandatory words are in the recognized sentence or not
   bool mandatoryWords({
     required List<String> mandatoryWordsList,
     required String recognizedSentence,

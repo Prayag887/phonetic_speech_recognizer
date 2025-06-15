@@ -229,7 +229,7 @@ class LanguageHandlers(private val context: Context) {
             }
        }
 
-        return if (bestSimilarity >= 0.7) {
+        return if (bestSimilarity >= 0.85) {
             mapOf(expectedPhrase to bestSimilarity)
         } else {
             mapOf(bestMatch to bestSimilarity)
