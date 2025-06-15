@@ -7,6 +7,8 @@ import android.os.Build
 import android.util.Log
 import io.flutter.plugin.common.MethodChannel
 import org.apache.commons.lang3.StringUtils
+import java.net.HttpURLConnection
+import java.net.URL
 
 class LanguageHandlers(private val context: Context) {
     private var pluginInstance: PhoneticSpeechRecognizerPlugin? = null

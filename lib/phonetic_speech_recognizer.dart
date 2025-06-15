@@ -38,7 +38,7 @@ class PhoneticSpeechRecognizer {
   }
 
   static Future<bool> stopRecognition() async {
-    await Future.delayed(Duration(seconds: 1));
+    await Future.delayed(Duration(milliseconds: 500));
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
       return result;
@@ -383,15 +383,15 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    log('SUMMARY:');
-    log('Original words: $originalWords');
-    log('Matched indexes: $matchedIndexes');
-    log('Mispronounce indexes: $mispronounceIndexes');
-    log('Skipped indexes: $skippedIndexes');
-    log('Last processed index: $lastProcessedIndex');
-    log('Correct words list: $correctWordsList');
-    log('Error pronunciation list: $errorWordsPronunciationList');
-    log('Error words index list: $errorWordsIndexList');
+    // log('SUMMARY:');
+    // log('Original words: $originalWords');
+    // log('Matched indexes: $matchedIndexes');
+    // log('Mispronounce indexes: $mispronounceIndexes');
+    // log('Skipped indexes: $skippedIndexes');
+    // log('Last processed index: $lastProcessedIndex');
+    // log('Correct words list: $correctWordsList');
+    // log('Error pronunciation list: $errorWordsPronunciationList');
+    // log('Error words index list: $errorWordsIndexList');
 
     // Set global variables
     errorWordsIndexes = errorWordsIndexList;
