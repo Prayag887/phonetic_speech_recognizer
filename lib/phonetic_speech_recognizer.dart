@@ -736,24 +736,36 @@ class PhoneticSpeechRecognizer {
   bool mandatoryWords({
     required List<String> mandatoryWordsList,
     required String recognizedSentence,
+    bool andCase = true
   }) {
     final lowerCaseSentence = recognizedSentence.toLowerCase();
     final lowerCaseMandatoryWords =
     mandatoryWordsList.map((word) => word.toLowerCase()).toList();
 
-    int lastIndex = -1;
+    if (andCase) {
+      // AND case: All words must be present in order
+      int lastIndex = -1;
 
-    for (String word in lowerCaseMandatoryWords) {
-      int currentIndex = lowerCaseSentence.indexOf(word);
+      for (String word in lowerCaseMandatoryWords) {
+        int currentIndex = lowerCaseSentence.indexOf(word);
 
-      if (currentIndex == -1 || currentIndex < lastIndex) {
-        return false; // word not found or order is incorrect
+        if (currentIndex == -1 || currentIndex < lastIndex) {
+          return false; // word not found or order is incorrect
+        }
+
+        lastIndex = currentIndex;
       }
 
-      lastIndex = currentIndex;
+      return true;
+    } else {
+      // OR case: At least one word from mandatory list must be present
+      for (String word in lowerCaseMandatoryWords) {
+        if (lowerCaseSentence.contains(word)) {
+          return true; // Found at least one mandatory word
+        }
+      }
+
+      return false; // No mandatory words found
     }
-
-    return true;
   }
-
 }
