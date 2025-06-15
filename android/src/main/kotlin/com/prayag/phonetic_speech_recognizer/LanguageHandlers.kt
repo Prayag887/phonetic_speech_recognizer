@@ -197,16 +197,94 @@ class LanguageHandlers(private val context: Context) {
 
     private fun isNetworkAvailable(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: return false
+            ?: run {
+                Log.e("NetworkCheck", "ConnectivityManager not available")
+                return false
+            }
 
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = connectivityManager.activeNetwork ?: return false
-            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+        val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectivityManager.activeNetwork ?: run {
+                Log.e("NetworkCheck", "No active network")
+                return false
+            }
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: run {
+                Log.e("NetworkCheck", "No network capabilities")
+                return false
+            }
             capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         } else {
             @Suppress("DEPRECATION")
             connectivityManager.activeNetworkInfo?.isConnected == true
         }
+
+//        if (isConnected) {
+//            Log.i("NetworkCheck", "Network connection detected, testing speed...")
+//
+//            // Perform ping test in background thread
+//            Thread {
+//                try {
+//                    Log.i("NetworkCheck", "Starting ping test to google.com...")
+//                    val startTime = System.currentTimeMillis()
+//
+//                    val process = Runtime.getRuntime().exec("ping -c 1 google.com")
+//                    val exitCode = process.waitFor()
+//
+//                    if (exitCode == 0) {
+//                        val endTime = System.currentTimeMillis()
+//                        var pingTime = endTime - startTime
+//
+//                        // Parse ping output for more accurate timing
+//                        val reader = BufferedReader(InputStreamReader(process.inputStream))
+//                        var line: String?
+//
+//                        while (reader.readLine().also { line = it } != null) {
+//                            Log.d("NetworkCheck", "Ping output: $line")
+//
+//                            // Extract time from ping output (format: time=XX.X ms)
+//                            line?.let { output ->
+//                                val timeRegex = "time=([0-9.]+)".toRegex()
+//                                val matchResult = timeRegex.find(output)
+//                                matchResult?.let {
+//                                    pingTime = it.groupValues[1].toDouble().toLong()
+//                                }
+//                            }
+//                        }
+//
+//                        val speedCategory = when {
+//                            pingTime <= 50 -> "FAST"
+//                            pingTime <= 150 -> "AVERAGE"
+//                            else -> "SLOW"
+//                        }
+//
+//                        Log.i("NetworkCheck", "Ping successful! Time: ${pingTime}ms - Internet Speed: $speedCategory")
+//
+//                        // Print to console as well
+//                        println("Internet Speed: $speedCategory (${pingTime}ms)")
+//
+//                    } else {
+//                        Log.e("NetworkCheck", "Ping failed with exit code: $exitCode")
+//
+//                        // Read error stream
+//                        val errorReader = BufferedReader(InputStreamReader(process.errorStream))
+//                        var errorLine: String?
+//                        while (errorReader.readLine().also { errorLine = it } != null) {
+//                            Log.e("NetworkCheck", "Ping error: $errorLine")
+//                        }
+//
+//                        Log.w("NetworkCheck", "Network available but ping failed - connection may be limited")
+//                    }
+//
+//                } catch (e: Exception) {
+//                    Log.e("NetworkCheck", "Exception during ping test: ${e.message}", e)
+//                }
+//            }.start()
+//
+//        }
+//        else {
+//            Log.e("NetworkCheck", "No internet connection available")
+//        }
+
+        return isConnected
     }
 
     // Helper method for correcting recognized phrases based on phonetic similarity
@@ -227,15 +305,21 @@ class LanguageHandlers(private val context: Context) {
                             kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
                     )
 
-            val similarity = (phoneticSimilarity * 0.5)  + (stringSimilarity * 0.5)
+            val similarity = (phoneticSimilarity * 0.5) + (stringSimilarity * 0.5)
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
                 bestMatch = recognizedPhrase
             }
-       }
+        }
 
-        return if (bestSimilarity >= 0.85) {
+        // Count words in expected phrase
+        val wordCount = expectedPhrase.trim().split("\\s+".toRegex()).size
+
+        // Set threshold based on word count
+        val threshold = if (wordCount <= 3) 0.90 else 0.85
+
+        return if (bestSimilarity >= threshold) {
             mapOf(expectedPhrase to bestSimilarity)
         } else {
             mapOf(bestMatch to bestSimilarity)
