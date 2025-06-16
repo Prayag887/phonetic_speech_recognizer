@@ -4,13 +4,11 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
-import android.util.Log
-import io.flutter.plugin.common.MethodChannel
-import org.apache.commons.lang3.StringUtils
-import java.net.HttpURLConnection
-import java.net.URL
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
+import android.widget.Toast
+import org.apache.commons.lang3.StringUtils
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -110,7 +108,15 @@ class LanguageHandlers(private val context: Context) {
             paragraph = "",
             lang = languageCode,
             mapper = { text ->
-                if (languageCode == "en-US") correctRecognizedPhrase(listOf(text.keys.first()), sentence) else text
+                if (languageCode == "en-US") {
+                    val context = ContextBasedDetection().detectContext(sentence)
+                    Log.d("SpeechRecognition", "Detected context: $context")
+                    Log.d("SpeechRecognition", "Original recognition: ${text.keys.first()}")
+                    correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
+                }
+                else {
+                    text
+                }
             },
             timeoutMillis = timeoutMillis,
             keepListening = false
@@ -290,7 +296,8 @@ class LanguageHandlers(private val context: Context) {
     // Helper method for correcting recognized phrases based on phonetic similarity
     fun correctRecognizedPhrase(
         recognizedPhrases: List<String>,
-        expectedPhrase: String
+        expectedPhrase: String,
+        context: String = "" // Add context parameter
     ): Map<String, Double> {
         if (recognizedPhrases.isEmpty()) return mapOf("" to 0.0)
 
@@ -298,31 +305,84 @@ class LanguageHandlers(private val context: Context) {
         var bestSimilarity = 0.0
 
         for (recognizedPhrase in recognizedPhrases) {
-            val phoneticSimilarity = PhoneticSimilarity().calculatePhoneticSimilarity(recognizedPhrase, expectedPhrase)
+            // Apply context-aware preprocessing
+            val preprocessedPhrase = preprocessWithContext(recognizedPhrase, context)
+
+            val phoneticSimilarity = PhoneticSimilarity().calculatePhoneticSimilarity(
+                preprocessedPhrase, expectedPhrase
+            )
 
             val stringSimilarity = 1.0 - (
                     StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() /
                             kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
                     )
-
-            val similarity = (phoneticSimilarity * 0.5) + (stringSimilarity * 0.5)
+            // Adjust weights based on context
+            val contextWeight = if (context.isNotEmpty()) 0.7 else 0.5
+            val similarity = (phoneticSimilarity * contextWeight) + (stringSimilarity * (1.0 - contextWeight))
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
-                bestMatch = recognizedPhrase
+                bestMatch = preprocessedPhrase
             }
         }
 
-        // Count words in expected phrase
-        val wordCount = expectedPhrase.trim().split("\\s+".toRegex()).size
-
-        // Set threshold based on word count
-        val threshold = if (wordCount <= 3) 0.90 else 0.85
+        val threshold = calculateDynamicThreshold(expectedPhrase)
 
         return if (bestSimilarity >= threshold) {
             mapOf(expectedPhrase to bestSimilarity)
         } else {
             mapOf(bestMatch to bestSimilarity)
+        }
+    }
+
+    private fun preprocessWithContext(phrase: String, context: String): String {
+        var corrected = phrase
+
+        // Common speech recognition errors in food context
+        val foodContextCorrections = mapOf(
+            "V8" to "we ate",
+            "V 8" to "we ate",
+            "we 8" to "we ate",
+            "we eight" to "we ate",
+            "VI" to "we",
+            "V" to "we"
+        )
+
+        if (context.contains("food") || context.contains("eating")) {
+            foodContextCorrections.forEach { (wrong, correct) ->
+                corrected = corrected.replace(wrong, correct, ignoreCase = true)
+            }
+        }
+
+        return corrected
+    }
+
+    private fun calculateDynamicThreshold(expectedPhrase: String): Double {
+        val words = expectedPhrase.trim().split("\\s+".toRegex())
+        val wordCount = words.size
+
+        // Check if phrase contains commonly misrecognized words
+        val problematicWords = listOf("we", "ate", "the", "a", "I", "you", "to", "too", "two", "for", "four")
+        val hasProblematicWords = words.any { it.lowercase() in problematicWords }
+
+        // Check for short words that are often confused
+        val shortWords = words.filter { it.length <= 2 }
+        val hasShortWords = shortWords.isNotEmpty()
+
+        // Check if any word has 2 or more syllables (simple heuristic: contains vowel groups)
+        val hasMultiSyllableWords = words.any { word ->
+            val vowelGroups = word.lowercase().split(Regex("[bcdfghjklmnpqrstvwxyz]+")).filter { it.isNotEmpty() }
+            vowelGroups.size >= 2
+        }
+
+        return when {
+            wordCount <= 2 && hasProblematicWords -> 0.90
+            wordCount <= 2 && hasShortWords -> 0.90
+            wordCount <= 3 && hasMultiSyllableWords -> 0.90  // New condition for multi-syllable words
+            wordCount <= 3 && hasProblematicWords -> 0.85
+            wordCount <= 3 -> 0.90
+            hasProblematicWords -> 0.80
+            else -> 0.90
         }
     }
 }

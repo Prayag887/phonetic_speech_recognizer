@@ -37,7 +37,7 @@ class _MyAppState extends State<MyApp> {
   final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(1.0);
   final ValueNotifier<double> _confidenceNotifier = ValueNotifier<double>(0.0);
   final ValueNotifier<RecognitionType> _selectedTypeNotifier = ValueNotifier<RecognitionType>(RecognitionType.sentences);
-  final ValueNotifier<String> _randomTextNotifier = ValueNotifier<String>("I love cats");
+  final ValueNotifier<String> _randomTextNotifier = ValueNotifier<String>("we ate banana.");
   final ValueNotifier<String> _randomNumberNotifier = ValueNotifier<String>(RandomSentenceGenerator.generateSerialKoreanNumber());
   final ValueNotifier<String> _partialTextNotifier = ValueNotifier<String>("");
   final ValueNotifier<String> _newTextNotifier = ValueNotifier<String>("");
@@ -193,6 +193,8 @@ class _MyAppState extends State<MyApp> {
         sentence: textToRecognize,
         sendKeyOnly: sendKeyOnly,
       );
+
+      print("result:::::: $result");
 
       if (!sendKeyOnly && result is Map) {
         if (result.isNotEmpty) {
