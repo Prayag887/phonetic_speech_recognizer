@@ -100,8 +100,16 @@ class PhoneticSpeechRecognizer {
       List<String> sentenceWords = sentence.split(RegExp(r'\s+'));
       currentSentenceCount = sentenceIndex + 1;
 
+      // Calculate the halfway point of the sentence
+      int halfwayPoint = (sentenceWords.length / 2).ceil();
+
       for (int i = 0; i < sentenceWords.length && wordIndex < words.length; i++) {
-        sentenceCounts[wordIndex] = currentSentenceCount;
+        // If we've reached the halfway point, increment the sentence count
+        if (i >= halfwayPoint) {
+          sentenceCounts[wordIndex] = currentSentenceCount + 1;
+        } else {
+          sentenceCounts[wordIndex] = currentSentenceCount;
+        }
         wordIndex++;
       }
     }
