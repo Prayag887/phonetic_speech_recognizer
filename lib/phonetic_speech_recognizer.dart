@@ -75,6 +75,8 @@ class PhoneticSpeechRecognizer {
   /// Builds a lookup table that maps each word in the input text to its corresponding sentence index.
   /// Empty lookup table List<int> sentenceCounts = List.filled(words.length, 0);
   ///
+  /// sentence count increases if atleast half of the words in sentence has been spoken
+  ///
   /// Sentence: Hello world. This is sentence two! How are you?
   /// Words: ["Hello", "world", "This", "is", "sentence", "two", "How", "are", "you"]
   /// Lookup table: [1, 1, 2, 2, 2, 2, 3, 3, 3]
@@ -98,21 +100,24 @@ class PhoneticSpeechRecognizer {
       if (sentence.isEmpty) continue;
 
       List<String> sentenceWords = sentence.split(RegExp(r'\s+'));
-      currentSentenceCount = sentenceIndex + 1;
+      currentSentenceCount = sentenceIndex;
 
       // Calculate the halfway point of the sentence
       int halfwayPoint = (sentenceWords.length / 2).ceil();
+      bool hasReachedHalfway = false;
 
       for (int i = 0; i < sentenceWords.length && wordIndex < words.length; i++) {
-        // If we've reached the halfway point, increment the sentence count
-        if (i >= halfwayPoint) {
-          sentenceCounts[wordIndex] = currentSentenceCount + 1;
-        } else {
-          sentenceCounts[wordIndex] = currentSentenceCount;
+        // If we've reached the halfway point for the first time, increment the sentence count
+        if (i >= halfwayPoint && !hasReachedHalfway) {
+          currentSentenceCount++;
+          hasReachedHalfway = true;
         }
+
+        sentenceCounts[wordIndex] = currentSentenceCount;
         wordIndex++;
       }
     }
+
     return sentenceCounts;
   }
 
