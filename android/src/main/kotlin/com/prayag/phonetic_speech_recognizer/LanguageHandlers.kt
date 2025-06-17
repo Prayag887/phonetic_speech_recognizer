@@ -356,6 +356,7 @@ class LanguageHandlers(private val context: Context) {
             wordCount <= 3 && hasMultiSyllableWords -> 0.90  // New condition for multi-syllable words
             wordCount <= 3 && hasProblematicWords -> 0.85
             wordCount <= 3 -> 0.90
+            wordCount >= 4 -> 0.75
             hasProblematicWords -> 0.80
             else -> 0.90
         }

@@ -448,18 +448,22 @@ class PhoneticSpeechRecognizer {
 
               if (matchedIndexes.contains(index)) {
                 wordColor = highlightCorrectColor;
+                backgroundColor = highlightCorrectColor;
                 borderColor = highlightCorrectColor;
               } else if (mispronounceIndexes.contains(index)) {
                 wordColor = highlightCorrectColor;
                 borderColor = highlightCorrectColor;
+                backgroundColor = highlightCorrectColor;
                 weight = FontWeight.normal;
               } else if (skippedIndexes.contains(index)) {
-                wordColor = highlightWrongColor;
+                wordColor = highlightCorrectColor;
+                backgroundColor = highlightCorrectColor;
                 borderColor = Colors.blue;
                 weight = FontWeight.normal;
               } else if (index < targetIndex) {
                 wordColor = highlightWrongColor;
                 borderColor = highlightWrongColor;
+                backgroundColor = highlightWrongColor;
                 weight = FontWeight.normal;
               } else {
                 wordColor = defaultTextColor;
@@ -471,6 +475,7 @@ class PhoneticSpeechRecognizer {
                   margin: EdgeInsets.symmetric(vertical: 2),
                   padding: EdgeInsets.symmetric(horizontal: 2),
                   decoration: BoxDecoration(
+                    color: backgroundColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -507,7 +512,6 @@ class PhoneticSpeechRecognizer {
 
     double accuracyPercentageDouble = (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100);
     int accuracyPercentage = (accuracyPercentageDouble > 0) ? accuracyPercentageDouble.toInt() : 0;
-    // (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100).toInt();
 
 
     // Split the text into words
@@ -647,6 +651,7 @@ class PhoneticSpeechRecognizer {
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
+            color: Colors.black,
           ),
         ),
         const SizedBox(width: 8),
