@@ -72,6 +72,42 @@ class PhoneticSpeechRecognizer {
   }
 
 
+  /// Builds a lookup table that maps each word in the input text to its corresponding sentence index.
+  /// Empty lookup table List<int> sentenceCounts = List.filled(words.length, 0);
+  ///
+  /// Sentence: Hello world. This is sentence two! How are you?
+  /// Words: ["Hello", "world", "This", "is", "sentence", "two", "How", "are", "you"]
+  /// Lookup table: [1, 1, 2, 2, 2, 2, 3, 3, 3]
+  ///
+  /// This is done by splitting the text into sentences, then splitting each sentence into words, and then
+  /// mapping each word to its corresponding sentence index.
+  ///
+  /// The reason for this is to allow us to know which sentence a word belongs to when we receive the
+  /// partial recognition results from the native code.
+  List<int> _buildSentenceCountLookup(String text) {
+    List<String> words = text.split(RegExp(r'\s+'));
+    List<int> sentenceCounts = List.filled(words.length, 0);
+
+    int currentSentenceCount = 0;
+    int wordIndex = 0;
+
+    List<String> sentences = text.split(RegExp(r'[.!?]+\s*'));
+
+    for (int sentenceIndex = 0; sentenceIndex < sentences.length; sentenceIndex++) {
+      String sentence = sentences[sentenceIndex].trim();
+      if (sentence.isEmpty) continue;
+
+      List<String> sentenceWords = sentence.split(RegExp(r'\s+'));
+      currentSentenceCount = sentenceIndex + 1;
+
+      for (int i = 0; i < sentenceWords.length && wordIndex < words.length; i++) {
+        sentenceCounts[wordIndex] = currentSentenceCount;
+        wordIndex++;
+      }
+    }
+    return sentenceCounts;
+  }
+
   Widget buildRealTimeHighlightedText({
     required String randomText,
     required String partialText,
@@ -83,32 +119,32 @@ class PhoneticSpeechRecognizer {
     required double fontSize,
     required double lineSpace,
     required double endOfScreen,
-    required void Function({int? correctPronouncationListLength, int? errorPronouncationListLength, int? errorWordsIndexesLength}) callback,
+    required void Function({
+      int? correctPronouncationListLength,
+      int? errorPronouncationListLength,
+      int? errorWordsIndexesLength,
+      int? indexedSentenceCount,
+    }) callback,
   }) {
     String cleanText(String text) {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
     }
 
+    List<int> sentenceCountLookup = _buildSentenceCountLookup(randomText);
+
     List<String> originalWords = randomText.split(RegExp(r'\s+'));
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    //dont search for words that are farther than 2 words away
     final int maxLookahead = 2;
-    //dont let the users skip more than 2 words ahead
     final int maxSkipLimit = 2;
-    //populated after checking double metaphones and  homophones
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
     final List<String> errorBuffer = [];
-    //if more tham 2 words are consecutively wrong, then skip
     final int consecutiveErrorThreshold = 2;
 
-
-    //to check the current targeted words
     int targetIndex = 0;
-    //to check the last spoken word at the end of the partial text
     int lastProcessedIndex = -1;
 
     List<int> errorWordsIndexList = [];
@@ -209,22 +245,6 @@ class PhoneticSpeechRecognizer {
       return false;
     }
 
-    /// Finds the starting index of the first occurrence of the given pattern
-    /// in the target words list, starting from the specified index.
-    ///
-    /// This function compares each word in the pattern with corresponding words
-    /// in the target words list using the `wordsMatch` method. A match is
-    /// considered successful if all words in the pattern match with a contiguous
-    /// sequence of words in the target words list.
-    ///
-    /// Returns the starting index of the match if found, or -1 if the pattern
-    /// is not found in the target words list.
-    ///
-    /// - Parameters:
-    ///   - pattern: A list of words to find in the target words list.
-    ///   - startIndex: The index in the target words list to start the search from.
-    /// - Returns: The starting index of the first matching occurrence, or -1 if no match is found.
-
     int findPatternInTarget(List<String> pattern, int startIndex) {
       if (pattern.isEmpty) return -1;
 
@@ -244,14 +264,6 @@ class PhoneticSpeechRecognizer {
       return -1;
     }
 
-
-    /// Iterate through the partial words and try to find a match in the target words list.
-    /// If a match is found, add the index to the matchedIndexes list and move the targetIndex forward.
-    /// If a similar match is found, add the index to the mispronounceIndexes list and move the targetIndex forward.
-    /// If no match is found, add the partial word to the error buffer and check if the buffer has reached the
-    /// consecutive error threshold. If it has, try to find a match of the entire buffer in the target words list.
-    /// If a match is found, add the indexes to the matchedIndexes list and move the targetIndex forward.
-    // If no match is found, remove the oldest word from the buffer until the buffer is no longer at the threshold.
     for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
       String partialWord = partialWords[partialIndex];
       bool found = false;
@@ -319,19 +331,6 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-
-    /// NEW: Auto-highlight skipped functional words between matched words
-    /// Automatically highlight functional words between matched words.
-    ///
-    /// This function goes through all matched words and checks if there are any
-    /// functional words between them. If there are, and they are not already
-    /// matched or mispronounced, they are added to the matched list and removed
-    /// from the skipped list. This is done to highlight functional words that are
-    /// close to the correct words, even if they are not part of the correct phrase.
-    ///
-    /// This function also checks for functional words at the beginning of the
-    /// target phrase, if there are any matches. If there are, and they are close
-    /// enough to the first matched word, they are also highlighted.
     void autoHighlightFunctionalWords() {
       List<int> allMatchedIndexes = [...matchedIndexes, ...mispronounceIndexes];
       allMatchedIndexes.sort();
@@ -340,22 +339,18 @@ class PhoneticSpeechRecognizer {
         int currentIndex = allMatchedIndexes[i];
         int nextIndex = allMatchedIndexes[i + 1];
 
-        // Check all words between current and next matched word
         for (int j = currentIndex + 1; j < nextIndex; j++) {
           if (isFunctionWord(targetWords[j]) && !matchedIndexes.contains(j) && !mispronounceIndexes.contains(j)) {
             matchedIndexes.add(j);
-            // Remove from skipped if it was there
             skippedIndexes.remove(j);
           }
         }
       }
 
-      // Also check for functional words at the beginning if we have matches
       if (allMatchedIndexes.isNotEmpty) {
         int firstMatchedIndex = allMatchedIndexes.first;
         for (int i = 0; i < firstMatchedIndex; i++) {
           if (isFunctionWord(targetWords[i]) && !matchedIndexes.contains(i) && !mispronounceIndexes.contains(i)) {
-            // Only highlight if it's very close to the first matched word (within 2 positions)
             if (firstMatchedIndex - i <= 2) {
               matchedIndexes.add(i);
               skippedIndexes.remove(i);
@@ -365,10 +360,8 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    // Call the new function to auto-highlight functional words
     autoHighlightFunctionalWords();
 
-    // Process all words for final categorization
     for (int index = 0; index < originalWords.length; index++) {
       if (matchedIndexes.contains(index)) {
         correctWordsList.add(index);
@@ -383,17 +376,27 @@ class PhoneticSpeechRecognizer {
       }
     }
 
-    // log('SUMMARY:');
-    // log('Original words: $originalWords');
-    // log('Matched indexes: $matchedIndexes');
-    // log('Mispronounce indexes: $mispronounceIndexes');
-    // log('Skipped indexes: $skippedIndexes');
-    // log('Last processed index: $lastProcessedIndex');
-    // log('Correct words list: $correctWordsList');
-    // log('Error pronunciation list: $errorWordsPronunciationList');
-    // log('Error words index list: $errorWordsIndexList');
+    int latestIndex = -1;
 
-    // Set global variables
+    for (int index in matchedIndexes) {
+      if (index > latestIndex) latestIndex = index;
+    }
+    for (int index in mispronounceIndexes) {
+      if (index > latestIndex) latestIndex = index;
+    }
+    for (int index in skippedIndexes) {
+      if (index > latestIndex) latestIndex = index;
+    }
+
+    if (lastProcessedIndex > latestIndex) {
+      latestIndex = lastProcessedIndex;
+    }
+
+    int indexedSentenceCount = 0;
+    if (latestIndex >= 0 && latestIndex < sentenceCountLookup.length) {
+      indexedSentenceCount = sentenceCountLookup[latestIndex];
+    }
+
     errorWordsIndexes = errorWordsIndexList;
     errorPronouncationList = errorWordsPronunciationList;
     correctPronouncationList = correctWordsList;
@@ -401,7 +404,8 @@ class PhoneticSpeechRecognizer {
     callback(
         errorWordsIndexesLength: errorWordsIndexList.length,
         errorPronouncationListLength: errorWordsPronunciationList.length,
-        correctPronouncationListLength: correctWordsList.length
+        correctPronouncationListLength: correctWordsList.length,
+        indexedSentenceCount: indexedSentenceCount
     );
 
     ScrollController controller = ScrollController();

@@ -15,10 +15,20 @@ import java.io.InputStreamReader
 class LanguageHandlers(private val context: Context) {
     private var pluginInstance: PhoneticSpeechRecognizerPlugin? = null
 
+    /**
+     * Sets the plugin instance that will receive the recognition results.
+     *
+     * @param plugin the plugin instance to receive the recognition results
+     */
     fun setPluginInstance(plugin: PhoneticSpeechRecognizerPlugin) {
         pluginInstance = plugin
     }
 
+    /**
+     * Handles alphabet recognition, first gets nepali language and maps it back to english..
+     * Its done because english cant detect alphabets.
+     * @param timeoutMillis the timeout in milliseconds for the recognition
+     */
     fun handleAlphabetRecognition(timeoutMillis: Int) {
         val isConnected = isNetworkAvailable(context)
         if (!isConnected) {
@@ -37,6 +47,12 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
+    /**
+     * Handles recognition for all languages.
+     *
+     * @param timeoutMillis the timeout in milliseconds for the recognition
+     * @param languageCode the language code for the recognition
+     */
     fun handleAllLanguages(timeoutMillis: Int, languageCode: String) {
         val isConnected = isNetworkAvailable(context)
         if (!isConnected) {
@@ -54,6 +70,11 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
+    /**
+     * Handles Korean alphabet recognition, works similar to english alohabets.
+     *
+     * @param timeoutMillis the timeout in milliseconds for the recognition
+     */
     fun handleKoreanAlphabetRecognition(timeoutMillis: Int) {
         val isConnected = isNetworkAvailable(context)
         if (!isConnected) {
@@ -71,6 +92,11 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
+    /**
+     * Handles number recognition based on hindi, similar to english alphabet detection.
+     *
+     * @param timeoutMillis the timeout in milliseconds for the recognition
+     */
     fun handleNumberRecognition(timeoutMillis: Int) {
         val isConnected = isNetworkAvailable(context)
         if (!isConnected) {
@@ -88,6 +114,13 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
+    /**
+     * Handles word recognition like objects.
+     *
+     * @param languageCode the language code for the recognition
+     * @param timeoutMillis the timeout in milliseconds for the recognition
+     * @param sentence the sentence to recognize
+     */
     fun handleWordsRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
         Log.d("SpeechRecognition", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
         if (languageCode == null) {
@@ -113,8 +146,7 @@ class LanguageHandlers(private val context: Context) {
                     Log.d("SpeechRecognition", "Detected context: $context")
                     Log.d("SpeechRecognition", "Original recognition: ${text.keys.first()}")
                     correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
-                }
-                else {
+                } else {
                     text
                 }
             },
@@ -123,6 +155,13 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
+    /**
+     * Handles paragraph mapping or partial texts.
+     *
+     * @param languageCode the language code for the recognition
+     * @param timeoutMillis the timeout in milliseconds for the recognition
+     * @param paragraph the paragraph to recognize
+     */
     fun handleParagraphMapping(languageCode: String?, timeoutMillis: Int, paragraph: String) {
         Log.d("SpeechRecognition", "PARAGRAPH FROM FLUTTER SIDE: \"$paragraph\"")
         if (languageCode == null) {
@@ -155,6 +194,12 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
+    /**
+     * Handles Japanese recognition based on nepali language.
+     *
+     * @param timeoutMillis the timeout in milliseconds for the recognition
+     * @param type the type of recognition
+     */
     fun handleJapaneseRecognition(timeoutMillis: Int, type: String) {
         val isConnected = isNetworkAvailable(context)
         if (!isConnected) {
@@ -178,6 +223,12 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
+    /**
+     * Handles Korean number recognition based on nepali language.
+     *
+     * @param timeoutMillis the timeout in milliseconds for the recognition
+     * @param type the type of recognition
+     */
     fun handleKoreanNumberRecognition(timeoutMillis: Int, type: String) {
         val isConnected = isNetworkAvailable(context)
         if (!isConnected) {
@@ -201,6 +252,11 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
+    /**
+     * Checks if the device has an active internet connection.
+     *
+     * @return true if the device has an active internet connection, false otherwise
+     */
     private fun isNetworkAvailable(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
             ?: run {
@@ -223,73 +279,6 @@ class LanguageHandlers(private val context: Context) {
             connectivityManager.activeNetworkInfo?.isConnected == true
         }
 
-//        if (isConnected) {
-//            Log.i("NetworkCheck", "Network connection detected, testing speed...")
-//
-//            // Perform ping test in background thread
-//            Thread {
-//                try {
-//                    Log.i("NetworkCheck", "Starting ping test to google.com...")
-//                    val startTime = System.currentTimeMillis()
-//
-//                    val process = Runtime.getRuntime().exec("ping -c 1 google.com")
-//                    val exitCode = process.waitFor()
-//
-//                    if (exitCode == 0) {
-//                        val endTime = System.currentTimeMillis()
-//                        var pingTime = endTime - startTime
-//
-//                        // Parse ping output for more accurate timing
-//                        val reader = BufferedReader(InputStreamReader(process.inputStream))
-//                        var line: String?
-//
-//                        while (reader.readLine().also { line = it } != null) {
-//                            Log.d("NetworkCheck", "Ping output: $line")
-//
-//                            // Extract time from ping output (format: time=XX.X ms)
-//                            line?.let { output ->
-//                                val timeRegex = "time=([0-9.]+)".toRegex()
-//                                val matchResult = timeRegex.find(output)
-//                                matchResult?.let {
-//                                    pingTime = it.groupValues[1].toDouble().toLong()
-//                                }
-//                            }
-//                        }
-//
-//                        val speedCategory = when {
-//                            pingTime <= 50 -> "FAST"
-//                            pingTime <= 150 -> "AVERAGE"
-//                            else -> "SLOW"
-//                        }
-//
-//                        Log.i("NetworkCheck", "Ping successful! Time: ${pingTime}ms - Internet Speed: $speedCategory")
-//
-//                        // Print to console as well
-//                        println("Internet Speed: $speedCategory (${pingTime}ms)")
-//
-//                    } else {
-//                        Log.e("NetworkCheck", "Ping failed with exit code: $exitCode")
-//
-//                        // Read error stream
-//                        val errorReader = BufferedReader(InputStreamReader(process.errorStream))
-//                        var errorLine: String?
-//                        while (errorReader.readLine().also { errorLine = it } != null) {
-//                            Log.e("NetworkCheck", "Ping error: $errorLine")
-//                        }
-//
-//                        Log.w("NetworkCheck", "Network available but ping failed - connection may be limited")
-//                    }
-//
-//                } catch (e: Exception) {
-//                    Log.e("NetworkCheck", "Exception during ping test: ${e.message}", e)
-//                }
-//            }.start()
-//
-//        }
-//        else {
-//            Log.e("NetworkCheck", "No internet connection available")
-//        }
-
         return isConnected
     }
 
@@ -306,7 +295,7 @@ class LanguageHandlers(private val context: Context) {
 
         for (recognizedPhrase in recognizedPhrases) {
             // Apply context-aware preprocessing
-            val preprocessedPhrase = preprocessWithContext(recognizedPhrase, context)
+            val preprocessedPhrase = ContextBasedDetection().preprocessWithContext(recognizedPhrase, context)
 
             val phoneticSimilarity = PhoneticSimilarity().calculatePhoneticSimilarity(
                 preprocessedPhrase, expectedPhrase
@@ -335,28 +324,14 @@ class LanguageHandlers(private val context: Context) {
         }
     }
 
-    private fun preprocessWithContext(phrase: String, context: String): String {
-        var corrected = phrase
-
-        // Common speech recognition errors in food context
-        val foodContextCorrections = mapOf(
-            "V8" to "we ate",
-            "V 8" to "we ate",
-            "we 8" to "we ate",
-            "we eight" to "we ate",
-            "VI" to "we",
-            "V" to "we"
-        )
-
-        if (context.contains("food") || context.contains("eating")) {
-            foodContextCorrections.forEach { (wrong, correct) ->
-                corrected = corrected.replace(wrong, correct, ignoreCase = true)
-            }
-        }
-
-        return corrected
-    }
-
+    /**
+     * Calculates a dynamic threshold based on the length and complexity of the expected phrase.
+     * This is used to adjust the similarity threshold for the phonetic similarity correction.
+     * The goal is to be more lenient for shorter phrases and more strict for longer phrases.
+     *
+     * @param expectedPhrase the expected phrase
+     * @return the dynamic threshold
+     */
     private fun calculateDynamicThreshold(expectedPhrase: String): Double {
         val words = expectedPhrase.trim().split("\\s+".toRegex())
         val wordCount = words.size

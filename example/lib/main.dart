@@ -37,7 +37,7 @@ class _MyAppState extends State<MyApp> {
   final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(1.0);
   final ValueNotifier<double> _confidenceNotifier = ValueNotifier<double>(0.0);
   final ValueNotifier<RecognitionType> _selectedTypeNotifier = ValueNotifier<RecognitionType>(RecognitionType.sentences);
-  final ValueNotifier<String> _randomTextNotifier = ValueNotifier<String>("we ate banana.");
+  final ValueNotifier<String> _randomTextNotifier = ValueNotifier<String>("I like cats");
   final ValueNotifier<String> _randomNumberNotifier = ValueNotifier<String>(RandomSentenceGenerator.generateSerialKoreanNumber());
   final ValueNotifier<String> _partialTextNotifier = ValueNotifier<String>("");
   final ValueNotifier<String> _newTextNotifier = ValueNotifier<String>("");
@@ -204,6 +204,8 @@ class _MyAppState extends State<MyApp> {
           _recognizedTextNotifier.value = recognizedValue;
           _confidenceNotifier.value = confidenceStr;
 
+          print("recognizedValue:::::: ${_recognizedTextNotifier.value.length}");
+          print("_randomTextNotifier:::::: ${_randomTextNotifier.value.length}");
           // Compare recognized text with expected text (text from question like sentence or paragraph)(_randomText)
           if (_recognizedTextNotifier.value == _randomTextNotifier.value) {
             _generateRandomText();
@@ -320,10 +322,15 @@ class _MyAppState extends State<MyApp> {
                             lineSpace: 1.5,
                             endOfScreen: 300,
 
-                            callback: ({correctPronouncationListLength, errorPronouncationListLength, errorWordsIndexesLength}) {
-                              // log("Correct Pronouncation List Length: $correctPronouncationListLength");
-                              // log("Error Pronouncation List Length: $errorPronouncationListLength");
-                              // log("Error Words Indexes Length: $errorWordsIndexesLength");
+                            callback: ({
+                              correctPronouncationListLength,
+                              errorPronouncationListLength,
+                              errorWordsIndexesLength,
+                              indexedSentenceCount}) {
+                              log("Correct Pronouncation List Length: $correctPronouncationListLength");
+                              log("Error Pronouncation List Length: $errorPronouncationListLength");
+                              log("Error Words Indexes Length: $errorWordsIndexesLength");
+                              log("Current sentence index: $indexedSentenceCount");
                             },
                           );
                         } else {
@@ -338,10 +345,15 @@ class _MyAppState extends State<MyApp> {
                             fontSize: 30,
                             lineSpace: 1.5,
                             endOfScreen: 300,
-                            callback: ({correctPronouncationListLength, errorPronouncationListLength, errorWordsIndexesLength}) {
-                              // log("Correct Pronouncation List Length:::::::::: $correctPronouncationListLength");
-                              // log("Error Pronouncation List Length: $errorPronouncationListLength");
-                              // log("Error Words Indexes Length: $errorWordsIndexesLength");
+                            callback: ({
+                              correctPronouncationListLength,
+                              errorPronouncationListLength,
+                              errorWordsIndexesLength,
+                              indexedSentenceCount}) {
+                              log("Correct Pronouncation List Length:::::::::: $correctPronouncationListLength");
+                              log("Error Pronouncation List Length: $errorPronouncationListLength");
+                              log("Error Words Indexes Length: $errorWordsIndexesLength");
+                              log("Current sentence index: $indexedSentenceCount");
                             },
                           );
                         }
