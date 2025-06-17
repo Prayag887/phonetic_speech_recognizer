@@ -377,15 +377,24 @@ class PhoneticSpeechRecognizer {
 
     for (int index = 0; index < originalWords.length; index++) {
       if (matchedIndexes.contains(index)) {
+        // Correctly pronounced
         correctWordsList.add(index);
-        log('Correct word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+        log('Correct word at index $index: "${originalWords[index]}"');
+
       } else if (mispronounceIndexes.contains(index)) {
+        // Incorrectly pronounced
         errorWordsPronunciationList.add(index);
         log('Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+
       } else if (skippedIndexes.contains(index)) {
+        // Skipped/not attempted
         errorWordsIndexList.add(index);
-        errorWordsPronunciationList.add(index);
-        log('Skipped word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+        log('Skipped word at index $index: "${originalWords[index]}"');
+
+      } else {
+        // Unaccounted for - this shouldn't happen if your logic is complete
+        errorWordsIndexList.add(index);
+        log('Unaccounted word at index $index: "${originalWords[index]}"');
       }
     }
 
