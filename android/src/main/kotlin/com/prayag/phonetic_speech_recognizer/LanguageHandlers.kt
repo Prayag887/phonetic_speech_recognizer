@@ -7,7 +7,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
+//import android.widget.Toast
 import org.apache.commons.lang3.StringUtils
 import java.io.BufferedReader
 import java.io.InputStreamReader

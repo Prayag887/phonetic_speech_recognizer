@@ -507,20 +507,20 @@ class PhoneticSpeechRecognizer {
 
   Widget displayMistakeWords({required List<int> errorWordsList, required List<int> errorPronunciationList, required List<int> correctPronouncationList, required String randomText, required int totalWords, required Color defaultTextColor, required Color highlightWrongColor, required double fontSize, required double lineSpace,}) {
 
-    int totalSpokenWords = correctPronouncationList.length + errorPronouncationList.length;
-    int totalSkippedWords = totalWords - totalSpokenWords;
+    int correctWords = correctPronouncationList.length;
+    int mispronounced = errorPronouncationList.length;
+    int skippedWords = errorWordsList.length;
 
-    int pronunciationMistakes = errorPronouncationList.length;
-    int fluencyMistakes = errorWordsList.length;
+    int totalSpokenWords = correctWords + mispronounced;
+    int totalProcessedWords = correctWords + mispronounced + skippedWords;
 
-    // int totalErrors = pronunciationMistakes + fluencyMistakes;
-    int totalErrors = fluencyMistakes;
+    // Scores
+    int pronunciationScore = correctWords; // out of totalSpokenWords
+    int fluencyScore = correctWords; // out of totalWords
 
-    int pronunciationScore = totalSpokenWords - pronunciationMistakes;
-    int fluencyScore = totalSpokenWords - fluencyMistakes;
-
-    double accuracyPercentageDouble = (((totalWords - (totalErrors + totalSkippedWords)) / totalWords) * 100);
-    int accuracyPercentage = (accuracyPercentageDouble > 0) ? accuracyPercentageDouble.toInt() : 0;
+    // Accuracy: correct words out of total words
+    double accuracyPercentageDouble = (correctWords / totalWords) * 100;
+    int accuracyPercentage = accuracyPercentageDouble.toInt();
 
 
     // Split the text into words
