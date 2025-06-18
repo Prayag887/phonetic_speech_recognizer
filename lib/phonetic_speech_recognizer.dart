@@ -593,11 +593,11 @@ class PhoneticSpeechRecognizer {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildMetricRow("Pronunciation", pronunciationScore, totalSpokenWords, Colors.green),
+                      _buildMetricRow("Pronunciation", pronunciationScore, totalWords, Colors.green),
                       const SizedBox(height: 8),
                       // _buildMetricRow("Fluency", fluencyScore,  totalSpokenWords, Colors.blue),
                       // const SizedBox(height: 8),
-                      _buildMetricRow("Mistakes", totalErrors, totalWords, Colors.red),
+                      _buildMetricRow("Mistakes", (totalWords - pronunciationScore), totalWords, Colors.red),
                     ],
                   ),
                 ),
