@@ -289,7 +289,8 @@ object PhoneticMapping {
             "h h",
             "aitch aitch",
             "age age",
-            "hatch hatch"
+            "hatch hatch",
+            "ats"
         ),
 
         "I" to listOf(
@@ -434,7 +435,9 @@ object PhoneticMapping {
             "क्यु",
             "क्यु क्यु",
             "queue queue",
-            "kyon kyon"
+            "kyon kyon",
+            "के हो",
+            "त्यो"
         ),
 
         "R" to listOf(

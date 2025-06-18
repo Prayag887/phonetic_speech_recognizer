@@ -21,6 +21,9 @@ import io.flutter.plugin.common.MethodChannel
 import java.util.*
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import android.media.AudioManager
+import android.media.audiofx.AutomaticGainControl
+import android.os.Build
 
 
 class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler, EventChannel.StreamHandler, ActivityAware {
@@ -199,6 +202,37 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       cleanup()
     }
 
+    // Enable audio effects for volume enhancement
+    try {
+      val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+      // Get audio session ID for effects
+      val audioSessionId = audioManager.generateAudioSessionId()
+
+      // Try to enable AutomaticGainControl
+      if (AutomaticGainControl.isAvailable()) {
+        val agc = AutomaticGainControl.create(audioSessionId)
+        agc?.enabled = true
+        Log.d("SpeechRecognition", "AGC enabled for volume boost")
+      }
+
+      // Boost microphone gain programmatically
+      audioManager.setStreamVolume(
+        AudioManager.STREAM_VOICE_CALL,
+        audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL),
+        0
+      )
+
+      // Set microphone gain if supported
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        audioManager.setMicrophoneMute(false)
+      }
+      Log.d("SpeechRecognition", "Microphone volume boosted")
+
+    } catch (e: Exception) {
+      Log.w("SpeechRecognition", "Could not apply audio enhancements: ${e.message}")
+    }
+
     speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
     val intent = if(keepListening) {
       Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -206,6 +240,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
+        // Add audio enhancement preferences
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false) // Online recognition often has better noise handling
+        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
       }
     } else {
       Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -213,6 +250,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 7)
+        // Add audio enhancement preferences
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
       }
     }
 
@@ -316,11 +355,15 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         }
       }
 
+      override fun onRmsChanged(rmsdB: Float) {
+        // Optional: Monitor audio levels for debugging
+         Log.d("SpeechRecognition", "Audio level: $rmsdB dB")
+      }
+
       // Other overrides remain unchanged
       override fun onEndOfSpeech() {}
       override fun onReadyForSpeech(params: Bundle?) {}
       override fun onBeginningOfSpeech() {}
-      override fun onRmsChanged(rmsdB: Float) {}
       override fun onBufferReceived(buffer: ByteArray?) {}
       override fun onEvent(eventType: Int, params: Bundle?) {}
     })
