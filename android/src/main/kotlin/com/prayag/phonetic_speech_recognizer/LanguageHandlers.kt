@@ -30,7 +30,7 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleAlphabetRecognition(timeoutMillis: Int) {
-        val isConnected = isNetworkAvailable(context)
+        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -54,7 +54,7 @@ class LanguageHandlers(private val context: Context) {
      * @param languageCode the language code for the recognition
      */
     fun handleAllLanguages(timeoutMillis: Int, languageCode: String) {
-        val isConnected = isNetworkAvailable(context)
+        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -76,7 +76,7 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleKoreanAlphabetRecognition(timeoutMillis: Int) {
-        val isConnected = isNetworkAvailable(context)
+        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -98,7 +98,7 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleNumberRecognition(timeoutMillis: Int) {
-        val isConnected = isNetworkAvailable(context)
+        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -130,7 +130,7 @@ class LanguageHandlers(private val context: Context) {
             return
         }
 
-        val isConnected = isNetworkAvailable(context)
+        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -171,7 +171,7 @@ class LanguageHandlers(private val context: Context) {
             return
         }
 
-        val isConnected = isNetworkAvailable(context)
+        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -201,7 +201,7 @@ class LanguageHandlers(private val context: Context) {
      * @param type the type of recognition
      */
     fun handleJapaneseRecognition(timeoutMillis: Int, type: String) {
-        val isConnected = isNetworkAvailable(context)
+        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -230,7 +230,7 @@ class LanguageHandlers(private val context: Context) {
      * @param type the type of recognition
      */
     fun handleKoreanNumberRecognition(timeoutMillis: Int, type: String) {
-        val isConnected = isNetworkAvailable(context)
+        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -257,29 +257,13 @@ class LanguageHandlers(private val context: Context) {
      *
      * @return true if the device has an active internet connection, false otherwise
      */
-    private fun isNetworkAvailable(context: Context): Boolean {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            ?: run {
-                Log.e("NetworkCheck", "ConnectivityManager not available")
-                return false
-            }
-
-        val isConnected = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val network = connectivityManager.activeNetwork ?: run {
-                Log.e("NetworkCheck", "No active network")
-                return false
-            }
-            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: run {
-                Log.e("NetworkCheck", "No network capabilities")
-                return false
-            }
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        } else {
-            @Suppress("DEPRECATION")
-            connectivityManager.activeNetworkInfo?.isConnected == true
+    private fun isNetworkAvailable(): Boolean {
+        return try {
+                val process = Runtime.getRuntime().exec("ping -c 1 8.8.8.8")
+                process.waitFor() == 0
+        } catch (e: Exception) {
+            false
         }
-
-        return isConnected
     }
 
     // Helper method for correcting recognized phrases based on phonetic similarity

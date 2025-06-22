@@ -357,7 +357,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       override fun onRmsChanged(rmsdB: Float) {
         // Optional: Monitor audio levels for debugging
-//         Log.d("SpeechRecognition", "Audio level: $rmsdB dB")
+         Log.d("SpeechRecognition", "Audio level: $rmsdB dB")
       }
 
       // Other overrides remain unchanged
