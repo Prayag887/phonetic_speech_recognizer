@@ -30,7 +30,6 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleAlphabetRecognition(timeoutMillis: Int) {
-        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -54,7 +53,6 @@ class LanguageHandlers(private val context: Context) {
      * @param languageCode the language code for the recognition
      */
     fun handleAllLanguages(timeoutMillis: Int, languageCode: String) {
-        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -76,7 +74,6 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleKoreanAlphabetRecognition(timeoutMillis: Int) {
-        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -98,7 +95,6 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleNumberRecognition(timeoutMillis: Int) {
-        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -130,7 +126,6 @@ class LanguageHandlers(private val context: Context) {
             return
         }
 
-        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -171,7 +166,6 @@ class LanguageHandlers(private val context: Context) {
             return
         }
 
-        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -201,7 +195,6 @@ class LanguageHandlers(private val context: Context) {
      * @param type the type of recognition
      */
     fun handleJapaneseRecognition(timeoutMillis: Int, type: String) {
-        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -230,7 +223,6 @@ class LanguageHandlers(private val context: Context) {
      * @param type the type of recognition
      */
     fun handleKoreanNumberRecognition(timeoutMillis: Int, type: String) {
-        val isConnected = isNetworkAvailable()
         if (!isConnected) {
             pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
             pluginInstance?.activeResult = null
@@ -252,19 +244,6 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
-    /**
-     * Checks if the device has an active internet connection.
-     *
-     * @return true if the device has an active internet connection, false otherwise
-     */
-    private fun isNetworkAvailable(): Boolean {
-        return try {
-                val process = Runtime.getRuntime().exec("ping -c 1 8.8.8.8")
-                process.waitFor() == 0
-        } catch (e: Exception) {
-            false
-        }
-    }
 
     // Helper method for correcting recognized phrases based on phonetic similarity
     fun correctRecognizedPhrase(
@@ -335,7 +314,7 @@ class LanguageHandlers(private val context: Context) {
         }
 
         return when {
-            wordCount == 1 -> 0.60
+            wordCount == 1 -> 0.40
             wordCount <= 2 && hasProblematicWords -> 0.80
             wordCount <= 2 && hasShortWords -> 0.80
             wordCount <= 3 && hasMultiSyllableWords -> 0.80  // New condition for multi-syllable words
