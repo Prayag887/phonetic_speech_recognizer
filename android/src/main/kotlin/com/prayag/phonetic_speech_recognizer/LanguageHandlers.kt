@@ -30,11 +30,6 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleAlphabetRecognition(timeoutMillis: Int) {
-        if (!isConnected) {
-            pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
-            pluginInstance?.activeResult = null
-            return
-        }
 
         val lang = "ne-NP"
         pluginInstance?.startRecognition(
@@ -53,11 +48,6 @@ class LanguageHandlers(private val context: Context) {
      * @param languageCode the language code for the recognition
      */
     fun handleAllLanguages(timeoutMillis: Int, languageCode: String) {
-        if (!isConnected) {
-            pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
-            pluginInstance?.activeResult = null
-            return
-        }
 
         pluginInstance?.startRecognition(
             paragraph = "",
@@ -74,11 +64,6 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleKoreanAlphabetRecognition(timeoutMillis: Int) {
-        if (!isConnected) {
-            pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
-            pluginInstance?.activeResult = null
-            return
-        }
 
         pluginInstance?.startRecognition(
             paragraph = "",
@@ -95,11 +80,6 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleNumberRecognition(timeoutMillis: Int) {
-        if (!isConnected) {
-            pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
-            pluginInstance?.activeResult = null
-            return
-        }
 
         pluginInstance?.startRecognition(
             paragraph = "",
@@ -126,11 +106,6 @@ class LanguageHandlers(private val context: Context) {
             return
         }
 
-        if (!isConnected) {
-            pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
-            pluginInstance?.activeResult = null
-            return
-        }
 
         pluginInstance?.startRecognition(
             paragraph = "",
@@ -166,11 +141,6 @@ class LanguageHandlers(private val context: Context) {
             return
         }
 
-        if (!isConnected) {
-            pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
-            pluginInstance?.activeResult = null
-            return
-        }
 
         val words = paragraph.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
 
@@ -195,11 +165,6 @@ class LanguageHandlers(private val context: Context) {
      * @param type the type of recognition
      */
     fun handleJapaneseRecognition(timeoutMillis: Int, type: String) {
-        if (!isConnected) {
-            pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
-            pluginInstance?.activeResult = null
-            return
-        }
 
         val lang = "ne-NP"
         pluginInstance?.startRecognition(
@@ -223,11 +188,6 @@ class LanguageHandlers(private val context: Context) {
      * @param type the type of recognition
      */
     fun handleKoreanNumberRecognition(timeoutMillis: Int, type: String) {
-        if (!isConnected) {
-            pluginInstance?.activeResult?.error("NETWORK_ERROR", "Network not available", null)
-            pluginInstance?.activeResult = null
-            return
-        }
 
         val lang = "ne-NP"
         pluginInstance?.startRecognition(
