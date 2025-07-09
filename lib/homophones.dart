@@ -172,4 +172,36 @@ class Homophones {
     'coat': ['quote', 'court'],
     'court': ['coat', 'quote'],
   };
+
+  static bool _arePhoneticallySimilar(String a, String b) {
+    final Map<String, String> similarMap = {
+      'j': 'g',
+      'g': 'j',
+      'b': 'd',
+      'd': 'b',
+      'm': 'n',
+      'n': 'm',
+      'v': 'f',
+      'f': 'v',
+      's': 'z',
+      'z': 's',
+    };
+
+    // Normalize to lowercase
+    a = a.trim().toLowerCase();
+    b = b.trim().toLowerCase();
+
+    // Exact match
+    if (a == b) return true;
+
+    // If single letters and interchangeable
+    if (a.length == 1 && b.length == 1 && similarMap[a] == b) return true;
+
+    // Optionally: Use Metaphone for longer strings
+    // final String metaphoneA = Metaphone.encode(a);
+    // final String metaphoneB = Metaphone.encode(b);
+    // return metaphoneA == metaphoneB;
+
+    return false;
+  }
 }

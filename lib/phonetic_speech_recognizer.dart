@@ -711,6 +711,8 @@ class PhoneticSpeechRecognizer {
     String? sentence,
     bool sendKeyOnly = true,
   }) async {
+
+    var homoPhones = Homophones();
     if (timeout < 0) {
       throw ArgumentError('Timeout must be a positive value');
     }
@@ -725,36 +727,32 @@ class PhoneticSpeechRecognizer {
 
       if (raw == null) return "";
 
-      // Case 1: raw is a String
+      String? recognizedText;
+      double? confidence;
+
       if (raw is String) {
-        if (sendKeyOnly) {
-
-          return raw;
-        } else {
-          return {'text': raw, 'confidence': null};
-        }
-      }
-
-      // Case 2: raw is a Map
-      if (raw is Map) {
+        recognizedText = raw;
+      } else if (raw is Map) {
         final Map<String, double> result = raw.map(
               (key, value) => MapEntry(key.toString(), (value as num).toDouble()),
         );
-
-        if (result.isEmpty) return "";
-
-        final entry = result.entries.first;
-        final String text = entry.key;
-        final double confidence = entry.value;
-
-        if (sendKeyOnly) {
-          return text;
-        } else {
-          return {'text': text, 'confidence': confidence};
+        if (result.isNotEmpty) {
+          final entry = result.entries.first;
+          recognizedText = entry.key;
+          confidence = entry.value;
         }
       }
 
-      return "";
+      if (recognizedText == null) return "";
+
+      // Handle correction for common misrecognized characters
+      if (sentence != null && _arePhoneticallySimilar(recognizedText, sentence)) {
+        recognizedText = sentence;
+      }
+
+      return sendKeyOnly
+          ? recognizedText
+          : {'text': recognizedText, 'confidence': confidence};
     } on PlatformException catch (e) {
       if (kDebugMode) {
         log("Speech Recognition Error: ${e.code} - ${e.message}");
@@ -762,6 +760,7 @@ class PhoneticSpeechRecognizer {
       return "";
     }
   }
+
 
 
   /// Checks if the recognized sentence contains mandatory words.
@@ -805,4 +804,27 @@ class PhoneticSpeechRecognizer {
       return false; // No mandatory words found
     }
   }
+
+  static bool _arePhoneticallySimilar(String a, String b) {
+    final Map<String, String> similarMap = {
+      'j': 'g',
+      'g': 'j',
+      'b': 'd',
+      'd': 'b',
+      'm': 'n',
+      'n': 'm',
+      'b': 'p',
+      'p': 'b',
+    };
+
+    // Normalize to lowercase
+    a = a.trim().toLowerCase();
+    b = b.trim().toLowerCase();
+
+    if (a == b) return true;
+    if (a.length == 1 && b.length == 1 && similarMap[a] == b) return true;
+
+    return false;
+  }
+
 }

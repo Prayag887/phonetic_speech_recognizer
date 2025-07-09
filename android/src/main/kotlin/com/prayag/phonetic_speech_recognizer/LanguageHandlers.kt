@@ -84,7 +84,7 @@ class LanguageHandlers(private val context: Context) {
         pluginInstance?.startRecognition(
             paragraph = "",
             lang = "hi-IN",
-            mapper = { text -> Mapper().mapNumber(text.keys.first(), PhoneticMapping.phoneticNumbersMapping) },
+            mapper = { text -> Mapper().mapNumbersIncludingSpellings(text.keys.first(), PhoneticMapping.phoneticNumbersMapping) },
             timeoutMillis = timeoutMillis,
             keepListening = false
         )

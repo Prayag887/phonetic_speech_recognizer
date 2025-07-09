@@ -6,6 +6,29 @@ import java.util.Locale
 class Mapper {
     val speakLoud: String = "Please speak clearly and loudly in a silent environment."
 
+    fun mapNumbersIncludingSpellings(text: String, mapping: Map<String, List<String>>): String {
+        if (text.isBlank()) return text
+
+        val normalizedInput = text.trim().lowercase(Locale.ROOT)
+
+        // Invert the mapping to pronunciation -> keys
+        val reversedMapping = mutableMapOf<String, MutableList<String>>()
+        mapping.forEach { (key, spellings) ->
+            for (spelling in spellings) {
+                val normalizedSpelling = spelling.lowercase(Locale.ROOT).trim()
+                reversedMapping.getOrPut(normalizedSpelling) { mutableListOf() }.add(key)
+            }
+        }
+
+        // Find all keys that match the full normalized input
+        val matchedKeys = reversedMapping[normalizedInput]
+            ?.distinct()
+            ?: listOf(text.uppercase(Locale.ROOT))
+
+        return matchedKeys.joinToString(", ")
+    }
+
+
     fun mapNumber(text: String, mapping: Map<String, List<String>>): String {
         if (text.isBlank()) {
             return speakLoud
