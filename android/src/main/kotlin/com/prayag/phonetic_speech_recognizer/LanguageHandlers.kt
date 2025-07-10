@@ -79,11 +79,17 @@ class LanguageHandlers(private val context: Context) {
      *
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
-    fun handleNumberRecognition(timeoutMillis: Int) {
+    fun handleNumberRecognition(timeoutMillis: Int, sentence: String) {
+        val lang = if (listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "10").any { sentence.contains(it) }) {
+            "ne-NP"
+        } else {
+            "hi-IN"
+        }
+        println("this is number $sentence, lang $lang")
 
         pluginInstance?.startRecognition(
             paragraph = "",
-            lang = "hi-IN",
+            lang = lang,
             mapper = { text -> Mapper().mapNumbersIncludingSpellings(text.keys.first(), PhoneticMapping.phoneticNumbersMapping) },
             timeoutMillis = timeoutMillis,
             keepListening = false

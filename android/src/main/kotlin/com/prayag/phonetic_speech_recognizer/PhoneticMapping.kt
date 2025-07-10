@@ -843,7 +843,7 @@ object PhoneticMapping {
         ),
 
         //numbers mapping
-        "0" to listOf("zero", "jero", "0", "ज़ीरो", "जिरो", "zoro", "zeero", "jiro", "जीरो", "जेरो"),
+        "0" to listOf("zero", "jero", "0", "ज़ीरो", "जिरो", "zoro", "zeero", "jiro", "जीरो", "जेरो", "यारों"),
         "1" to listOf("one", "1", "वान", "waan", "wan", "won", "वन"),
         "2" to listOf(
             "two",
@@ -854,7 +854,8 @@ object PhoneticMapping {
             "तु",
             "to",
             "दो",
-            "तू"
+            "तू",
+            "पु"
         ),
         "3" to listOf("three", "3", "थ्री", "three", "tree", "ट्री"),
         "4" to listOf("four", "4", "फोर", "for", "फो", "पोर", "फोहोर", "पोहोर", "पो"),

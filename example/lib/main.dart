@@ -256,7 +256,7 @@ class _MyAppState extends State<MyApp> {
         break;
       case RecognitionType.numbers:
         _isRealTimeNotifier.value = false;
-        _randomTextNotifier.value = (DateTime.now().millisecondsSinceEpoch % 100).toString();
+        _randomTextNotifier.value = (DateTime.now().millisecondsSinceEpoch % 10).toString();
         break;
       case RecognitionType.koreanAlphabets:
         _isRealTimeNotifier.value = false;

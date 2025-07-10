@@ -110,7 +110,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           when (type) {
             "alphabet" -> languageHandlers.handleAlphabetRecognition(timeoutMillis)
             "koreanAlphabet" -> languageHandlers.handleKoreanAlphabetRecognition(timeoutMillis)
-            "number" -> languageHandlers.handleNumberRecognition(timeoutMillis)
+            "number" -> languageHandlers.handleNumberRecognition(timeoutMillis, sentence)
             "englishWordsOrSentence" -> languageHandlers.handleWordsRecognition(languageCode, timeoutMillis, sentence)
             "japaneseAlphabet" -> languageHandlers.handleJapaneseRecognition(timeoutMillis, "hiragana")
             "koreanNumber" -> languageHandlers.handleKoreanNumberRecognition(timeoutMillis, "katakana")
