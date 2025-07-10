@@ -843,7 +843,7 @@ object PhoneticMapping {
         ),
 
         //numbers mapping
-        "0" to listOf("zero", "jero", "0", "ज़ीरो", "जिरो", "zoro", "zeero", "jiro", "जीरो", "जेरो", "यारों"),
+        "0" to listOf("zero", "jero", "0", "ज़ीरो", "जिरो", "zoro", "zeero", "jiro", "जीरो", "जेरो", "यारों", "ज्यारो"),
         "1" to listOf("one", "1", "वान", "waan", "wan", "won", "वन"),
         "2" to listOf(
             "two",
