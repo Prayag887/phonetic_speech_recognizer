@@ -85,4 +85,6 @@ dependencies {
 
     // For storage access (recommended for API 29+)
     implementation("androidx.documentfile:documentfile:1.0.1")
+
+//    implementation("com.alphacephei:vosk-api-kotlin-android:0.4.0-alpha0")
 }

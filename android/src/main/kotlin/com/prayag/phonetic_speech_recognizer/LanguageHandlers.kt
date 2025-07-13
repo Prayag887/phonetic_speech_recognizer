@@ -230,13 +230,14 @@ class LanguageHandlers(private val context: Context) {
                 preprocessedPhrase, expectedPhrase
             )
 
-            val stringSimilarity = 1.0 - (
-                    StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() /
-                            kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
-                    )
+//            val stringSimilarity = 1.0 - (
+//                    StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() /
+//                            kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
+//                    )
             // Adjust weights based on context
             val contextWeight = if (context.isNotEmpty()) 0.7 else 0.5
-            val similarity = (phoneticSimilarity * contextWeight) + (stringSimilarity * (1.0 - contextWeight))
+//            val similarity = (phoneticSimilarity * contextWeight) + (stringSimilarity * (1.0 - contextWeight))
+            val similarity = phoneticSimilarity
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
@@ -281,14 +282,14 @@ class LanguageHandlers(private val context: Context) {
 
         return when {
             wordCount == 1 -> 0.40
-            wordCount <= 2 && hasProblematicWords -> 0.80
-            wordCount <= 2 && hasShortWords -> 0.80
-            wordCount <= 3 && hasMultiSyllableWords -> 0.80  // New condition for multi-syllable words
-            wordCount <= 3 && hasProblematicWords -> 0.75
-            wordCount <= 3 -> 0.80
-            wordCount >= 4 -> 0.75
-            hasProblematicWords -> 0.70
-            else -> 0.80
+            wordCount <= 2 && hasProblematicWords -> 0.50
+            wordCount <= 2 && hasShortWords -> 0.50
+            wordCount <= 3 && hasMultiSyllableWords -> 0.60  // New condition for multi-syllable words
+            wordCount <= 3 && hasProblematicWords -> 0.50
+            wordCount <= 3 -> 0.50
+            wordCount >= 4 -> 0.60
+            hasProblematicWords -> 0.50
+            else -> 0.60
         }
     }
 }

@@ -809,8 +809,8 @@ class PhoneticSpeechRecognizer {
     final Map<String, String> similarMap = {
       'j': 'g',
       'g': 'j',
-      'b': 'd',
-      'd': 'b',
+      't': 'd',
+      'd': 't',
       'm': 'n',
       'n': 'm',
       'b': 'p',
