@@ -222,8 +222,8 @@ class LanguageHandlers(private val context: Context) {
             return 0.0
         }
 
-        val recognizedWords = recognizedText.toLowerCase().split("\\s+".toRegex()).filter { it.isNotEmpty() }
-        val expectedWords = expectedParagraph.toLowerCase().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        val recognizedWords = recognizedText.lowercase().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        val expectedWords = expectedParagraph.lowercase().split("\\s+".toRegex()).filter { it.isNotEmpty() }
 
         if (expectedWords.isEmpty()) {
             return originalConfidence
