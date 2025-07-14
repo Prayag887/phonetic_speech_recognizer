@@ -177,7 +177,7 @@ class _MyAppState extends State<MyApp> {
       case RecognitionType.sentences:
       default:
         phoneticType = PhoneticType.englishWordsOrSentence;
-        languageCode = "en-US";
+        languageCode = "en-GB";
         break;
     }
 

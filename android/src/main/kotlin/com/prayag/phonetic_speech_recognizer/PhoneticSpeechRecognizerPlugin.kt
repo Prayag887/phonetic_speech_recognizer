@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
+import android.media.audiofx.AcousticEchoCanceler
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -39,6 +41,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var isProcessing: Boolean = false
   private var activity: Activity? = null
   private var activityBinding: ActivityPluginBinding? = null
+  private var audioManager: AudioManager? = null
+  private var originalStreamVolume: Int = 0
+  private var originalMicMute: Boolean = false
 
   // Create a single instance of LanguageHandlers that will be reused
   private lateinit var languageHandlers: LanguageHandlers
@@ -56,6 +61,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     languageHandlers = LanguageHandlers(context)
     languageHandlers.setPluginInstance(this)
 
+    // Initialize AudioManager
+    audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
   }
 
   // Implement the missing ActivityAware methods
@@ -142,18 +149,22 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     val permission = Manifest.permission.RECORD_AUDIO
     if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
       ActivityCompat.requestPermissions(activity!!, arrayOf(permission), 1001)
-    } else { Log.d("PhoneticPlugin", "Permission already granted.") }
+    } else {
+      Log.d("PhoneticPlugin", "Permission already granted.")
+    }
   }
-
 
   private fun stopRecognition(result: MethodChannel.Result) {
     try {
       speechRecognizer?.cancel()
+      restoreAudioSettings()
       cleanup()
       result.success(true)
       Log.d("TAG", "stopRecognition: stopped successfully")
       isListening = false
-    } catch (e: Exception) { result.error("STOP_ERROR", "Failed to stop recognition", e.message) }
+    } catch (e: Exception) {
+      result.error("STOP_ERROR", "Failed to stop recognition", e.message)
+    }
   }
 
   fun updateHighlightedText(spokenText: String, words: List<String>, paragraph: String): Map<String, Any> {
@@ -191,6 +202,82 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     return mapOf("highlights" to highlightedIndices.sortedBy { it["start"] })
   }
 
+  private fun setupAudioEnhancements(): Int {
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    var audioSessionId = 0
+
+    try {
+      // Store original settings
+      originalStreamVolume = audioManager.getStreamVolume(AudioManager.STREAM_VOICE_CALL)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        originalMicMute = audioManager.isMicrophoneMute
+      }
+
+      // Generate audio session ID for effects
+      audioSessionId = audioManager.generateAudioSessionId()
+
+      // Set microphone to unmuted and boost system volume
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        audioManager.setMicrophoneMute(false)
+      }
+
+      // Boost voice call stream volume to maximum
+      val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL)
+      audioManager.setStreamVolume(AudioManager.STREAM_VOICE_CALL, maxVolume, 0)
+
+      // Enable noise suppression if available
+      if (NoiseSuppressor.isAvailable()) {
+        val noiseSuppressor = NoiseSuppressor.create(audioSessionId)
+        noiseSuppressor?.enabled = true
+        Log.d("SpeechRecognition", "Noise suppressor enabled")
+      }
+
+      // Enable Automatic Gain Control for sensitivity boost
+      if (AutomaticGainControl.isAvailable()) {
+        val agc = AutomaticGainControl.create(audioSessionId)
+        agc?.enabled = true
+        Log.d("SpeechRecognition", "AGC enabled for sensitivity boost")
+      }
+
+      // Enable Acoustic Echo Canceler if available
+      if (AcousticEchoCanceler.isAvailable()) {
+        val aec = AcousticEchoCanceler.create(audioSessionId)
+        aec?.enabled = true
+        Log.d("SpeechRecognition", "AEC enabled")
+      }
+
+      // Set mode to improve voice recognition
+      audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+
+      Log.d("SpeechRecognition", "Audio enhancements applied successfully")
+
+    } catch (e: Exception) {
+      Log.w("SpeechRecognition", "Could not apply audio enhancements: ${e.message}")
+    }
+
+    return audioSessionId
+  }
+
+  private fun restoreAudioSettings() {
+    try {
+      audioManager?.let { am ->
+        // Restore original volume
+        am.setStreamVolume(AudioManager.STREAM_VOICE_CALL, originalStreamVolume, 0)
+
+        // Restore original mic mute state
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+          am.setMicrophoneMute(originalMicMute)
+        }
+
+        // Restore normal audio mode
+        am.mode = AudioManager.MODE_NORMAL
+      }
+      Log.d("SpeechRecognition", "Audio settings restored")
+    } catch (e: Exception) {
+      Log.w("SpeechRecognition", "Could not restore audio settings: ${e.message}")
+    }
+  }
+
   fun startRecognition(lang: String, mapper: (Map<String, Double>) -> Any, timeoutMillis: Int, paragraph: String = "", keepListening: Boolean) {
     // Set processing flags
     isProcessing = true
@@ -201,59 +288,34 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       cleanup()
     }
 
-    // Enable audio effects for volume enhancement
-    try {
-      val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-      // Get audio session ID for effects
-      val audioSessionId = audioManager.generateAudioSessionId()
-
-      // Try to enable AutomaticGainControl
-      if (AutomaticGainControl.isAvailable()) {
-        val agc = AutomaticGainControl.create(audioSessionId)
-        agc?.enabled = true
-        Log.d("SpeechRecognition", "AGC enabled for volume boost")
-      }
-
-      // Boost microphone gain programmatically
-      audioManager.setStreamVolume(
-        AudioManager.STREAM_VOICE_CALL,
-        audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL),
-        0
-      )
-
-      // Set microphone gain if supported
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        audioManager.setMicrophoneMute(false)
-      }
-      Log.d("SpeechRecognition", "Microphone volume boosted")
-
-    } catch (e: Exception) {
-      Log.w("SpeechRecognition", "Could not apply audio enhancements: ${e.message}")
-    }
+    // Setup audio enhancements for improved sensitivity
+    val audioSessionId = setupAudioEnhancements()
 
     speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-    val intent = if(keepListening) {
-      Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-//        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
-        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
-        // Add audio enhancement preferences
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false) // Online recognition often has better noise handling
-        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
+
+    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+      // Use web search model for better recognition
+      putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+      putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+      putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+
+      // Enhanced audio settings for better sensitivity
+      putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false) // Online often better for sensitivity
+      putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
+      putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
+
+      // Try to set timeout parameters (may not work on all devices)
+      putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 500L)
+      putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
+      putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 800L)
+
+      // Request more results for better matching
+      if (!keepListening) {
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 10)
       }
-    } else {
-      Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
-        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-        // Add audio enhancement preferences
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
-        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
-      }
+
+      // Audio source hint for better microphone sensitivity
+      putExtra("android.speech.extra.AUDIO_SOURCE", android.media.MediaRecorder.AudioSource.VOICE_RECOGNITION)
     }
 
     timeoutHandler = Handler(context.mainLooper)
@@ -272,6 +334,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         activeResult?.error("TIMEOUT_ERROR", "Error processing timeout result", e.message)
       }
       speechRecognizer?.cancel()
+      restoreAudioSettings()
       cleanup()
     }
     timeoutHandler?.postDelayed(timeoutRunnable!!, timeoutMillis.toLong())
@@ -279,6 +342,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     speechRecognizer?.setRecognitionListener(object : RecognitionListener {
       override fun onResults(results: Bundle) {
         val matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+        val confidenceScores = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
 
         if (!matches.isNullOrEmpty()) {
           try {
@@ -288,30 +352,53 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
               val accumulatedText = mapOf(recognizedResults.joinToString(" ") to 0.0)
 
               eventSink?.success(mapper(accumulatedText))
-              speechRecognizer?.startListening(intent)
+
+              // Restart listening with reduced delay for better continuous recognition
+              Handler().postDelayed({
+                if (isListening) {
+                  speechRecognizer?.startListening(intent)
+                }
+              }, 100)
             } else {
               recognizedResults.clear()
               recognizedResults.addAll(matches)
               isListening = false
-              val mappedMatches = mapOf(matches.first() to 0.0) // change to the real value later
+
+              // Use confidence scores if available for better results
+              val bestMatch = if (confidenceScores != null && confidenceScores.isNotEmpty()) {
+                val bestIndex = confidenceScores.indices.maxByOrNull { confidenceScores[it] } ?: 0
+                matches[bestIndex]
+              } else {
+                matches.first()
+              }
+
+              val mappedMatches = mapOf(bestMatch to (confidenceScores?.get(0)?.toDouble() ?: 0.0))
               val finalResult = mapper(mappedMatches)
               Log.d("SpeechRecognition", "Sending final result: $finalResult")
               activeResult?.success(finalResult)
               speechRecognizer?.cancel()
+              restoreAudioSettings()
               cleanup()
             }
           } catch (e: Exception) {
             Log.e("SpeechRecognition", "Error processing results", e)
             activeResult?.error("PROCESSING_ERROR", "Error processing speech results", e.message)
+            restoreAudioSettings()
             cleanup()
           }
         } else {
           if (keepListening) {
-            speechRecognizer?.startListening(intent)
+            // Restart listening even if no match, with shorter delay
+            Handler().postDelayed({
+              if (isListening) {
+                speechRecognizer?.startListening(intent)
+              }
+            }, 100)
           } else {
             isListening = false
             activeResult?.error("NO_MATCH", "No speech recognized", null)
             speechRecognizer?.cancel()
+            restoreAudioSettings()
             cleanup()
           }
         }
@@ -319,10 +406,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       override fun onPartialResults(partialResults: Bundle?) {
         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let { partialList ->
-          if (partialList.isNotEmpty() && paragraph.isNotEmpty()) {
+          if (partialList.isNotEmpty()) {
             try {
               if (keepListening) {
-                val currentPartial = partialList.firstOrNull { paragraph.contains(it) } ?: partialList.first()
+                val currentPartial = if (paragraph.isNotEmpty()) {
+                  partialList.firstOrNull { paragraph.contains(it, ignoreCase = true) } ?: partialList.first()
+                } else {
+                  partialList.first()
+                }
                 val accumulatedText = recognizedResults.joinToString(" ")
                 val fullText = if (accumulatedText.isNotEmpty()) {
                   mapOf("$accumulatedText $currentPartial" to 0.0)
@@ -333,40 +424,68 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
               } else {
                 recognizedResults.clear()
                 recognizedResults.addAll(partialList)
-                val correctedText = languageHandlers.correctRecognizedPhrase(partialList, paragraph)
+                val correctedText = if (paragraph.isNotEmpty()) {
+                  languageHandlers.correctRecognizedPhrase(partialList, paragraph)
+                } else {
+                  mapOf(partialList.first() to 0.0)
+                }
                 eventSink?.success(mapper(correctedText))
               }
-            } catch (e: Exception) { Log.e("SpeechRecognition", "Error processing partial results", e) }
+            } catch (e: Exception) {
+              Log.e("SpeechRecognition", "Error processing partial results", e)
+            }
           }
         }
       }
 
       override fun onError(error: Int) {
+        val errorText = getErrorText(error)
+        Log.e("SpeechRecognition", "Recognition error: $errorText")
+
         if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
                   error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
                   error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
-          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
-          speechRecognizer?.startListening(intent)
+          Log.d("SpeechRecognition", "Recoverable error, restarting: $errorText")
+          // Restart with slight delay for better stability
+          Handler().postDelayed({
+            if (isListening) {
+              speechRecognizer?.startListening(intent)
+            }
+          }, 200)
         } else {
           isListening = false
-          Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
-          activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
+          Log.e("SpeechRecognition", "Fatal error occurred: $errorText")
+          activeResult?.error("SPEECH_ERROR", errorText, null)
           speechRecognizer?.cancel()
           speechRecognizer?.destroy()
+          restoreAudioSettings()
           cleanup()
         }
       }
 
       override fun onRmsChanged(rmsdB: Float) {
-        // Optional: Monitor audio levels for debugging
-         Log.d("SpeechRecognition", "Audio level: $rmsdB dB")
+        // Monitor audio levels for debugging - more sensitive threshold
+        if (rmsdB > -30.0f) { // Lower threshold for better sensitivity detection
+          Log.d("SpeechRecognition", "Good audio level detected: $rmsdB dB")
+        }
       }
 
-      // Other overrides remain unchanged
-      override fun onEndOfSpeech() {}
-      override fun onReadyForSpeech(params: Bundle?) {}
-      override fun onBeginningOfSpeech() {}
-      override fun onBufferReceived(buffer: ByteArray?) {}
+      override fun onReadyForSpeech(params: Bundle?) {
+        Log.d("SpeechRecognition", "Ready for speech - enhanced sensitivity active")
+      }
+
+      override fun onBeginningOfSpeech() {
+        Log.d("SpeechRecognition", "Speech detected")
+      }
+
+      override fun onEndOfSpeech() {
+        Log.d("SpeechRecognition", "End of speech detected")
+      }
+
+      override fun onBufferReceived(buffer: ByteArray?) {
+        // Could potentially process buffer here for custom sensitivity adjustments
+      }
+
       override fun onEvent(eventType: Int, params: Bundle?) {}
     })
 
@@ -382,6 +501,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Busy"
     SpeechRecognizer.ERROR_SERVER -> "Server error"
     SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech"
+    SpeechRecognizer.ERROR_NO_MATCH -> "No match"
     else -> "Unknown error"
   }
 

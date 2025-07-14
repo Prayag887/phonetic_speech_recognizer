@@ -112,7 +112,6 @@ class LanguageHandlers(private val context: Context) {
             return
         }
 
-
         pluginInstance?.startRecognition(
             paragraph = "",
             lang = languageCode,
@@ -121,9 +120,27 @@ class LanguageHandlers(private val context: Context) {
                     val context = ContextBasedDetection().detectContext(sentence)
                     Log.d("SpeechRecognition", "Detected context: $context")
                     Log.d("SpeechRecognition", "Original recognition: ${text.keys.first()}")
-                    correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
+
+                    // Ensure we always get a result with confidence
+                    val correctedResult = correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
+
+                    // If correctedResult is empty or has no confidence, provide default
+                    if (correctedResult.isEmpty()) {
+                        Log.w("SpeechRecognition", "No corrected result found, using original with default confidence")
+                        mapOf(text.keys.first() to (text.values.firstOrNull() ?: 0.5))
+                    } else {
+                        Log.d("SpeechRecognition", "Corrected result: $correctedResult")
+                        correctedResult
+                    }
                 } else {
-                    text
+                    // For non-English languages, preserve original confidence or provide default
+                    if (text.isEmpty()) {
+                        Log.w("SpeechRecognition", "Empty recognition result for language: $languageCode")
+                        mapOf("" to 0.0)
+                    } else {
+                        Log.d("SpeechRecognition", "Non-English recognition: $text")
+                        text
+                    }
                 }
             },
             timeoutMillis = timeoutMillis,
@@ -147,7 +164,6 @@ class LanguageHandlers(private val context: Context) {
             return
         }
 
-
         val words = paragraph.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
 
         pluginInstance?.startRecognition(
@@ -155,13 +171,81 @@ class LanguageHandlers(private val context: Context) {
             lang = languageCode,
             mapper = { text ->
                 if (languageCode == "en-US") {
+                    // Update highlighted text and preserve confidence
                     pluginInstance?.updateHighlightedText(text.keys.first(), words, paragraph)
+
+                    // Ensure we have confidence level for paragraph mapping
+                    if (text.isEmpty()) {
+                        Log.w("SpeechRecognition", "Empty paragraph recognition result")
+                        mapOf("" to 0.0)
+                    } else {
+                        // For paragraphs, we can apply basic confidence calculation
+                        val recognizedText = text.keys.first()
+                        val originalConfidence = text.values.firstOrNull() ?: 0.5
+
+                        // Calculate paragraph-level confidence based on word matching
+                        val paragraphConfidence = calculateParagraphConfidence(recognizedText, paragraph, originalConfidence)
+
+                        Log.d("SpeechRecognition", "Paragraph confidence: $paragraphConfidence for text: $recognizedText")
+                        mapOf(recognizedText to paragraphConfidence)
+                    }
+                } else {
+                    // For non-English languages, preserve original confidence
+                    if (text.isEmpty()) {
+                        Log.w("SpeechRecognition", "Empty paragraph recognition result for language: $languageCode")
+                        mapOf("" to 0.0)
+                    } else {
+                        Log.d("SpeechRecognition", "Non-English paragraph recognition: $text")
+                        text
+                    }
                 }
-                text
             },
             timeoutMillis = timeoutMillis,
             keepListening = true
         )
+    }
+
+    /**
+     * Calculates confidence level for paragraph recognition based on word matching.
+     *
+     * @param recognizedText the recognized text
+     * @param expectedParagraph the expected paragraph
+     * @param originalConfidence the original confidence from speech recognition
+     * @return calculated confidence level
+     */
+    private fun calculateParagraphConfidence(
+        recognizedText: String,
+        expectedParagraph: String,
+        originalConfidence: Double
+    ): Double {
+        if (recognizedText.isEmpty() || expectedParagraph.isEmpty()) {
+            return 0.0
+        }
+
+        val recognizedWords = recognizedText.toLowerCase().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        val expectedWords = expectedParagraph.toLowerCase().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+
+        if (expectedWords.isEmpty()) {
+            return originalConfidence
+        }
+
+        // Calculate word-level matching
+        var matchedWords = 0
+        for (expectedWord in expectedWords) {
+            if (recognizedWords.any { recognizedWord ->
+                    PhoneticSimilarity().calculatePhoneticSimilarity(recognizedWord, expectedWord) >= 0.7
+                }) {
+                matchedWords++
+            }
+        }
+
+        val wordMatchRatio = matchedWords.toDouble() / expectedWords.size
+
+        // Combine original confidence with word matching ratio
+        val combinedConfidence = (originalConfidence * 0.4) + (wordMatchRatio * 0.6)
+
+        // Ensure confidence is between 0.0 and 1.0
+        return minOf(1.0, maxOf(0.0, combinedConfidence))
     }
 
     /**
@@ -210,14 +294,21 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
-
     // Helper method for correcting recognized phrases based on phonetic similarity
     fun correctRecognizedPhrase(
         recognizedPhrases: List<String>,
         expectedPhrase: String,
         context: String = "" // Add context parameter
     ): Map<String, Double> {
-        if (recognizedPhrases.isEmpty()) return mapOf("" to 0.0)
+        if (recognizedPhrases.isEmpty()) {
+            Log.w("SpeechRecognition", "No recognized phrases provided")
+            return mapOf("" to 0.0)
+        }
+
+        if (expectedPhrase.isEmpty()) {
+            Log.w("SpeechRecognition", "Expected phrase is empty")
+            return mapOf(recognizedPhrases[0] to 0.5)
+        }
 
         var bestMatch = recognizedPhrases[0]
         var bestSimilarity = 0.0
@@ -230,13 +321,8 @@ class LanguageHandlers(private val context: Context) {
                 preprocessedPhrase, expectedPhrase
             )
 
-//            val stringSimilarity = 1.0 - (
-//                    StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() /
-//                            kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
-//                    )
             // Adjust weights based on context
             val contextWeight = if (context.isNotEmpty()) 0.7 else 0.5
-//            val similarity = (phoneticSimilarity * contextWeight) + (stringSimilarity * (1.0 - contextWeight))
             val similarity = phoneticSimilarity
 
             if (similarity > bestSimilarity) {
@@ -247,9 +333,13 @@ class LanguageHandlers(private val context: Context) {
 
         val threshold = calculateDynamicThreshold(expectedPhrase)
 
+        Log.d("SpeechRecognition", "Best similarity: $bestSimilarity, threshold: $threshold")
+        Log.d("SpeechRecognition", "Best match: '$bestMatch', expected: '$expectedPhrase'")
+
         return if (bestSimilarity >= threshold) {
             mapOf(expectedPhrase to bestSimilarity)
         } else {
+            // Even if below threshold, return the best match with its confidence
             mapOf(bestMatch to bestSimilarity)
         }
     }
