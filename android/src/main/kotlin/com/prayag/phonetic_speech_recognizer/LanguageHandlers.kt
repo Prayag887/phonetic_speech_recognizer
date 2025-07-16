@@ -282,15 +282,14 @@ class LanguageHandlers(private val context: Context) {
 
         return when {
             wordCount == 1 -> 0.40
-            wordCount < 2 && hasProblematicWords -> 0.50
-            wordCount == 2 -> 0.70
-            wordCount <= 2 && hasShortWords -> 0.50
-            wordCount <= 3 && hasMultiSyllableWords -> 0.70  // New condition for multi-syllable words
-            wordCount <= 3 && hasProblematicWords -> 0.60
-            wordCount <= 3 -> 0.70
-            wordCount >= 4 -> 0.70
+            wordCount <= 2 && hasProblematicWords -> 0.80
+            wordCount <= 2 && hasShortWords -> 0.80
+            wordCount <= 3 && hasMultiSyllableWords -> 0.80  // New condition for multi-syllable words
+            wordCount <= 3 && hasProblematicWords -> 0.75
+            wordCount <= 3 -> 0.80
+            wordCount >= 4 -> 0.75
             hasProblematicWords -> 0.70
-            else -> 0.90
+            else -> 0.80
         }
     }
 }
