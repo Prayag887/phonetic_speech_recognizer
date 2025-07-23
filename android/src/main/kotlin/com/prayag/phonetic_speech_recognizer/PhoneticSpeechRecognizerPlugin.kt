@@ -97,7 +97,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     Log.d("SpeechRecognition", "onMethodCall: ${call.method}")
     when (call.method) {
       "recognize" -> {
-//        checkAndRequestPermission()
+        checkAndRequestPermission()
         // Store the result reference
         activeResult = result
 
@@ -138,12 +138,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
-//  private fun checkAndRequestPermission() {
-//    val permission = Manifest.permission.RECORD_AUDIO
-//    if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
-//      ActivityCompat.requestPermissions(activity!!, arrayOf(permission), 1001)
-//    } else { Log.d("PhoneticPlugin", "Permission already granted.") }
-//  }
+  private fun checkAndRequestPermission() {
+    val permission = Manifest.permission.RECORD_AUDIO
+    if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+      ActivityCompat.requestPermissions(activity!!, arrayOf(permission), 1001)
+    } else { Log.d("PhoneticPlugin", "Permission already granted.") }
+  }
 
 
   private fun stopRecognition(result: MethodChannel.Result) {
@@ -201,36 +201,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       cleanup()
     }
 
-    // Enable audio effects for volume enhancement
-//    try {
-//      val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-//
-//      // Get audio session ID for effects
-//      val audioSessionId = audioManager.generateAudioSessionId()
-//
-//      // Try to enable AutomaticGainControl
-//      if (AutomaticGainControl.isAvailable()) {
-//        val agc = AutomaticGainControl.create(audioSessionId)
-//        agc?.enabled = true
-//        Log.d("SpeechRecognition", "AGC enabled for volume boost")
-//      }
-//
-//      // Boost microphone gain programmatically
-//      audioManager.setStreamVolume(
-//        AudioManager.STREAM_VOICE_CALL,
-//        audioManager.getStreamMaxVolume(AudioManager.STREAM_VOICE_CALL),
-//        0
-//      )
-//
-//      // Set microphone gain if supported
-//      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-//        audioManager.setMicrophoneMute(false)
-//      }
-//      Log.d("SpeechRecognition", "Microphone volume boosted")
-//
-//    } catch (e: Exception) {
-//      Log.w("SpeechRecognition", "Could not apply audio enhancements: ${e.message}")
-//    }
 
     speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
     val intent = if(keepListening) {
