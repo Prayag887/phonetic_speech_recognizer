@@ -8,22 +8,29 @@ import 'package:flutter/services.dart';
 import 'double_metaphone.dart';
 import 'homophones.dart';
 
-enum PhoneticType { alphabet, koreanAlphabet, number, englishWordsOrSentence, japaneseAlphabet, koreanNumber, allLanguageSupport, paragraphsMapping }
+enum PhoneticType {
+  alphabet,
+  koreanAlphabet,
+  number,
+  englishWordsOrSentence,
+  japaneseAlphabet,
+  koreanNumber,
+  allLanguageSupport,
+  paragraphsMapping
+}
 
 class PhoneticSpeechRecognizer {
   final Map<String, List<String>> homophones = Homophones.homophones;
 
-
   // Function words that should always be highlighted as correct
-  static const Set<String> functionWords = {
-    'a', 'an',"i"
-  };
+  static const Set<String> functionWords = {'a', 'an', "i"};
 
   List<int> errorWordsIndexes = [];
-  List<int> errorPronouncationList= [];
-  List<int> correctPronouncationList= [];
+  List<int> errorPronouncationList = [];
+  List<int> correctPronouncationList = [];
 
-  static const MethodChannel _channel = MethodChannel('phonetic_speech_recognizer');
+  static const MethodChannel _channel =
+      MethodChannel('phonetic_speech_recognizer');
 
   static Future<String?> getPlatformVersion() async {
     try {
@@ -67,10 +74,10 @@ class PhoneticSpeechRecognizer {
 
 // The supporting function that gets the raw data stream
   Stream<dynamic> getDataStream() {
-    final EventChannel _eventChannel = EventChannel('phonetic_speech_recognizer/partial_results');
+    final EventChannel _eventChannel =
+        EventChannel('phonetic_speech_recognizer/partial_results');
     return _eventChannel.receiveBroadcastStream();
   }
-
 
   /// Builds a lookup table that maps each word in the input text to its corresponding sentence index.
   /// Empty lookup table List<int> sentenceCounts = List.filled(words.length, 0);
@@ -95,7 +102,9 @@ class PhoneticSpeechRecognizer {
 
     List<String> sentences = text.split(RegExp(r'[.!?]+\s*'));
 
-    for (int sentenceIndex = 0; sentenceIndex < sentences.length; sentenceIndex++) {
+    for (int sentenceIndex = 0;
+        sentenceIndex < sentences.length;
+        sentenceIndex++) {
       String sentence = sentences[sentenceIndex].trim();
       if (sentence.isEmpty) continue;
 
@@ -106,7 +115,9 @@ class PhoneticSpeechRecognizer {
       int halfwayPoint = (sentenceWords.length / 2).ceil();
       bool hasReachedHalfway = false;
 
-      for (int i = 0; i < sentenceWords.length && wordIndex < words.length; i++) {
+      for (int i = 0;
+          i < sentenceWords.length && wordIndex < words.length;
+          i++) {
         // If we've reached the halfway point for the first time, increment the sentence count
         if (i >= halfwayPoint && !hasReachedHalfway) {
           currentSentenceCount++;
@@ -147,7 +158,8 @@ class PhoneticSpeechRecognizer {
 
     List<String> originalWords = randomText.split(RegExp(r'\s+'));
     List<String> targetWords = originalWords.map(cleanText).toList();
-    List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
+    List<String> partialWords =
+        partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
     final int maxLookahead = 2;
     final int maxSkipLimit = 2;
@@ -192,7 +204,8 @@ class PhoneticSpeechRecognizer {
       }
 
       List<List<int>> dp = List.generate(
-        word1.length + 1, (_) => List.filled(word2.length + 1, 0),
+        word1.length + 1,
+        (_) => List.filled(word2.length + 1, 0),
       );
 
       for (int i = 0; i <= word1.length; i++) {
@@ -277,11 +290,15 @@ class PhoneticSpeechRecognizer {
       return -1;
     }
 
-    for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
+    for (int partialIndex = 0;
+        partialIndex < partialWords.length;
+        partialIndex++) {
       String partialWord = partialWords[partialIndex];
       bool found = false;
 
-      for (int i = targetIndex; i < targetIndex + maxLookahead && i < targetWords.length; i++) {
+      for (int i = targetIndex;
+          i < targetIndex + maxLookahead && i < targetWords.length;
+          i++) {
         if (isExactMatch(targetWords[i], partialWord)) {
           matchedIndexes.add(i);
           lastProcessedIndex = i;
@@ -289,8 +306,7 @@ class PhoneticSpeechRecognizer {
           found = true;
           errorBuffer.clear();
           break;
-        }
-        else if (isSimilarMatch(targetWords[i], partialWord)) {
+        } else if (isSimilarMatch(targetWords[i], partialWord)) {
           mispronounceIndexes.add(i);
           lastProcessedIndex = i;
           targetIndex = i + 1;
@@ -314,7 +330,8 @@ class PhoneticSpeechRecognizer {
               for (int j = 0; j < errorBuffer.length; j++) {
                 if (isExactMatch(errorBuffer[j], targetWords[newIndex + j])) {
                   matchedIndexes.add(newIndex + j);
-                } else if (isSimilarMatch(errorBuffer[j], targetWords[newIndex + j])) {
+                } else if (isSimilarMatch(
+                    errorBuffer[j], targetWords[newIndex + j])) {
                   mispronounceIndexes.add(newIndex + j);
                 } else {
                   matchedIndexes.add(newIndex + j);
@@ -353,7 +370,9 @@ class PhoneticSpeechRecognizer {
         int nextIndex = allMatchedIndexes[i + 1];
 
         for (int j = currentIndex + 1; j < nextIndex; j++) {
-          if (isFunctionWord(targetWords[j]) && !matchedIndexes.contains(j) && !mispronounceIndexes.contains(j)) {
+          if (isFunctionWord(targetWords[j]) &&
+              !matchedIndexes.contains(j) &&
+              !mispronounceIndexes.contains(j)) {
             matchedIndexes.add(j);
             skippedIndexes.remove(j);
           }
@@ -363,7 +382,9 @@ class PhoneticSpeechRecognizer {
       if (allMatchedIndexes.isNotEmpty) {
         int firstMatchedIndex = allMatchedIndexes.first;
         for (int i = 0; i < firstMatchedIndex; i++) {
-          if (isFunctionWord(targetWords[i]) && !matchedIndexes.contains(i) && !mispronounceIndexes.contains(i)) {
+          if (isFunctionWord(targetWords[i]) &&
+              !matchedIndexes.contains(i) &&
+              !mispronounceIndexes.contains(i)) {
             if (firstMatchedIndex - i <= 2) {
               matchedIndexes.add(i);
               skippedIndexes.remove(i);
@@ -380,21 +401,18 @@ class PhoneticSpeechRecognizer {
         // Correctly pronounced
         correctWordsList.add(index);
         log('Correct word at index $index: "${originalWords[index]}"');
-
       } else if (mispronounceIndexes.contains(index)) {
         // Incorrectly pronounced
         errorWordsPronunciationList.add(index);
         log('Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
-
       } else if (skippedIndexes.contains(index)) {
         // Skipped/not attempted
         errorWordsIndexList.add(index);
         log('Skipped word at index $index: "${originalWords[index]}"');
-
       } else {
         // Unaccounted for - this shouldn't happen if your logic is complete
         errorWordsIndexList.add(index);
-        log('Unaccounted word at index $index: "${originalWords[index]}"');
+        // log('Unaccounted word at index $index: "${originalWords[index]}"');
       }
     }
 
@@ -427,8 +445,7 @@ class PhoneticSpeechRecognizer {
         errorWordsIndexesLength: errorWordsIndexList.length,
         errorPronouncationListLength: errorWordsPronunciationList.length,
         correctPronouncationListLength: correctWordsList.length,
-        indexedSentenceCount: indexedSentenceCount
-    );
+        indexedSentenceCount: indexedSentenceCount);
 
     ScrollController controller = ScrollController();
 
@@ -505,8 +522,17 @@ class PhoneticSpeechRecognizer {
     );
   }
 
-  Widget displayMistakeWords({required List<int> errorWordsList, required List<int> errorPronunciationList, required List<int> correctPronouncationList, required String randomText, required int totalWords, required Color defaultTextColor, required Color highlightWrongColor, required double fontSize, required double lineSpace,}) {
-
+  Widget displayMistakeWords({
+    required List<int> errorWordsList,
+    required List<int> errorPronunciationList,
+    required List<int> correctPronouncationList,
+    required String randomText,
+    required int totalWords,
+    required Color defaultTextColor,
+    required Color highlightWrongColor,
+    required double fontSize,
+    required double lineSpace,
+  }) {
     int correctWords = correctPronouncationList.length;
     int mispronounced = errorPronouncationList.length;
     int skippedWords = errorWordsList.length;
@@ -521,7 +547,6 @@ class PhoneticSpeechRecognizer {
     // Accuracy: correct words out of total words
     double accuracyPercentageDouble = (correctWords / totalWords) * 100;
     int accuracyPercentage = accuracyPercentageDouble.toInt();
-
 
     // Split the text into words
     final List<String> words = randomText.split(' ');
@@ -568,7 +593,7 @@ class PhoneticSpeechRecognizer {
                         width: 120,
                         height: 120,
                         child: CircularProgressIndicator(
-                          value: accuracyPercentage/100, // 60%
+                          value: accuracyPercentage / 100, // 60%
                           strokeWidth: 10,
                           backgroundColor: Colors.grey.shade200,
                           valueColor: AlwaysStoppedAnimation<Color>(
@@ -579,7 +604,7 @@ class PhoneticSpeechRecognizer {
                       Text(
                         "${accuracyPercentage}%",
                         style: TextStyle(
-                          fontSize: 18,  // Increased font size
+                          fontSize: 18, // Increased font size
                           fontWeight: FontWeight.bold,
                           color: Colors.blue,
                         ),
@@ -593,11 +618,16 @@ class PhoneticSpeechRecognizer {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildMetricRow("Pronunciation", pronunciationScore, totalWords, Colors.green),
+                      _buildMetricRow("Pronunciation", pronunciationScore,
+                          totalWords, Colors.green),
                       const SizedBox(height: 8),
                       // _buildMetricRow("Fluency", fluencyScore,  totalSpokenWords, Colors.blue),
                       // const SizedBox(height: 8),
-                      _buildMetricRow("Mistakes", (totalWords - pronunciationScore), totalWords, Colors.red),
+                      _buildMetricRow(
+                          "Mistakes",
+                          (totalWords - pronunciationScore),
+                          totalWords,
+                          Colors.red),
                     ],
                   ),
                 ),
@@ -634,11 +664,15 @@ class PhoneticSpeechRecognizer {
                   children: List.generate(words.length, (index) {
                     bool isError = errorWordsList.contains(index);
                     return TextSpan(
-                      text: _processWord(words[index], isError) + (index < words.length - 1 ? ' ' : ''),
+                      text: _processWord(words[index], isError) +
+                          (index < words.length - 1 ? ' ' : ''),
                       style: TextStyle(
                         color: isError ? highlightWrongColor : defaultTextColor,
-                        fontWeight: isError ? FontWeight.bold : FontWeight.normal,
-                        decoration: isError ? TextDecoration.lineThrough : TextDecoration.none,
+                        fontWeight:
+                            isError ? FontWeight.bold : FontWeight.normal,
+                        decoration: isError
+                            ? TextDecoration.lineThrough
+                            : TextDecoration.none,
                       ),
                     );
                   }),
@@ -676,11 +710,10 @@ class PhoneticSpeechRecognizer {
     );
   }
 
-
   void startAutoScroll(ScrollController controller, int autoScrollSpeed) {
     if (!controller.hasClients) return;
 
-    if (autoScrollSpeed == 0){
+    if (autoScrollSpeed == 0) {
       final double currentOffset = controller.offset;
       controller.jumpTo(currentOffset);
       return;
@@ -711,7 +744,6 @@ class PhoneticSpeechRecognizer {
     String? sentence,
     bool sendKeyOnly = true,
   }) async {
-
     var homoPhones = Homophones();
     if (timeout < 0) {
       throw ArgumentError('Timeout must be a positive value');
@@ -734,7 +766,7 @@ class PhoneticSpeechRecognizer {
         recognizedText = raw;
       } else if (raw is Map) {
         final Map<String, double> result = raw.map(
-              (key, value) => MapEntry(key.toString(), (value as num).toDouble()),
+          (key, value) => MapEntry(key.toString(), (value as num).toDouble()),
         );
         if (result.isNotEmpty) {
           final entry = result.entries.first;
@@ -746,7 +778,8 @@ class PhoneticSpeechRecognizer {
       if (recognizedText == null) return "";
 
       // Handle correction for common misrecognized characters
-      if (sentence != null && _arePhoneticallySimilar(recognizedText, sentence)) {
+      if (sentence != null &&
+          _arePhoneticallySimilar(recognizedText, sentence)) {
         recognizedText = sentence;
       }
 
@@ -761,8 +794,6 @@ class PhoneticSpeechRecognizer {
     }
   }
 
-
-
   /// Checks if the recognized sentence contains mandatory words.
   ///
   /// If [andCase] is true, all words in [mandatoryWordsList] must be present
@@ -770,13 +801,13 @@ class PhoneticSpeechRecognizer {
   /// word from [mandatoryWordsList] must be present in the [recognizedSentence].
   ///
   /// If [andCase] is false, atleast one word in [mandatoryWordsList] must be present
-  bool mandatoryWords({
-    required List<String> mandatoryWordsList,
-    required String recognizedSentence,
-    bool andCase = true
-  }) {
+  bool mandatoryWords(
+      {required List<String> mandatoryWordsList,
+      required String recognizedSentence,
+      bool andCase = true}) {
     final lowerCaseSentence = recognizedSentence.toLowerCase();
-    final lowerCaseMandatoryWords = mandatoryWordsList.map((word) => word.toLowerCase()).toList();
+    final lowerCaseMandatoryWords =
+        mandatoryWordsList.map((word) => word.toLowerCase()).toList();
 
     if (andCase) {
       // AND case: All words must be present in order
@@ -826,5 +857,4 @@ class PhoneticSpeechRecognizer {
 
     return false;
   }
-
 }

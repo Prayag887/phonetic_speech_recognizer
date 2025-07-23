@@ -119,7 +119,7 @@ class LanguageHandlers(private val context: Context) {
             mapper = { text ->
                 if (languageCode == "en-US") {
                     val context = ContextBasedDetection().detectContext(sentence)
-                    Log.d("SpeechRecognition", "Detected context: $context")
+//                    Log.d("SpeechRecognition", "Detected context: $context")
                     Log.d("SpeechRecognition", "Original recognition: ${text.keys.first()}")
                     correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
                 } else {
@@ -215,81 +215,102 @@ class LanguageHandlers(private val context: Context) {
     fun correctRecognizedPhrase(
         recognizedPhrases: List<String>,
         expectedPhrase: String,
-        context: String = "" // Add context parameter
+        context: String = ""
     ): Map<String, Double> {
-        if (recognizedPhrases.isEmpty()) return mapOf("" to 0.0)
+        if (recognizedPhrases.isEmpty()) return emptyMap()
 
-        var bestMatch = recognizedPhrases[0]
+        // Use the enhanced phonetic similarity
+        val enhancedSimilarity = PhoneticSimilarity()
+        var bestMatch = ""
         var bestSimilarity = 0.0
 
-        for (recognizedPhrase in recognizedPhrases) {
+        println("=" * 60)
+        println("🎯 ENHANCED PHONETIC SPEECH RECOGNITION CORRECTION")
+        println("=" * 60)
+        println("📝 Expected Phrase: '$expectedPhrase'")
+        println("🗣️  Context: '${context.ifEmpty { "No context provided" }}'")
+        println("📊 Total Recognized Phrases: ${recognizedPhrases.size}")
+        println()
+
+        for ((index, recognizedPhrase) in recognizedPhrases.withIndex()) {
+            println("--- Processing Phrase ${index + 1} ---")
+            println("🔤 Original Recognized: '$recognizedPhrase'")
+
             // Apply context-aware preprocessing
             val preprocessedPhrase = ContextBasedDetection().preprocessWithContext(recognizedPhrase, context)
+            println("⚙️  After Processing: '$preprocessedPhrase'")
 
-            val phoneticSimilarity = PhoneticSimilarity().calculatePhoneticSimilarity(
+            // Calculate enhanced similarity
+            val similarity = enhancedSimilarity.calculatePhoneticSimilarity(
                 preprocessedPhrase, expectedPhrase
             )
 
-//            val stringSimilarity = 1.0 - (
-//                    StringUtils.getLevenshteinDistance(recognizedPhrase, expectedPhrase).toDouble() /
-//                            kotlin.math.max(recognizedPhrase.length, expectedPhrase.length)
-//                    )
-            // Adjust weights based on context
-            val contextWeight = if (context.isNotEmpty()) 0.7 else 0.5
-//            val similarity = (phoneticSimilarity * contextWeight) + (stringSimilarity * (1.0 - contextWeight))
-            val similarity = phoneticSimilarity
+            println("📈 Enhanced Accuracy Score: ${String.format("%.2f", similarity * 100)}%")
+            println("✅ Meets Threshold (90%): ${if (similarity >= 0.90) "YES" else "NO"}")
+
+            // Show detailed phonetic analysis
+            val cleanedExpected = expectedPhrase.trim()
+                .lowercase()
+                .replace(Regex("[^a-zA-Z\\s]"), "") // Remove punctuation/symbols
+                .replace(Regex("\\s+"), " ") // Normalize multiple spaces to single space
+                .trim() // Final trim after cleanup
+
+            showPhoneticBreakdown(preprocessedPhrase, cleanedExpected)
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
                 bestMatch = preprocessedPhrase
+                println("🏆 NEW BEST MATCH!")
             }
+            println()
         }
 
-        val threshold = calculateDynamicThreshold(expectedPhrase)
+        // Final results
+        println("=" * 60)
+        println("📋 ENHANCED FINAL RESULTS")
+        println("=" * 60)
+        println("🔧 Best Processed: '$bestMatch'")
+        println("🎯 Enhanced Accuracy: ${String.format("%.2f", bestSimilarity * 100)}%")
+        println("✅ Accepted: ${if (bestSimilarity >= 0.90) "YES" else "NO"}")
+        println("=" * 60)
 
-        return if (bestSimilarity >= threshold) {
+        // Return only if similarity is 90% or higher
+        return if (bestSimilarity >= 0.90) {
             mapOf(expectedPhrase to bestSimilarity)
         } else {
-            mapOf(bestMatch to bestSimilarity)
+            emptyMap()
         }
     }
 
-    /**
-     * Calculates a dynamic threshold based on the length and complexity of the expected phrase.
-     * This is used to adjust the similarity threshold for the phonetic similarity correction.
-     * The goal is to be more lenient for shorter phrases and more strict for longer phrases.
-     *
-     * @param expectedPhrase the expected phrase
-     * @return the dynamic threshold
-     */
-    private fun calculateDynamicThreshold(expectedPhrase: String): Double {
-        val words = expectedPhrase.trim().split("\\s+".toRegex())
-        val wordCount = words.size
+    private fun showPhoneticBreakdown(phrase1: String, phrase2: String) {
+        val doubleMetaphone = DoubleMetaphone()
+        val words1 = phrase1.trim().split("\\s+".toRegex())
+        val words2 = phrase2.trim().split("\\s+".toRegex())
 
-        // Check if phrase contains commonly misrecognized words
-        val problematicWords = listOf("we", "ate", "the", "a", "I", "you", "to", "too", "two", "for", "four")
-        val hasProblematicWords = words.any { it.lowercase() in problematicWords }
+        println("   🔍 Phonetic Analysis:")
 
-        // Check for short words that are often confused
-        val shortWords = words.filter { it.length <= 2 }
-        val hasShortWords = shortWords.isNotEmpty()
+        val maxWords = maxOf(words1.size, words2.size)
+        for (i in 0 until maxWords) {
+            val word1 = if (i < words1.size) words1[i] else ""
+            val word2 = if (i < words2.size) words2[i] else ""
 
-        // Check if any word has 2 or more syllables (simple heuristic: contains vowel groups)
-        val hasMultiSyllableWords = words.any { word ->
-            val vowelGroups = word.lowercase().split(Regex("[bcdfghjklmnpqrstvwxyz]+")).filter { it.isNotEmpty() }
-            vowelGroups.size >= 2
-        }
+            if (word1.isNotEmpty() && word2.isNotEmpty()) {
+                val meta1 = doubleMetaphone.encode(word1)
+                val meta2 = doubleMetaphone.encode(word2)
 
-        return when {
-            wordCount == 1 -> 0.40
-            wordCount <= 2 && hasProblematicWords -> 0.80
-            wordCount <= 2 && hasShortWords -> 0.80
-            wordCount <= 3 && hasMultiSyllableWords -> 0.80  // New condition for multi-syllable words
-            wordCount <= 3 && hasProblematicWords -> 0.75
-            wordCount <= 3 -> 0.80
-            wordCount >= 4 -> 0.75
-            hasProblematicWords -> 0.70
-            else -> 0.80
+                val matches = when {
+                    meta1.primary == meta2.primary -> "✅ EXACT"
+                    meta1.primary == meta2.alternate || meta1.alternate == meta2.primary -> "🟡 CLOSE"
+                    meta1.alternate == meta2.alternate && meta1.alternate.isNotEmpty() -> "🟠 ALT"
+                    else -> "❌ DIFF"
+                }
+
+                println("   • '$word1' [${meta1.primary}] vs '$word2' [${meta2.primary}] → $matches")
+            }
         }
     }
+
+    // Helper extension for string repetition
+    private operator fun String.times(n: Int): String = this.repeat(n)
+
 }
