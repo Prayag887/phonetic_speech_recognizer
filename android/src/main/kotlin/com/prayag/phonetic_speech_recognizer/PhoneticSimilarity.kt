@@ -72,7 +72,9 @@ class PhoneticSimilarity {
         showDetailedPhoneticBreakdown(words1, words2)
 
         // Enhanced weighted combination
-        val finalScore = (metaphoneSim * 0.6 + acousticSim * 0.3 + editSim * 0.1)
+//        val finalScore = (metaphoneSim * 0.6 + acousticSim * 0.3 + editSim * 0.1)
+
+        val finalScore = acousticSim
 
         return minOf(1.0, finalScore)
     }
@@ -276,7 +278,7 @@ class PhoneticSimilarity {
         val metaphone1 = words1.map { doubleMetaphone.doubleMetaphone(it) }
         val metaphone2 = words2.map { doubleMetaphone.doubleMetaphone(it) }
 
-        println("📋 Expected vs Recognized:")
+        println("📋 Expected words (phrase1):")
         for (i in words1.indices) {
             val word1 = words1[i]
             val phone1 = metaphone1[i]
@@ -285,7 +287,7 @@ class PhoneticSimilarity {
             println("   Expected: '$word1' → [$phone1]$wordType")
         }
 
-        println("📋 Recognized words:")
+        println("📋 Recognized words (phrase2):")
         for (j in words2.indices) {
             val word2 = words2[j]
             val phone2 = metaphone2[j]

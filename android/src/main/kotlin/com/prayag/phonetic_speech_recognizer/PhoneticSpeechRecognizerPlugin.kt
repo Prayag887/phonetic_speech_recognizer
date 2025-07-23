@@ -5,8 +5,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-//import android.media.AudioManager
-//import android.media.audiofx.AutomaticGainControl
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -56,12 +54,16 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     languageHandlers = LanguageHandlers(context)
     languageHandlers.setPluginInstance(this)
 
+    // Pre-initialize SpeechRecognizer
+    initializeSpeechRecognizer()
   }
 
   // Implement the missing ActivityAware methods
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     activity = binding.activity
     activityBinding = binding
+    // Re-initialize speech recognizer when activity is available
+    initializeSpeechRecognizer()
   }
 
   override fun onDetachedFromActivity() {
@@ -81,6 +83,10 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     channel.setMethodCallHandler(null)
     eventChannel.setStreamHandler(null)
 
+    // Clean up speech recognizer
+    speechRecognizer?.destroy()
+    speechRecognizer = null
+
     activity = null
     activityBinding = null
   }
@@ -93,11 +99,32 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     eventSink = null
   }
 
+  private fun initializeSpeechRecognizer() {
+    // Only initialize if we have permission and don't already have an instance
+    if (speechRecognizer == null && hasRecordAudioPermission()) {
+      try {
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        Log.d("SpeechRecognition", "SpeechRecognizer pre-initialized")
+      } catch (e: Exception) {
+        Log.e("SpeechRecognition", "Failed to pre-initialize SpeechRecognizer", e)
+      }
+    }
+  }
+
+  private fun hasRecordAudioPermission(): Boolean {
+    return ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+  }
+
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
     Log.d("SpeechRecognition", "onMethodCall: ${call.method}")
     when (call.method) {
       "recognize" -> {
-        checkAndRequestPermission()
+        // Quick permission check without requesting
+        if (!hasRecordAudioPermission()) {
+          result.error("PERMISSION_DENIED", "Microphone permission required", null)
+          return
+        }
+
         // Store the result reference
         activeResult = result
 
@@ -137,14 +164,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       else -> result.notImplemented()
     }
   }
-
-  private fun checkAndRequestPermission() {
-    val permission = Manifest.permission.RECORD_AUDIO
-    if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
-      ActivityCompat.requestPermissions(activity!!, arrayOf(permission), 1001)
-    } else { Log.d("PhoneticPlugin", "Permission already granted.") }
-  }
-
 
   private fun stopRecognition(result: MethodChannel.Result) {
     try {
@@ -196,22 +215,23 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     isProcessing = true
     isListening = true
 
-    if (speechRecognizer != null) {
-      speechRecognizer?.cancel()
-      cleanup()
+    // Ensure we have a SpeechRecognizer instance
+    if (speechRecognizer == null) {
+      initializeSpeechRecognizer()
     }
 
+    // If still null, create one (fallback)
+    if (speechRecognizer == null) {
+      speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+    }
 
-    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
     val intent = if(keepListening) {
       Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-//        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
-        // Add audio enhancement preferences
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false) // Online recognition often has better noise handling
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
         putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
       }
     } else {
@@ -220,7 +240,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
-        // Add audio enhancement preferences
         putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
         putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
       }
@@ -327,10 +346,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         }
       }
 
-      override fun onRmsChanged(rmsdB: Float) {
-        // Optional: Monitor audio levels for debugging
-//         Log.d("SpeechRecognition", "Audio level: $rmsdB dB")
-      }
+      override fun onRmsChanged(rmsdB: Float) {}
 
       // Other overrides remain unchanged
       override fun onEndOfSpeech() {}
@@ -361,8 +377,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     timeoutHandler?.removeCallbacks(timeoutRunnable!!)
     timeoutHandler = null
     timeoutRunnable = null
-    speechRecognizer?.destroy()
-    speechRecognizer = null
+    // Don't destroy the speechRecognizer here - keep it for reuse
     activeResult = null
   }
 }
