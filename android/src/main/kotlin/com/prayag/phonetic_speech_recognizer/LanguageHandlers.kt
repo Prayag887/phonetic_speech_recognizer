@@ -219,10 +219,11 @@ class LanguageHandlers(private val context: Context) {
     ): Map<String, Double> {
         if (recognizedPhrases.isEmpty()) return emptyMap()
 
-        // Use the enhanced phonetic similarity
         val enhancedSimilarity = PhoneticSimilarity()
         var bestMatch = ""
         var bestSimilarity = 0.0
+
+        val auxiliaryVerbs = setOf("am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "shall", "should", "can", "could", "may", "might", "must")
 
         println("=" * 60)
         println("🎯 ENHANCED PHONETIC SPEECH RECOGNITION CORRECTION")
@@ -232,30 +233,41 @@ class LanguageHandlers(private val context: Context) {
         println("📊 Total Recognized Phrases: ${recognizedPhrases.size}")
         println()
 
+        val expectedWords = expectedPhrase
+            .lowercase()
+            .replace(Regex("[^a-zA-Z\\s]"), "")
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() && it !in auxiliaryVerbs }
+
         for ((index, recognizedPhrase) in recognizedPhrases.withIndex()) {
             println("--- Processing Phrase ${index + 1} ---")
             println("🔤 Original Recognized: '$recognizedPhrase'")
 
-            // Apply context-aware preprocessing
             val preprocessedPhrase = ContextBasedDetection().preprocessWithContext(recognizedPhrase, context)
             println("⚙️  After Processing: '$preprocessedPhrase'")
 
-            // Calculate enhanced similarity
-            val similarity = enhancedSimilarity.calculatePhoneticSimilarity(
-                preprocessedPhrase, expectedPhrase
-            )
+            val recognizedWords = preprocessedPhrase
+                .lowercase()
+                .replace(Regex("[^a-zA-Z\\s]"), "")
+                .split(Regex("\\s+"))
+                .filter { it.isNotBlank() }
 
+            val containsAllExpected = expectedWords.all { expectedWord ->
+                recognizedWords.any { recognizedWord ->
+                    recognizedWord == expectedWord
+                }
+            }
+
+            if (containsAllExpected) {
+                println("✅ All non-auxiliary words matched! Returning expected phrase.")
+                return mapOf(expectedPhrase to 1.0)
+            }
+
+            val similarity = enhancedSimilarity.calculatePhoneticSimilarity(preprocessedPhrase, expectedPhrase)
             println("📈 Enhanced Accuracy Score: ${String.format("%.2f", similarity * 100)}%")
             println("✅ Meets Threshold (90%): ${if (similarity >= 0.90) "YES" else "NO"}")
 
-            // Show detailed phonetic analysis
-            val cleanedExpected = expectedPhrase.trim()
-                .lowercase()
-                .replace(Regex("[^a-zA-Z\\s]"), "") // Remove punctuation/symbols
-                .replace(Regex("\\s+"), " ") // Normalize multiple spaces to single space
-                .trim() // Final trim after cleanup
-
-            showPhoneticBreakdown(preprocessedPhrase, cleanedExpected)
+            showPhoneticBreakdown(preprocessedPhrase, expectedPhrase)
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
@@ -265,7 +277,6 @@ class LanguageHandlers(private val context: Context) {
             println()
         }
 
-        // Final results
         println("=" * 60)
         println("📋 ENHANCED FINAL RESULTS")
         println("=" * 60)
@@ -274,13 +285,13 @@ class LanguageHandlers(private val context: Context) {
         println("✅ Accepted: ${if (bestSimilarity >= 0.90) "YES" else "NO"}")
         println("=" * 60)
 
-        // Return only if similarity is 90% or higher
-        return if (bestSimilarity >= 0.90) {
+        return if (bestSimilarity >= 0.93) {
             mapOf(expectedPhrase to bestSimilarity)
         } else {
-            emptyMap()
+            mapOf(bestMatch to bestSimilarity)
         }
     }
+
 
     private fun showPhoneticBreakdown(phrase1: String, phrase2: String) {
         val doubleMetaphone = DoubleMetaphone()
