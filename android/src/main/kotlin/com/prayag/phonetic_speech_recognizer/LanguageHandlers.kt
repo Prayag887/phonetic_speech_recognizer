@@ -7,13 +7,17 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-//import android.widget.Toast
 import org.apache.commons.lang3.StringUtils
+import com.google.firebase.crashlytics.buildtools.reloc.org.apache.commons.codec.language.DoubleMetaphone
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
 class LanguageHandlers(private val context: Context) {
     private var pluginInstance: PhoneticSpeechRecognizerPlugin? = null
+
+    // Initialize enhanced phonetic system with NLP capabilities
+    private val enhancedPhoneticSimilarity = PhoneticSimilarity()
+    private val nlpEnhancedMatcher = NlpEnhancedPhoneticMatcher()
 
     /**
      * Sets the plugin instance that will receive the recognition results.
@@ -97,21 +101,22 @@ class LanguageHandlers(private val context: Context) {
     }
 
     /**
-     * Handles word recognition like objects.
+     * Enhanced word recognition with full NLP integration for severe misrecognitions.
      *
      * @param languageCode the language code for the recognition
      * @param timeoutMillis the timeout in milliseconds for the recognition
      * @param sentence the sentence to recognize
      */
     fun handleWordsRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
-        Log.d("SpeechRecognition", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
+        Log.d("SpeechRecognition", "🎯 ENHANCED WORD RECOGNITION STARTED")
+        Log.d("SpeechRecognition", "Expected sentence: \"$sentence\"")
+
         if (languageCode == null) {
-            println("this is sentence $sentence")
+            println("Missing language code for sentence: $sentence")
             pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
             pluginInstance?.activeResult = null
             return
         }
-
 
         pluginInstance?.startRecognition(
             paragraph = "",
@@ -119,9 +124,11 @@ class LanguageHandlers(private val context: Context) {
             mapper = { text ->
                 if (languageCode == "en-US") {
                     val context = ContextBasedDetection().detectContext(sentence)
-//                    Log.d("SpeechRecognition", "Detected context: $context")
-                    Log.d("SpeechRecognition", "Original recognition: ${text.keys.first()}")
-                    correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
+                    Log.d("SpeechRecognition", "🧠 Detected context: $context")
+                    Log.d("SpeechRecognition", "🗣️ Original recognition: ${text.keys.first()}")
+
+                    // Use enhanced correction with full NLP integration
+                    correctRecognizedPhraseEnhanced(listOf(text.keys.first()), sentence, context)
                 } else {
                     text
                 }
@@ -146,7 +153,6 @@ class LanguageHandlers(private val context: Context) {
             pluginInstance?.activeResult = null
             return
         }
-
 
         val words = paragraph.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
 
@@ -210,27 +216,31 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
-
-    // Helper method for correcting recognized phrases based on phonetic similarity
-    fun correctRecognizedPhrase(
+    /**
+     * ENHANCED: Full NLP-powered phrase correction with semantic understanding
+     */
+    fun correctRecognizedPhraseEnhanced(
         recognizedPhrases: List<String>,
         expectedPhrase: String,
         context: String = ""
     ): Map<String, Double> {
         if (recognizedPhrases.isEmpty()) return emptyMap()
 
-        val enhancedSimilarity = PhoneticSimilarity()
         var bestMatch = ""
         var bestSimilarity = 0.0
+        var bestResult: EnhancedPhoneticResult? = null
 
-        val auxiliaryVerbs = setOf("am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "shall", "should", "can", "could", "may", "might", "must")
+        val auxiliaryVerbs = setOf("am", "is", "are", "was", "were", "be", "been", "being",
+            "have", "has", "had", "do", "does", "did", "will", "would",
+            "shall", "should", "can", "could", "may", "might", "must")
 
-        println("=" * 60)
-        println("🎯 ENHANCED PHONETIC SPEECH RECOGNITION CORRECTION")
-        println("=" * 60)
+        println("=" * 80)
+        println("🧠 ENHANCED NLP-POWERED SPEECH RECOGNITION CORRECTION")
+        println("=" * 80)
         println("📝 Expected Phrase: '$expectedPhrase'")
-        println("🗣️  Context: '${context.ifEmpty { "No context provided" }}'")
-        println("📊 Total Recognized Phrases: ${recognizedPhrases.size}")
+        println("🏷️ Context: '${context.ifEmpty { "general" }}'")
+        println("📊 Recognition Candidates: ${recognizedPhrases.size}")
+        println("🎯 Using: Traditional Phonetic + NLP Semantic Analysis")
         println()
 
         val expectedWords = expectedPhrase
@@ -240,11 +250,11 @@ class LanguageHandlers(private val context: Context) {
             .filter { it.isNotBlank() && it !in auxiliaryVerbs }
 
         for ((index, recognizedPhrase) in recognizedPhrases.withIndex()) {
-            println("--- Processing Phrase ${index + 1} ---")
-            println("🔤 Original Recognized: '$recognizedPhrase'")
+            println("--- 🔍 Analyzing Candidate ${index + 1} ---")
+            println("🗣️ Original: '$recognizedPhrase'")
 
             val preprocessedPhrase = ContextBasedDetection().preprocessWithContext(recognizedPhrase, context)
-            println("⚙️  After Processing: '$preprocessedPhrase'")
+            println("⚙️ Preprocessed: '$preprocessedPhrase'")
 
             val recognizedWords = preprocessedPhrase
                 .lowercase()
@@ -252,6 +262,7 @@ class LanguageHandlers(private val context: Context) {
                 .split(Regex("\\s+"))
                 .filter { it.isNotBlank() }
 
+            // Quick exact match check
             val containsAllExpected = expectedWords.all { expectedWord ->
                 recognizedWords.any { recognizedWord ->
                     recognizedWord == expectedWord
@@ -259,69 +270,162 @@ class LanguageHandlers(private val context: Context) {
             }
 
             if (containsAllExpected) {
-                println("✅ All non-auxiliary words matched! Returning expected phrase.")
+                println("✅ PERFECT MATCH: All content words found!")
+                println("🎉 Returning expected phrase with 100% confidence")
                 return mapOf(expectedPhrase to 1.0)
             }
 
-            val similarity = enhancedSimilarity.calculatePhoneticSimilarity(preprocessedPhrase, expectedPhrase)
-            println("📈 Enhanced Accuracy Score: ${String.format("%.2f", similarity * 100)}%")
-            println("✅ Meets Threshold (90%): ${if (similarity >= 0.90) "YES" else "NO"}")
+            // ENHANCED: Use new integrated phonetic analysis with NLP
+            println("🧠 Running Enhanced Analysis...")
+            val enhancedResult = enhancedPhoneticSimilarity.getEnhancedPhoneticResult(
+                expectedPhrase,
+                preprocessedPhrase
+            )
 
-            showPhoneticBreakdown(preprocessedPhrase, expectedPhrase)
+            println("📊 ENHANCED ANALYSIS RESULTS:")
+            println("   Traditional Score: ${String.format("%.2f", enhancedResult.traditionalScore * 100)}%")
+            println("   NLP Score: ${String.format("%.2f", enhancedResult.nlpScore * 100)}%")
+            println("   Final Fused Score: ${String.format("%.2f", enhancedResult.finalScore * 100)}%")
+            println("   Strategy Used: ${enhancedResult.strategy}")
+            println("   Confidence Level: ${enhancedResult.confidence}")
+            println("   Should Accept: ${enhancedResult.shouldAccept}")
 
-            if (similarity > bestSimilarity) {
-                bestSimilarity = similarity
-                bestMatch = preprocessedPhrase
+            if (enhancedResult.correctedText != preprocessedPhrase) {
+                println("   🔧 NLP Correction: '${enhancedResult.correctedText}'")
+            }
+
+            // Show detailed breakdown
+            showEnhancedPhoneticBreakdown(preprocessedPhrase, expectedPhrase, enhancedResult)
+
+            if (enhancedResult.finalScore > bestSimilarity) {
+                bestSimilarity = enhancedResult.finalScore
+                bestMatch = if (enhancedResult.shouldAccept) {
+                    enhancedResult.correctedText
+                } else {
+                    preprocessedPhrase
+                }
+                bestResult = enhancedResult
                 println("🏆 NEW BEST MATCH!")
             }
             println()
         }
 
-        println("=" * 60)
-        println("📋 ENHANCED FINAL RESULTS")
-        println("=" * 60)
-        println("🔧 Best Processed: '$bestMatch'")
-        println("🎯 Enhanced Accuracy: ${String.format("%.2f", bestSimilarity * 100)}%")
-        println("✅ Accepted: ${if (bestSimilarity >= 0.90) "YES" else "NO"}")
-        println("=" * 60)
+        println("=" * 80)
+        println("📋 ENHANCED FINAL DECISION")
+        println("=" * 80)
+        println("🏆 Best Match: '$bestMatch'")
+        println("🎯 Final Score: ${String.format("%.2f", bestSimilarity * 100)}%")
+        println("🤖 Strategy: ${bestResult?.strategy ?: "Unknown"}")
+        println("📊 Confidence: ${bestResult?.confidence ?: "Unknown"}")
 
-        return if (bestSimilarity >= 0.93) {
-            mapOf(expectedPhrase to bestSimilarity)
+        val accepted = bestSimilarity >= 0.75 // Lower threshold with NLP confidence
+        println("✅ Decision: ${if (accepted) "ACCEPTED" else "REJECTED"}")
+
+        if (accepted && bestResult?.correctedText != null && bestResult.correctedText != bestMatch) {
+            println("🔧 Applied NLP Correction")
+            bestMatch = bestResult.correctedText
+        }
+
+        println("=" * 80)
+
+        return if (accepted) {
+            if (bestSimilarity >= 0.90) {
+                // Very high confidence - return expected phrase
+                mapOf(expectedPhrase to bestSimilarity)
+            } else {
+                // Good confidence - return corrected phrase
+                mapOf(bestMatch to bestSimilarity)
+            }
         } else {
+            // Low confidence - return original with low score
             mapOf(bestMatch to bestSimilarity)
         }
     }
 
+    /**
+     * LEGACY: Original method kept for backward compatibility
+     */
+    fun correctRecognizedPhrase(
+        recognizedPhrases: List<String>,
+        expectedPhrase: String,
+        context: String = ""
+    ): Map<String, Double> {
+        // Redirect to enhanced version
+        return correctRecognizedPhraseEnhanced(recognizedPhrases, expectedPhrase, context)
+    }
 
-    private fun showPhoneticBreakdown(phrase1: String, phrase2: String) {
+    private fun showEnhancedPhoneticBreakdown(
+        recognized: String,
+        expected: String,
+        result: EnhancedPhoneticResult
+    ) {
         val doubleMetaphone = DoubleMetaphone()
-        val words1 = phrase1.trim().split("\\s+".toRegex())
-        val words2 = phrase2.trim().split("\\s+".toRegex())
+        val recognizedWords = recognized.trim().split("\\s+".toRegex())
+        val expectedWords = expected.trim().split("\\s+".toRegex())
 
-        println("   🔍 Phonetic Analysis:")
+        println("   🔬 DETAILED PHONETIC BREAKDOWN:")
+        println("   Strategy: ${result.strategy}")
 
-        val maxWords = maxOf(words1.size, words2.size)
+        when (result.strategy) {
+            "TRADITIONAL_PHONETIC" -> {
+                println("   📞 Traditional phonetic matching was more reliable")
+                showTraditionalBreakdown(recognizedWords, expectedWords, doubleMetaphone)
+            }
+            "SEMANTIC_MATCH" -> {
+                println("   🧠 NLP semantic analysis provided better match")
+                println("   💡 Detected semantic similarity despite phonetic differences")
+            }
+            "CONTEXTUAL_MATCH" -> {
+                println("   🎯 Context-aware matching was decisive")
+                println("   📍 Context clues helped resolve ambiguity")
+            }
+            "NLP_FUSION" -> {
+                println("   ⚖️ Combined NLP analysis provided best results")
+                println("   🔗 Multiple NLP components contributed to decision")
+            }
+            else -> {
+                showTraditionalBreakdown(recognizedWords, expectedWords, doubleMetaphone)
+            }
+        }
+
+        if (result.correctedText != recognized) {
+            println("   🔧 NLP Corrections Applied:")
+            println("      Before: '$recognized'")
+            println("      After:  '${result.correctedText}'")
+        }
+    }
+
+    private fun showTraditionalBreakdown(
+        recognizedWords: List<String>,
+        expectedWords: List<String>,
+        doubleMetaphone: DoubleMetaphone
+    ) {
+        val maxWords = maxOf(recognizedWords.size, expectedWords.size)
         for (i in 0 until maxWords) {
-            val word1 = if (i < words1.size) words1[i] else ""
-            val word2 = if (i < words2.size) words2[i] else ""
+            val recognizedWord = if (i < recognizedWords.size) recognizedWords[i] else ""
+            val expectedWord = if (i < expectedWords.size) expectedWords[i] else ""
 
-            if (word1.isNotEmpty() && word2.isNotEmpty()) {
-                val meta1 = doubleMetaphone.encode(word1)
-                val meta2 = doubleMetaphone.encode(word2)
+            if (recognizedWord.isNotEmpty() && expectedWord.isNotEmpty()) {
+                val metaRecognized = doubleMetaphone.doubleMetaphone(recognizedWord)
+                val metaExpected = doubleMetaphone.doubleMetaphone(expectedWord)
 
                 val matches = when {
-                    meta1.primary == meta2.primary -> "✅ EXACT"
-                    meta1.primary == meta2.alternate || meta1.alternate == meta2.primary -> "🟡 CLOSE"
-                    meta1.alternate == meta2.alternate && meta1.alternate.isNotEmpty() -> "🟠 ALT"
-                    else -> "❌ DIFF"
+                    metaRecognized == metaExpected -> "✅ EXACT"
+                    recognizedWord.lowercase() == expectedWord.lowercase() -> "✅ EXACT TEXT"
+                    metaRecognized.isNotEmpty() && metaExpected.isNotEmpty() &&
+                            (metaRecognized == metaExpected) -> "🟡 CLOSE"
+                    else -> "❌ DIFFERENT"
                 }
 
-                println("   • '$word1' [${meta1.primary}] vs '$word2' [${meta2.primary}] → $matches")
+                println("   • '$recognizedWord' [$metaRecognized] vs '$expectedWord' [$metaExpected] → $matches")
+            } else if (recognizedWord.isNotEmpty()) {
+                println("   • '$recognizedWord' → ❌ EXTRA WORD")
+            } else if (expectedWord.isNotEmpty()) {
+                println("   • '$expectedWord' → ❌ MISSING WORD")
             }
         }
     }
 
     // Helper extension for string repetition
     private operator fun String.times(n: Int): String = this.repeat(n)
-
 }
