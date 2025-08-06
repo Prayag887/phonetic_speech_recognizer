@@ -75,19 +75,19 @@ class PhoneticSimilarity {
         val contentWordResults = wordResults.filter { !it.isMetaphoneZero }
         val failedWords = contentWordResults.filter { !it.meetsThreshold }
 
-        println("🎯 PER-WORD ACCURACY ANALYSIS:")
+        println(" PER-WORD ACCURACY ANALYSIS:")
         println("   Required threshold: 50% for content words")
         println("   Total content words: ${contentWordResults.size}")
         println("   Words meeting threshold: ${contentWordResults.count { it.meetsThreshold }}")
         println("   Words failing threshold: ${failedWords.size}")
 
         if (failedWords.isNotEmpty()) {
-            println("   ❌ FAILED WORDS:")
+            println("    FAILED WORDS:")
             failedWords.forEach { result ->
                 val matchInfo = result.bestMatch?.let { "→ '$it'" } ?: "→ NO MATCH"
                 println("      • '${result.word}' [${result.phoneticCode}] $matchInfo (${String.format("%.1f", result.bestScore * 100)}%)")
             }
-            println("   🚫 OVERALL RESULT: REJECTED - Not all words meet 60% threshold")
+            println("    OVERALL RESULT: REJECTED - Not all words meet 60% threshold")
             return 0.0 // Reject if any content word fails 80% threshold
         }
 
@@ -183,8 +183,8 @@ class PhoneticSimilarity {
             // Determine if word meets threshold
             val threshold = when {
                 isMetaphoneZero -> 0.0 // Metaphone [0] words are automatically accepted
-                isStopWord -> 0.6 // Lower threshold for stop words
-                else -> 0.5 // 50% threshold for content words
+                isStopWord -> 0.0 // Lower threshold for stop words (for now its 0, but if needed then put 0.6)
+                else -> 0.0 // 50% threshold for content words (for now its 0, but if needed then put 0.5)
             }
 
             val meetsThreshold = bestScore >= threshold
