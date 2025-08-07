@@ -85,7 +85,6 @@ class LanguageHandlers(private val context: Context) {
         } else {
             "hi-IN"
         }
-        println("this is number $sentence, lang $lang")
 
         pluginInstance?.startRecognition(
             paragraph = "",
@@ -106,24 +105,49 @@ class LanguageHandlers(private val context: Context) {
     fun handleWordsRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
         Log.d("SpeechRecognition", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
         if (languageCode == null) {
-            println("this is sentence $sentence")
             pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
             pluginInstance?.activeResult = null
             return
         }
 
-
         pluginInstance?.startRecognition(
-            paragraph = "",
+            paragraph = "", // Keep empty for word recognition
             lang = languageCode,
             mapper = { text ->
                 if (languageCode == "en-US") {
                     val context = ContextBasedDetection().detectContext(sentence)
-//                    Log.d("SpeechRecognition", "Detected context: $context")
                     Log.d("SpeechRecognition", "Original recognition: ${text.keys.first()}")
-                    correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
+
+                    try {
+                        // Get detailed analysis and return it directly
+                        val detailedAnalysis = getDetailedPhraseAnalysis(
+                            listOf(text.keys.first()),
+                            sentence,
+                            context
+                        )
+
+                        Log.d("SpeechRecognition", "Returning detailed analysis directly: $detailedAnalysis")
+
+                        // Return the detailed analysis directly instead of storing it
+                        detailedAnalysis
+
+                    } catch (e: Exception) {
+                        Log.e("SpeechRecognition", "Error getting detailed analysis", e)
+                        // Fallback to simple correction
+                        val simpleResult = correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
+                        mapOf(
+                            "result" to simpleResult.keys.first(),
+                            "confidence" to simpleResult.values.first(),
+                            "detailedAnalysis" to false
+                        )
+                    }
                 } else {
-                    text
+                    // For non-English, wrap in expected format
+                    mapOf(
+                        "result" to text.keys.first(),
+                        "confidence" to text.values.first(),
+                        "detailedAnalysis" to false
+                    )
                 }
             },
             timeoutMillis = timeoutMillis,
@@ -141,12 +165,10 @@ class LanguageHandlers(private val context: Context) {
     fun handleParagraphMapping(languageCode: String?, timeoutMillis: Int, paragraph: String) {
         Log.d("SpeechRecognition", "PARAGRAPH FROM FLUTTER SIDE: \"$paragraph\"")
         if (languageCode == null) {
-            println("this is paragraph $paragraph")
             pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
             pluginInstance?.activeResult = null
             return
         }
-
 
         val words = paragraph.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
 
@@ -210,28 +232,38 @@ class LanguageHandlers(private val context: Context) {
         )
     }
 
-
     // Helper method for correcting recognized phrases based on phonetic similarity
-    fun correctRecognizedPhrase(
+    data class PhraseAnalysisResult(
+        val overallSimilarity: Double,
+        val correctedPhrase: String,
+        val wordAnalysis: List<WordAnalysisResult>,
+        val accepted: Boolean,
+        val reason: String
+    )
+
+    fun correctRecognizedPhraseWithAnalysis(
         recognizedPhrases: List<String>,
         expectedPhrase: String,
         context: String = ""
-    ): Map<String, Double> {
-        if (recognizedPhrases.isEmpty()) return emptyMap()
+    ): PhraseAnalysisResult {
+        if (recognizedPhrases.isEmpty()) {
+            return PhraseAnalysisResult(
+                overallSimilarity = 0.0,
+                correctedPhrase = "",
+                wordAnalysis = emptyList(),
+                accepted = false,
+                reason = "No recognized phrases provided"
+            )
+        }
 
         val enhancedSimilarity = PhoneticSimilarity()
         var bestMatch = ""
         var bestSimilarity = 0.0
+        var bestWordAnalysis = emptyList<WordAnalysisResult>()
+        var bestAccepted = false
+        var bestReason = ""
 
         val auxiliaryVerbs = setOf("am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "shall", "should", "can", "could", "may", "might", "must")
-
-        println("=" * 60)
-        println("🎯 ENHANCED PHONETIC SPEECH RECOGNITION CORRECTION")
-        println("=" * 60)
-        println("📝 Expected Phrase: '$expectedPhrase'")
-        println("🗣️  Context: '${context.ifEmpty { "No context provided" }}'")
-        println("📊 Total Recognized Phrases: ${recognizedPhrases.size}")
-        println()
 
         val expectedWords = expectedPhrase
             .lowercase()
@@ -240,11 +272,7 @@ class LanguageHandlers(private val context: Context) {
             .filter { it.isNotBlank() && it !in auxiliaryVerbs }
 
         for ((index, recognizedPhrase) in recognizedPhrases.withIndex()) {
-            println("--- Processing Phrase ${index + 1} ---")
-            println("🔤 Original Recognized: '$recognizedPhrase'")
-
             val preprocessedPhrase = ContextBasedDetection().preprocessWithContext(recognizedPhrase, context)
-            println("⚙️  After Processing: '$preprocessedPhrase'")
 
             val recognizedWords = preprocessedPhrase
                 .lowercase()
@@ -252,6 +280,7 @@ class LanguageHandlers(private val context: Context) {
                 .split(Regex("\\s+"))
                 .filter { it.isNotBlank() }
 
+            // Check for exact word matches first
             val containsAllExpected = expectedWords.all { expectedWord ->
                 recognizedWords.any { recognizedWord ->
                     recognizedWord == expectedWord
@@ -259,69 +288,166 @@ class LanguageHandlers(private val context: Context) {
             }
 
             if (containsAllExpected) {
-                println("✅ All non-auxiliary words matched! Returning expected phrase.")
-                return mapOf(expectedPhrase to 1.0)
+                val perfectWordAnalysis = recognizedWords.map { word ->
+                    WordAnalysisResult(
+                        recognizedWord = word,
+                        confidence = 1.0,
+                        phoneticContentSimilarity = 1.0
+                    )
+                }
+                return PhraseAnalysisResult(
+                    overallSimilarity = 1.0,
+                    correctedPhrase = expectedPhrase,
+                    wordAnalysis = perfectWordAnalysis,
+                    accepted = true,
+                    reason = "Perfect word match - all content words found"
+                )
             }
 
-            val similarity = enhancedSimilarity.calculatePhoneticSimilarity(preprocessedPhrase, expectedPhrase)
-            println("📈 Enhanced Accuracy Score: ${String.format("%.2f", similarity * 100)}%")
-            println("✅ Meets Threshold (90%): ${if (similarity >= 0.90) "YES" else "NO"}")
+            // Get detailed analysis with word-level results
+            val (similarity, wordAnalysis) = enhancedSimilarity.calculatePhoneticSimilarityWithWordAnalysis(
+                expectedPhrase,
+                preprocessedPhrase
+            )
 
-            showPhoneticBreakdown(preprocessedPhrase, expectedPhrase)
+            // Show ONLY word-level analysis
+            showWordLevelAnalysis(wordAnalysis, expectedPhrase, preprocessedPhrase)
+
+            // Determine acceptance and reason
+            val accepted = similarity >= 0.90
+            val reason = when {
+                similarity >= 0.95 -> "Excellent phonetic match (≥95%)"
+                similarity >= 0.90 -> "Good phonetic match (≥90%)"
+                similarity >= 0.70 -> "Moderate phonetic match but below threshold"
+                similarity >= 0.50 -> "Weak phonetic match"
+                else -> "Poor phonetic match"
+            }
 
             if (similarity > bestSimilarity) {
                 bestSimilarity = similarity
                 bestMatch = preprocessedPhrase
-                println("🏆 NEW BEST MATCH!")
+                bestWordAnalysis = wordAnalysis
+                bestAccepted = accepted
+                bestReason = reason
             }
-            println()
         }
 
-        println("=" * 60)
-        println("📋 ENHANCED FINAL RESULTS")
-        println("=" * 60)
-        println("🔧 Best Processed: '$bestMatch'")
-        println("🎯 Enhanced Accuracy: ${String.format("%.2f", bestSimilarity * 100)}%")
-        println("✅ Accepted: ${if (bestSimilarity >= 0.90) "YES" else "NO"}")
-        println("=" * 60)
+        val finalPhrase = if (bestSimilarity >= 0.93) expectedPhrase else bestMatch
 
-        return if (bestSimilarity >= 0.93) {
-            mapOf(expectedPhrase to bestSimilarity)
-        } else {
-            mapOf(bestMatch to bestSimilarity)
-        }
+        return PhraseAnalysisResult(
+            overallSimilarity = bestSimilarity,
+            correctedPhrase = finalPhrase,
+            wordAnalysis = bestWordAnalysis,
+            accepted = bestAccepted,
+            reason = bestReason
+        )
     }
 
+    // Legacy function for backward compatibility
+    fun correctRecognizedPhrase(
+        recognizedPhrases: List<String>,
+        expectedPhrase: String,
+        context: String = ""
+    ): Map<String, Double> {
+        val result = correctRecognizedPhraseWithAnalysis(recognizedPhrases, expectedPhrase, context)
+        return mapOf(result.correctedPhrase to result.overallSimilarity)
+    }
 
-    private fun showPhoneticBreakdown(phrase1: String, phrase2: String) {
-        val doubleMetaphone = DoubleMetaphone()
-        val words1 = phrase1.trim().split("\\s+".toRegex())
-        val words2 = phrase2.trim().split("\\s+".toRegex())
+    // Helper function to show ONLY detailed word-level analysis
+    private fun showWordLevelAnalysis(
+        wordAnalysis: List<WordAnalysisResult>,
+        expectedPhrase: String,
+        recognizedPhrase: String
+    ) {
+        println("\n📊 WORD-LEVEL ANALYSIS:")
+        println("Expected: '$expectedPhrase' | Recognized: '$recognizedPhrase'")
 
-        println("   🔍 Phonetic Analysis:")
-
-        val maxWords = maxOf(words1.size, words2.size)
-        for (i in 0 until maxWords) {
-            val word1 = if (i < words1.size) words1[i] else ""
-            val word2 = if (i < words2.size) words2[i] else ""
-
-            if (word1.isNotEmpty() && word2.isNotEmpty()) {
-                val meta1 = doubleMetaphone.encode(word1)
-                val meta2 = doubleMetaphone.encode(word2)
-
-                val matches = when {
-                    meta1.primary == meta2.primary -> "✅ EXACT"
-                    meta1.primary == meta2.alternate || meta1.alternate == meta2.primary -> "🟡 CLOSE"
-                    meta1.alternate == meta2.alternate && meta1.alternate.isNotEmpty() -> "🟠 ALT"
-                    else -> "❌ DIFF"
-                }
-
-                println("   • '$word1' [${meta1.primary}] vs '$word2' [${meta2.primary}] → $matches")
-            }
+        if (wordAnalysis.isEmpty()) {
+            println("No word analysis available")
+            return
         }
+
+        wordAnalysis.forEachIndexed { index, result ->
+            val confidenceBar = createProgressBar(result.confidence, 20)
+            val phoneticBar = createProgressBar(result.phoneticContentSimilarity, 20)
+
+            println("${index + 1}. '${result.recognizedWord}'")
+            println("   Confidence:    ${String.format("%.2f", result.confidence)} $confidenceBar")
+            println("   Phonetic Sim:  ${String.format("%.2f", result.phoneticContentSimilarity)} $phoneticBar")
+
+            // Add interpretation
+            val confidenceLevel = when {
+                result.confidence >= 0.9 -> "Excellent"
+                result.confidence >= 0.7 -> "Good"
+                result.confidence >= 0.5 -> "Fair"
+                else -> "Poor"
+            }
+
+            val phoneticLevel = when {
+                result.phoneticContentSimilarity >= 0.9 -> "Excellent"
+                result.phoneticContentSimilarity >= 0.7 -> "Good"
+                result.phoneticContentSimilarity >= 0.5 -> "Fair"
+                else -> "Poor"
+            }
+
+            println("   Quality: $confidenceLevel confidence, $phoneticLevel phonetic match\n")
+        }
+
+        // Summary statistics
+        val avgConfidence = wordAnalysis.map { it.confidence }.average()
+        val avgPhonetic = wordAnalysis.map { it.phoneticContentSimilarity }.average()
+        val weakWords = wordAnalysis.count { it.confidence < 0.6 }
+        val strongWords = wordAnalysis.count { it.confidence >= 0.8 }
+
+        println("SUMMARY:")
+        println("Average Confidence: ${String.format("%.2f", avgConfidence)}")
+        println("Average Phonetic Similarity: ${String.format("%.2f", avgPhonetic)}")
+        println("Strong Words (≥80%): $strongWords/${wordAnalysis.size}")
+        println("Weak Words (<60%): $weakWords/${wordAnalysis.size}")
+        println()
+    }
+
+    // Helper function to create progress bars for visualization
+    private fun createProgressBar(value: Double, width: Int): String {
+        val filled = (value * width).toInt()
+        val empty = width - filled
+        return "[${"█".repeat(filled)}${" ".repeat(empty)}]"
+    }
+
+    // Enhanced function to get word analysis as map (for API responses)
+    fun getDetailedPhraseAnalysis(
+        recognizedPhrases: List<String>,
+        expectedPhrase: String,
+        context: String = ""
+    ): Map<String, Any> {
+        val result = correctRecognizedPhraseWithAnalysis(recognizedPhrases, expectedPhrase, context)
+
+        return mapOf(
+            "overallSimilarity" to result.overallSimilarity,
+            "correctedPhrase" to result.correctedPhrase,
+            "accepted" to result.accepted,
+            "reason" to result.reason,
+            "wordAnalysis" to result.wordAnalysis.map { word ->
+                mapOf(
+                    "recognizedWord" to word.recognizedWord,
+                    "confidence" to word.confidence,
+                    "phoneticContentSimilarity" to word.phoneticContentSimilarity
+                )
+            },
+            "summary" to mapOf(
+                "totalWords" to result.wordAnalysis.size,
+                "averageConfidence" to if (result.wordAnalysis.isNotEmpty()) {
+                    result.wordAnalysis.map { it.confidence }.average()
+                } else 0.0,
+                "averagePhoneticSimilarity" to if (result.wordAnalysis.isNotEmpty()) {
+                    result.wordAnalysis.map { it.phoneticContentSimilarity }.average()
+                } else 0.0,
+                "strongWords" to result.wordAnalysis.count { it.confidence >= 0.8 },
+                "weakWords" to result.wordAnalysis.count { it.confidence < 0.6 }
+            )
+        )
     }
 
     // Helper extension for string repetition
     private operator fun String.times(n: Int): String = this.repeat(n)
-
 }

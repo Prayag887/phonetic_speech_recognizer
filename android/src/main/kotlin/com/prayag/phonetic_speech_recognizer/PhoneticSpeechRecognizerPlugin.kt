@@ -30,6 +30,10 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var eventSink: EventChannel.EventSink? = null
   private var speechRecognizer: SpeechRecognizer? = null
   var activeResult: MethodChannel.Result? = null
+
+  // Change this to nullable
+  var detailedAnalysisResult: Map<String, Any>? = null
+
   private var timeoutHandler: Handler? = null
   private var timeoutRunnable: Runnable? = null
   private var isListening = false
@@ -282,10 +286,39 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
               recognizedResults.clear()
               recognizedResults.addAll(matches)
               isListening = false
-              val mappedMatches = mapOf(matches.first() to 0.0) // change to the real value later
+
+              // Apply the mapper to process the results
+              val mappedMatches = mapOf(matches.first() to 0.0)
               val finalResult = mapper(mappedMatches)
-              Log.d("SpeechRecognition", "Sending final result: $finalResult")
-              activeResult?.success(finalResult)
+
+              Log.d("SpeechRecognition", "Final result from mapper: $finalResult")
+
+              // The mapper now returns the result directly, so just use it
+              val resultToReturn = when (finalResult) {
+                is Map<*, *> -> {
+                  try {
+                    @Suppress("UNCHECKED_CAST")
+                    finalResult as Map<String, Any>
+                  } catch (e: ClassCastException) {
+                    Log.e("SpeechRecognition", "Error casting final result", e)
+                    mapOf(
+                      "result" to finalResult.toString(),
+                      "confidence" to 0.0,
+                      "detailedAnalysis" to false
+                    )
+                  }
+                }
+                else -> {
+                  mapOf(
+                    "result" to finalResult.toString(),
+                    "confidence" to 0.0,
+                    "detailedAnalysis" to false
+                  )
+                }
+              }
+
+              Log.d("SpeechRecognition", "Sending final result: $resultToReturn")
+              activeResult?.success(resultToReturn)
               speechRecognizer?.cancel()
               cleanup()
             }
@@ -306,6 +339,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         }
       }
 
+      // ... rest of your RecognitionListener methods remain the same
       override fun onPartialResults(partialResults: Bundle?) {
         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let { partialList ->
           if (partialList.isNotEmpty() && paragraph.isNotEmpty()) {
@@ -347,8 +381,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       override fun onRmsChanged(rmsdB: Float) {}
-
-      // Other overrides remain unchanged
       override fun onEndOfSpeech() {}
       override fun onReadyForSpeech(params: Bundle?) {}
       override fun onBeginningOfSpeech() {}

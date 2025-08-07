@@ -12,7 +12,15 @@ data class WordMatchResult(
     val isMetaphoneZero: Boolean,
     val bestMatch: String?,
     val bestScore: Double,
-    val meetsThreshold: Boolean
+    val meetsThreshold: Boolean,
+    val confidence: Double,
+    val phoneticContentSimilarity: Double
+)
+
+data class WordAnalysisResult(
+    val recognizedWord: String,
+    val confidence: Double,
+    val phoneticContentSimilarity: Double
 )
 
 class PhoneticSimilarity {
@@ -54,7 +62,10 @@ class PhoneticSimilarity {
         "PS" to listOf("S", "FS"),
     )
 
-    fun calculatePhoneticSimilarity(phrase1: String, phrase2: String): Double {
+    /**
+     * Main function that returns both overall similarity and word-level analysis
+     */
+    fun calculatePhoneticSimilarityWithWordAnalysis(phrase1: String, phrase2: String): Pair<Double, List<WordAnalysisResult>> {
         println("🔍 DEBUG INPUT:")
         println("   phrase1 (expected): '$phrase1'")
         println("   phrase2 (recognized): '$phrase2'")
@@ -65,13 +76,16 @@ class PhoneticSimilarity {
         println("   words1 count: ${words1.size} -> $words1")
         println("   words2 count: ${words2.size} -> $words2")
 
-        if (words1.isEmpty() && words2.isEmpty()) return 1.0
-        if (words1.isEmpty() || words2.isEmpty()) return 0.0
+        if (words1.isEmpty() && words2.isEmpty()) return Pair(1.0, emptyList())
+        if (words1.isEmpty() || words2.isEmpty()) return Pair(0.0, emptyList())
 
-        // Analyze per-word accuracy
-        val wordResults = analyzePerWordAccuracy(words1, words2)
+        // Analyze per-word accuracy with enhanced results
+        val wordResults = analyzePerWordAccuracyEnhanced(words1, words2)
 
-        // Check if all content words meet 80% threshold
+        // Generate word analysis results for recognized words
+        val wordAnalysisResults = generateWordAnalysisResults(words2, wordResults, words1)
+
+        // Check if all content words meet threshold
         val contentWordResults = wordResults.filter { !it.isMetaphoneZero }
         val failedWords = contentWordResults.filter { !it.meetsThreshold }
 
@@ -87,11 +101,11 @@ class PhoneticSimilarity {
                 val matchInfo = result.bestMatch?.let { "→ '$it'" } ?: "→ NO MATCH"
                 println("      • '${result.word}' [${result.phoneticCode}] $matchInfo (${String.format("%.1f", result.bestScore * 100)}%)")
             }
-            println("    OVERALL RESULT: REJECTED - Not all words meet 60% threshold")
-            return 0.0 // Reject if any content word fails 80% threshold
+            println("    OVERALL RESULT: REJECTED - Not all words meet threshold")
+            return Pair(0.0, wordAnalysisResults)
         }
 
-        // Calculate metrics for passed words
+        // Calculate overall metrics
         val metaphoneSim = calculateDynamicPhoneticSimilarity(words1, words2)
         val acousticSim = calculateAcousticSimilarity(words1, words2)
         val editSim = calculateEditDistanceSimilarity(phrase1, phrase2)
@@ -107,14 +121,258 @@ class PhoneticSimilarity {
 
         val finalScore = (metaphoneSim * 0.2 + acousticSim * 0.3 + wordOrderSim * 0.5)
 
-        println("   ALL CONTENT WORDS MEET 50% THRESHOLD")
+        println("   ALL CONTENT WORDS MEET THRESHOLD")
         println("   SPEECH CORRECTION APPLIED: Converting recognized speech to expected phrase")
         println("   Corrected Output: '$phrase1'")
 
-        return minOf(1.0, finalScore)
+        return Pair(minOf(1.0, finalScore), wordAnalysisResults)
     }
 
-    private fun analyzePerWordAccuracy(words1: List<String>, words2: List<String>): List<WordMatchResult> {
+    /**
+     * Legacy function for backward compatibility
+     */
+    fun calculatePhoneticSimilarity(phrase1: String, phrase2: String): Double {
+        return calculatePhoneticSimilarityWithWordAnalysis(phrase1, phrase2).first
+    }
+
+    /**
+     * Generate word analysis results for each recognized word
+     */
+    private fun generateWordAnalysisResults(
+        recognizedWords: List<String>,
+        wordResults: List<WordMatchResult>,
+        expectedWords: List<String>
+    ): List<WordAnalysisResult> {
+        val results = mutableListOf<WordAnalysisResult>()
+        val usedExpectedWords = mutableSetOf<Int>()
+
+        // Create reverse mapping from recognized words to expected words
+        val recognizedToExpectedMap = mutableMapOf<Int, Int>()
+
+        for (i in wordResults.indices) {
+            val result = wordResults[i]
+            if (result.bestMatch != null) {
+                // Find which recognized word(s) this expected word matched with
+                val matchedWords = result.bestMatch.split(" ")
+                for (j in recognizedWords.indices) {
+                    if (matchedWords.contains(recognizedWords[j]) && j !in recognizedToExpectedMap) {
+                        recognizedToExpectedMap[j] = i
+                        usedExpectedWords.add(i)
+                        break
+                    }
+                }
+            }
+        }
+
+        // Generate results for each recognized word
+        for (j in recognizedWords.indices) {
+            val recognizedWord = recognizedWords[j]
+            val recognizedPhonetic = doubleMetaphone.doubleMetaphone(recognizedWord)
+
+            if (j in recognizedToExpectedMap) {
+                // This recognized word has a match in expected words
+                val matchedResult = wordResults[recognizedToExpectedMap[j]!!]
+
+                // Calculate confidence (combination of all algorithms)
+                val confidence = calculateWordConfidence(
+                    expectedWord = matchedResult.word,
+                    recognizedWord = recognizedWord,
+                    phoneticMatch = matchedResult.bestScore
+                )
+
+                // Calculate pure phonetic content similarity
+                val phoneticContentSimilarity = calculatePurePhoneticSimilarity(
+                    expectedWord = matchedResult.word,
+                    recognizedWord = recognizedWord
+                )
+
+                results.add(WordAnalysisResult(
+                    recognizedWord = recognizedWord,
+                    confidence = confidence,
+                    phoneticContentSimilarity = phoneticContentSimilarity
+                ))
+            } else {
+                // This recognized word doesn't match any expected word
+                // Find the best possible match for confidence calculation
+                var bestExpectedMatch = ""
+                var bestPhoneticScore = 0.0
+
+                for (k in expectedWords.indices) {
+                    if (k in usedExpectedWords) continue
+
+                    val expectedPhonetic = doubleMetaphone.doubleMetaphone(expectedWords[k])
+                    val phoneticScore = calculateMetaphoneSimilarity(recognizedPhonetic, expectedPhonetic)
+
+                    if (phoneticScore > bestPhoneticScore) {
+                        bestPhoneticScore = phoneticScore
+                        bestExpectedMatch = expectedWords[k]
+                    }
+                }
+
+                val confidence = if (bestExpectedMatch.isNotEmpty()) {
+                    calculateWordConfidence(bestExpectedMatch, recognizedWord, bestPhoneticScore)
+                } else {
+                    0.3 // Base confidence for unmatched words
+                }
+
+                val phoneticContentSimilarity = if (bestExpectedMatch.isNotEmpty()) {
+                    calculatePurePhoneticSimilarity(bestExpectedMatch, recognizedWord)
+                } else {
+                    0.2 // Low similarity for unmatched words
+                }
+
+                results.add(WordAnalysisResult(
+                    recognizedWord = recognizedWord,
+                    confidence = confidence,
+                    phoneticContentSimilarity = phoneticContentSimilarity
+                ))
+            }
+        }
+
+        return results
+    }
+
+    /**
+     * Calculate confidence using combination of all algorithms
+     */
+    private fun calculateWordConfidence(
+        expectedWord: String,
+        recognizedWord: String,
+        phoneticMatch: Double
+    ): Double {
+        // Exact match gets full confidence
+        if (expectedWord.equals(recognizedWord, ignoreCase = true)) {
+            return 1.0
+        }
+
+        // Calculate various similarity metrics
+        val phoneticSimilarity = phoneticMatch
+        val editDistanceSimilarity = calculateWordEditSimilarity(expectedWord, recognizedWord)
+        val jaroWinklerSimilarity = jaro.apply(expectedWord.lowercase(), recognizedWord.lowercase())
+        val acousticSimilarity = calculateWordAcousticSimilarity(expectedWord, recognizedWord)
+
+        // Weight the different algorithms
+        val confidence = (
+                phoneticSimilarity * 0.35 +      // Phonetic matching is most important
+                        acousticSimilarity * 0.25 +      // Acoustic confusion patterns
+                        jaroWinklerSimilarity * 0.25 +   // String similarity
+                        editDistanceSimilarity * 0.15     // Edit distance
+                )
+
+        // Apply boost for stop words (they're often recognized correctly phonetically)
+        val finalConfidence = if (isStopWord(expectedWord) || isStopWord(recognizedWord)) {
+            minOf(1.0, confidence + 0.1)
+        } else {
+            confidence
+        }
+
+        return maxOf(0.0, minOf(1.0, finalConfidence))
+    }
+
+    /**
+     * Calculate pure phonetic content similarity focusing only on pronunciation
+     */
+    private fun calculatePurePhoneticSimilarity(expectedWord: String, recognizedWord: String): Double {
+        // Exact match
+        if (expectedWord.equals(recognizedWord, ignoreCase = true)) {
+            return 1.0
+        }
+
+        val expectedPhonetic = doubleMetaphone.doubleMetaphone(expectedWord)
+        val recognizedPhonetic = doubleMetaphone.doubleMetaphone(recognizedWord)
+
+        // Handle metaphone [0] codes
+        if (expectedPhonetic == "0" && recognizedPhonetic == "0") {
+            return 0.8 // Both are non-phonetic, give decent similarity
+        }
+        if (expectedPhonetic == "0" || recognizedPhonetic == "0") {
+            return 0.3 // One is non-phonetic, lower similarity
+        }
+
+        // Pure phonetic similarity
+        val phoneticSim = calculateMetaphoneSimilarity(expectedPhonetic, recognizedPhonetic)
+
+        // Add acoustic similarity for pronunciation confusions
+        val acousticSim = calculateAcousticCodeSimilarity(expectedPhonetic, recognizedPhonetic)
+
+        // Focus on pronunciation similarity with acoustic boost
+        val pronunciationSimilarity = phoneticSim * 0.7 + acousticSim * 0.3
+
+        // Special handling for common pronunciation patterns
+        val pronunciationBoost = checkCommonPronunciationPatterns(expectedWord, recognizedWord)
+
+        return minOf(1.0, pronunciationSimilarity + pronunciationBoost)
+    }
+
+    /**
+     * Check for common pronunciation patterns and confusions
+     */
+    private fun checkCommonPronunciationPatterns(expected: String, recognized: String): Double {
+        val exp = expected.lowercase()
+        val rec = recognized.lowercase()
+        var boost = 0.0
+
+        // Common pronunciation confusions
+        val pronunciationPairs = listOf(
+            Pair("she", "c"), Pair("c", "she"),
+            Pair("she", "sea"), Pair("sea", "she"),
+            Pair("seas", "she"), Pair("she", "seas"),
+            Pair("see", "c"), Pair("c", "see"),
+            Pair("to", "two"), Pair("two", "to"),
+            Pair("too", "to"), Pair("to", "too"),
+            Pair("there", "their"), Pair("their", "there"),
+            Pair("where", "wear"), Pair("wear", "where"),
+            Pair("for", "four"), Pair("four", "for"),
+            Pair("one", "won"), Pair("won", "one"),
+            Pair("know", "no"), Pair("no", "know"),
+            Pair("right", "write"), Pair("write", "right"),
+            Pair("night", "knight"), Pair("knight", "night")
+        )
+
+        for ((word1, word2) in pronunciationPairs) {
+            if ((exp == word1 && rec == word2) || (exp == word2 && rec == word1)) {
+                boost += 0.3 // Strong pronunciation similarity
+                break
+            }
+            if ((exp.contains(word1) && rec.contains(word2)) ||
+                (exp.contains(word2) && rec.contains(word1))) {
+                boost += 0.1 // Partial pronunciation similarity
+            }
+        }
+
+        // Similar starting sounds
+        if (exp.isNotEmpty() && rec.isNotEmpty() &&
+            calculateMetaphoneSimilarity(
+                doubleMetaphone.doubleMetaphone(exp.take(2)),
+                doubleMetaphone.doubleMetaphone(rec.take(2))
+            ) > 0.8) {
+            boost += 0.05
+        }
+
+        return boost
+    }
+
+    /**
+     * Calculate word-level acoustic similarity
+     */
+    private fun calculateWordAcousticSimilarity(word1: String, word2: String): Double {
+        val phone1 = doubleMetaphone.doubleMetaphone(word1)
+        val phone2 = doubleMetaphone.doubleMetaphone(word2)
+        return calculateAcousticCodeSimilarity(phone1, phone2)
+    }
+
+    /**
+     * Calculate word-level edit distance similarity
+     */
+    private fun calculateWordEditSimilarity(word1: String, word2: String): Double {
+        val maxLen = maxOf(word1.length, word2.length)
+        if (maxLen == 0) return 1.0
+
+        val distance = levenshtein.apply(word1.lowercase(), word2.lowercase())
+        return 1.0 - (distance.toDouble() / maxLen)
+    }
+
+    private fun analyzePerWordAccuracyEnhanced(words1: List<String>, words2: List<String>): List<WordMatchResult> {
         val metaphone1 = words1.map { doubleMetaphone.doubleMetaphone(it) }
         val metaphone2 = words2.map { doubleMetaphone.doubleMetaphone(it) }
         val matched2 = mutableSetOf<Int>()
@@ -189,6 +447,20 @@ class PhoneticSimilarity {
 
             val meetsThreshold = bestScore >= threshold
 
+            // Calculate confidence for this word match
+            val confidence = if (bestMatch != null) {
+                calculateWordConfidence(word1, bestMatch.split(" ")[0], bestScore)
+            } else {
+                0.2
+            }
+
+            // Calculate phonetic content similarity
+            val phoneticContentSimilarity = if (bestMatch != null) {
+                calculatePurePhoneticSimilarity(word1, bestMatch.split(" ")[0])
+            } else {
+                0.1
+            }
+
             results.add(WordMatchResult(
                 word = word1,
                 phoneticCode = phone1,
@@ -196,18 +468,22 @@ class PhoneticSimilarity {
                 isMetaphoneZero = isMetaphoneZero,
                 bestMatch = bestMatch,
                 bestScore = bestScore,
-                meetsThreshold = meetsThreshold
+                meetsThreshold = meetsThreshold,
+                confidence = confidence,
+                phoneticContentSimilarity = phoneticContentSimilarity
             ))
         }
 
         return results
     }
 
+    // ... (keep all existing helper methods unchanged)
+    // All the existing private methods remain the same: calculateCombinedSimilarity,
+    // calculateAcousticSimilarity, calculateAcousticCodeSimilarity, etc.
+
     private fun calculateCombinedSimilarity(code1: String, code2: String): Double {
         val phoneticSim = calculateMetaphoneSimilarity(code1, code2)
         val acousticSim = calculateAcousticCodeSimilarity(code1, code2)
-
-        // Weight phonetic similarity higher for threshold checking
         return (phoneticSim * 0.7 + acousticSim * 0.3)
     }
 
@@ -494,7 +770,6 @@ class PhoneticSimilarity {
                 (single.length >= 6) && // Compound words are usually longer
                 (first.length + second.length >= single.length * 0.8) // Combined length makes sense
     }
-
 
     private fun showDetailedPhoneticBreakdown(words1: List<String>, words2: List<String>) {
         println("🔍 Detailed Phonetic Analysis:")

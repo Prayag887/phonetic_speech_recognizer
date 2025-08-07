@@ -737,6 +737,13 @@ class PhoneticSpeechRecognizer {
     );
   }
 
+  /* does this recognize get the result:
+  {overallSimilarity=1.0, correctedPhrase=The toys are inside the box., accepted=true, reason=Perfect word match - all content words found,
+  wordAnalysis=[{recognizedWord=the, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=toys, confidence=1.0, phoneticContentSimilarity=1.0},
+  {recognizedWord=are, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=inside, confidence=1.0, phoneticContentSimilarity=1.0},
+  {recognizedWord=the, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=box, confidence=1.0, phoneticContentSimilarity=1.0}],
+  summary={totalWords=6, averageConfidence=1.0, averagePhoneticSimilarity=1.0, strongWords=6, weakWords=0}}, ifyes then prnt it as RESULT LIBS: ....
+  */
   static Future<dynamic> recognize({
     required PhoneticType type,
     String? languageCode,
@@ -757,39 +764,115 @@ class PhoneticSpeechRecognizer {
         'sentence': sentence,
       });
 
-      if (raw == null) return "";
+      if (raw == null) {
+        debugPrint("RESULT LIBS: null response from native side");
+        return "";
+      }
+
+      // Print the raw response from native
+      debugPrint("RESULT LIBS: Raw native response: $raw");
+      debugPrint("RESULT LIBS: Raw response type: ${raw.runtimeType}");
 
       String? recognizedText;
       double? confidence;
 
       if (raw is String) {
         recognizedText = raw;
+        debugPrint("RESULT LIBS: Simple string response - $recognizedText");
       } else if (raw is Map) {
-        final Map<String, double> result = raw.map(
-          (key, value) => MapEntry(key.toString(), (value as num).toDouble()),
-        );
-        if (result.isNotEmpty) {
-          final entry = result.entries.first;
-          recognizedText = entry.key;
-          confidence = entry.value;
+        debugPrint("RESULT LIBS: Complex map response detected");
+
+        // Check if this is the detailed analysis structure
+        if (raw.containsKey('overallSimilarity') &&
+            raw.containsKey('correctedPhrase') &&
+            raw.containsKey('accepted')) {
+          debugPrint("RESULT LIBS: Detailed analysis structure found!");
+          debugPrint(
+              "RESULT LIBS: Overall Similarity: ${raw['overallSimilarity']}");
+          debugPrint(
+              "RESULT LIBS: Corrected Phrase: ${raw['correctedPhrase']}");
+          debugPrint("RESULT LIBS: Accepted: ${raw['accepted']}");
+          debugPrint("RESULT LIBS: Reason: ${raw['reason']}");
+
+          if (raw['wordAnalysis'] != null) {
+            debugPrint(
+                "RESULT LIBS: Word Analysis Count: ${(raw['wordAnalysis'] as List).length}");
+            for (int i = 0; i < (raw['wordAnalysis'] as List).length; i++) {
+              var word = (raw['wordAnalysis'] as List)[i];
+              debugPrint(
+                  "RESULT LIBS: Word $i: ${word['recognizedWord']} (confidence: ${word['confidence']}, phonetic: ${word['phoneticContentSimilarity']})");
+            }
+          }
+
+          if (raw['summary'] != null) {
+            var summary = raw['summary'] as Map;
+            debugPrint(
+                "RESULT LIBS: Summary - Total Words: ${summary['totalWords']}, Avg Confidence: ${summary['averageConfidence']}, Strong Words: ${summary['strongWords']}, Weak Words: ${summary['weakWords']}");
+          }
+
+          recognizedText = raw['correctedPhrase']?.toString() ?? "";
+          confidence = (raw['overallSimilarity'] as num?)?.toDouble();
+
+          // Return full structure if not sendKeyOnly
+          if (!sendKeyOnly) {
+            debugPrint("RESULT LIBS: Returning full detailed structure");
+            return raw;
+          }
+        } else {
+          // Handle legacy simple map format (text: confidence)
+          debugPrint("RESULT LIBS: Legacy map format detected");
+          try {
+            final Map<String, double> result = raw.map(
+              (key, value) =>
+                  MapEntry(key.toString(), (value as num).toDouble()),
+            );
+            if (result.isNotEmpty) {
+              final entry = result.entries.first;
+              recognizedText = entry.key;
+              confidence = entry.value;
+              debugPrint(
+                  "RESULT LIBS: Legacy format - Text: $recognizedText, Confidence: $confidence");
+            }
+          } catch (e) {
+            debugPrint("RESULT LIBS: Error processing legacy format: $e");
+            // Fallback - try to extract text from common keys
+            recognizedText = raw['text']?.toString() ??
+                raw['recognizedText']?.toString() ??
+                raw.keys.first.toString();
+          }
         }
       }
 
-      if (recognizedText == null) return "";
-
-      // Handle correction for common misrecognized characters
-      if (sentence != null &&
-          _arePhoneticallySimilar(recognizedText, sentence)) {
-        recognizedText = sentence;
+      if (recognizedText == null || recognizedText.isEmpty) {
+        debugPrint(
+            "RESULT LIBS: No recognized text found, returning empty string");
+        return "";
       }
 
+      // Handle correction for common misrecognized characters
+      String finalText = recognizedText;
+      if (sentence != null &&
+          _arePhoneticallySimilar(recognizedText, sentence)) {
+        finalText = sentence;
+        debugPrint(
+            "RESULT LIBS: Applied phonetic correction: '$recognizedText' -> '$finalText'");
+      }
+
+      debugPrint("RESULT LIBS: Final recognized text: '$finalText'");
+      debugPrint("RESULT LIBS: Final confidence: $confidence");
+      debugPrint("RESULT LIBS: Returning sendKeyOnly: $sendKeyOnly");
+
       return sendKeyOnly
-          ? recognizedText
-          : {'text': recognizedText, 'confidence': confidence};
+          ? finalText
+          : {'text': finalText, 'confidence': confidence};
     } on PlatformException catch (e) {
+      debugPrint("RESULT LIBS: Platform Exception - ${e.code}: ${e.message}");
       if (kDebugMode) {
         log("Speech Recognition Error: ${e.code} - ${e.message}");
       }
+      return "";
+    } catch (e) {
+      debugPrint("RESULT LIBS: Unexpected error: $e");
       return "";
     }
   }
