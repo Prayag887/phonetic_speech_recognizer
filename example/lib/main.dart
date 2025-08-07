@@ -215,8 +215,7 @@ class _MyAppState extends State<MyApp> {
           _recognizedTextNotifier.value = recognizedValue;
           _confidenceNotifier.value = confidenceStr;
 
-          print(
-              "recognizedValue:::::: ${_recognizedTextNotifier.value.length}");
+          print("recognizedValue:::::: ${_recognizedTextNotifier.value}");
           print(
               "_randomTextNotifier:::::: ${_randomTextNotifier.value.length}");
           // Compare recognized text with expected text (text from question like sentence or paragraph)(_randomText)
