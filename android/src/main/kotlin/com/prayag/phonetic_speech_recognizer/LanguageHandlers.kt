@@ -136,7 +136,7 @@ class LanguageHandlers(private val context: Context) {
                         // Fallback to simple correction
                         val simpleResult = correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
                         mapOf(
-                            "result" to simpleResult.keys.first(),
+                            "correctedPhrase" to simpleResult.keys.first(),
                             "confidence" to simpleResult.values.first(),
                             "detailedAnalysis" to false
                         )
@@ -144,7 +144,7 @@ class LanguageHandlers(private val context: Context) {
                 } else {
                     // For non-English, wrap in expected format
                     mapOf(
-                        "result" to text.keys.first(),
+                        "correctedPhrase" to text.keys.first(),
                         "confidence" to text.values.first(),
                         "detailedAnalysis" to false
                     )

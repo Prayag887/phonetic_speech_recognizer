@@ -477,9 +477,6 @@ class PhoneticSimilarity {
         return results
     }
 
-    // ... (keep all existing helper methods unchanged)
-    // All the existing private methods remain the same: calculateCombinedSimilarity,
-    // calculateAcousticSimilarity, calculateAcousticCodeSimilarity, etc.
 
     private fun calculateCombinedSimilarity(code1: String, code2: String): Double {
         val phoneticSim = calculateMetaphoneSimilarity(code1, code2)

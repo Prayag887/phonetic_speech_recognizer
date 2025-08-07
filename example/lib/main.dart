@@ -40,7 +40,7 @@ class _MyAppState extends State<MyApp> {
   final ValueNotifier<RecognitionType> _selectedTypeNotifier =
       ValueNotifier<RecognitionType>(RecognitionType.sentences);
   final ValueNotifier<String> _randomTextNotifier =
-      ValueNotifier<String>("The toys are inside the box.");
+      ValueNotifier<String>("She saw sunshine.");
   final ValueNotifier<String> _randomNumberNotifier = ValueNotifier<String>(
       RandomSentenceGenerator.generateSerialKoreanNumber());
   final ValueNotifier<String> _partialTextNotifier = ValueNotifier<String>("");
@@ -210,7 +210,7 @@ class _MyAppState extends State<MyApp> {
       if (!sendKeyOnly && result is Map) {
         if (result.isNotEmpty) {
           final confidenceStr = result['confidence'] ?? 0.0;
-          final recognizedValue = result['text']?.toString() ?? '';
+          final recognizedValue = result['correctedPhrase']?.toString() ?? '';
 
           _recognizedTextNotifier.value = recognizedValue;
           _confidenceNotifier.value = confidenceStr;
