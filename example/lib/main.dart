@@ -207,21 +207,18 @@ class _MyAppState extends State<MyApp> {
 
       print("result:::::: $result");
 
-      if (!sendKeyOnly && result is Map) {
-        if (result.isNotEmpty) {
-          final confidenceStr = result['confidence'] ?? 0.0;
-          final recognizedValue = result['correctedPhrase']?.toString() ?? '';
+      if (result.isNotEmpty) {
+        final confidenceStr = result['confidence'] ?? 0.0;
+        final recognizedValue = result['correctedPhrase']?.toString() ?? '';
 
-          _recognizedTextNotifier.value = recognizedValue;
-          _confidenceNotifier.value = confidenceStr;
+        _recognizedTextNotifier.value = recognizedValue;
+        _confidenceNotifier.value = confidenceStr;
 
-          print("recognizedValue:::::: ${_recognizedTextNotifier.value}");
-          print(
-              "_randomTextNotifier:::::: ${_randomTextNotifier.value.length}");
-          // Compare recognized text with expected text (text from question like sentence or paragraph)(_randomText)
-          if (_recognizedTextNotifier.value == _randomTextNotifier.value) {
-            _generateRandomText();
-          }
+        print("recognizedValue:::::: ${_recognizedTextNotifier.value}");
+        print("_randomTextNotifier:::::: ${_randomTextNotifier.value.length}");
+        // Compare recognized text with expected text (text from question like sentence or paragraph)(_randomText)
+        if (_recognizedTextNotifier.value == _randomTextNotifier.value) {
+          _generateRandomText();
         } else {
           _recognizedTextNotifier.value = "Recognition failed";
           _confidenceNotifier.value = 0.0;
