@@ -302,7 +302,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
                   } catch (e: ClassCastException) {
                     Log.e("SpeechRecognition", "Error casting final result", e)
                     mapOf(
-                      "result" to finalResult.toString(),
+                      "correctedPhrase" to finalResult.toString(),
                       "confidence" to 0.0,
                       "detailedAnalysis" to false
                     )
@@ -310,7 +310,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
                 }
                 else -> {
                   mapOf(
-                    "result" to finalResult.toString(),
+                    "correctedPhrase" to finalResult.toString(),
                     "confidence" to 0.0,
                     "detailedAnalysis" to false
                   )
