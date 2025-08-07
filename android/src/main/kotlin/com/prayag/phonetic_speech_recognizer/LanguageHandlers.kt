@@ -236,6 +236,7 @@ class LanguageHandlers(private val context: Context) {
     data class PhraseAnalysisResult(
         val overallSimilarity: Double,
         val correctedPhrase: String,
+        val originalPhrase: String,
         val wordAnalysis: List<WordAnalysisResult>,
         val accepted: Boolean,
         val reason: String
@@ -250,6 +251,7 @@ class LanguageHandlers(private val context: Context) {
             return PhraseAnalysisResult(
                 overallSimilarity = 0.0,
                 correctedPhrase = "",
+                originalPhrase = "",
                 wordAnalysis = emptyList(),
                 accepted = false,
                 reason = "No recognized phrases provided"
@@ -298,6 +300,7 @@ class LanguageHandlers(private val context: Context) {
                 return PhraseAnalysisResult(
                     overallSimilarity = 1.0,
                     correctedPhrase = expectedPhrase,
+                    originalPhrase = expectedPhrase,
                     wordAnalysis = perfectWordAnalysis,
                     accepted = true,
                     reason = "Perfect word match - all content words found"
@@ -337,6 +340,7 @@ class LanguageHandlers(private val context: Context) {
         return PhraseAnalysisResult(
             overallSimilarity = bestSimilarity,
             correctedPhrase = finalPhrase,
+            originalPhrase = expectedPhrase,
             wordAnalysis = bestWordAnalysis,
             accepted = bestAccepted,
             reason = bestReason
@@ -425,6 +429,7 @@ class LanguageHandlers(private val context: Context) {
         return mapOf(
             "overallSimilarity" to result.overallSimilarity,
             "correctedPhrase" to result.correctedPhrase,
+            "originalPhrase" to result.originalPhrase,
             "accepted" to result.accepted,
             "reason" to result.reason,
             "wordAnalysis" to result.wordAnalysis.map { word ->
