@@ -143,6 +143,7 @@ class PhoneticSpeechRecognizer {
     required double fontSize,
     required double lineSpace,
     required double endOfScreen,
+    ScrollController? scrollcontroller,
     required void Function({
       int? correctPronouncationListLength,
       int? errorPronouncationListLength,
@@ -447,7 +448,7 @@ class PhoneticSpeechRecognizer {
         correctPronouncationListLength: correctWordsList.length,
         indexedSentenceCount: indexedSentenceCount);
 
-    ScrollController controller = ScrollController();
+    ScrollController controller = scrollcontroller ?? ScrollController();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (controller.hasClients) {
