@@ -580,15 +580,10 @@ class PhoneticSpeechRecognizer {
     if (controller.hasClients) {
       // Calculate which sentence the current word belongs to
       int currentSentence = _getSentenceFromWordIndex(currentWordIndex, words);
-      String currentSentenceText = _getSentenceText(currentSentence, words);
-      
-      log('🎯 SCROLL DEBUG: Current word index: $currentWordIndex');
-      log('📍 SCROLL DEBUG: Current sentence index: $currentSentence');
-      log('📝 SCROLL DEBUG: Current sentence text: "$currentSentenceText"');
       
       // Scroll in advance - add 3-4 lines ahead of current position
       double lineHeight = fontSize * lineSpace;
-      double advanceOffset = lineHeight * 3.5; // 3.5 lines in advance
+      double advanceOffset = lineHeight * 4.0; // 4 lines in advance
       
       // Estimate position based on sentence rather than individual words
       double estimatedPosition = _estimateSentencePosition(
@@ -602,8 +597,8 @@ class PhoneticSpeechRecognizer {
 
       double viewportHeight = controller.position.viewportDimension;
       
-      // Position the advanced content in the middle of the screen
-      double targetPosition = advancedPosition - (viewportHeight * 0.5);
+      // Position the advanced content in the upper portion of the screen
+      double targetPosition = advancedPosition - (viewportHeight * 0.3);
 
       double maxScroll = controller.position.maxScrollExtent;
       targetPosition = targetPosition.clamp(0.0, maxScroll);
@@ -611,31 +606,19 @@ class PhoneticSpeechRecognizer {
       double currentScroll = controller.offset;
       double currentScreenPosition = estimatedPosition - currentScroll;
 
-      log('📏 SCROLL DEBUG: Estimated position: ${estimatedPosition.toStringAsFixed(1)}');
-      log('🚀 SCROLL DEBUG: Advanced position: ${advancedPosition.toStringAsFixed(1)}');
-      log('🎯 SCROLL DEBUG: Target position: ${targetPosition.toStringAsFixed(1)}');
-      log('📱 SCROLL DEBUG: Current scroll: ${currentScroll.toStringAsFixed(1)}');
-      log('📍 SCROLL DEBUG: Screen position: ${currentScreenPosition.toStringAsFixed(1)}');
-
-      // Trigger scroll when current sentence is approaching the bottom half of screen
-      bool shouldScroll = currentScreenPosition > viewportHeight * 0.6 ||
+      // Trigger scroll when current sentence is approaching the middle of screen
+      bool shouldScroll = currentScreenPosition > viewportHeight * 0.5 ||
           currentScreenPosition < viewportHeight * 0.1;
-
-      log('⚡ SCROLL DEBUG: Should scroll: $shouldScroll');
 
       if (shouldScroll && autoScrollSpeed > 0) {
         double distance = (targetPosition - currentScroll).abs();
         int duration = (distance * autoScrollSpeed / 100).clamp(400, 1500).toInt();
-
-        log('🏃 SCROLL DEBUG: Starting scroll animation - Distance: ${distance.toStringAsFixed(1)}, Duration: ${duration}ms');
 
         controller.animateTo(
           targetPosition,
           duration: Duration(milliseconds: duration),
           curve: Curves.easeInOutCubic,
         );
-      } else {
-        log('⏸️ SCROLL DEBUG: No scroll needed - Speed: $autoScrollSpeed');
       }
     }
   });
