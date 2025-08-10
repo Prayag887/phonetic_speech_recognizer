@@ -580,6 +580,15 @@ class PhoneticSpeechRecognizer {
     if (controller.hasClients) {
       // Calculate which sentence the current word belongs to
       int currentSentence = _getSentenceFromWordIndex(currentWordIndex, words);
+      String currentSentenceText = _getSentenceText(currentSentence, words);
+      
+      log('🎯 SCROLL DEBUG: Current word index: $currentWordIndex');
+      log('📍 SCROLL DEBUG: Current sentence index: $currentSentence');
+      log('📝 SCROLL DEBUG: Current sentence text: "$currentSentenceText"');
+      
+      // Scroll in advance - add 3-4 lines ahead of current position
+      double lineHeight = fontSize * lineSpace;
+      double advanceOffset = lineHeight * 3.5; // 3.5 lines in advance
       
       // Estimate position based on sentence rather than individual words
       double estimatedPosition = _estimateSentencePosition(
@@ -587,31 +596,46 @@ class PhoneticSpeechRecognizer {
         fontSize: fontSize,
         lineSpace: lineSpace,
       );
+      
+      // Add the advance offset to scroll ahead
+      double advancedPosition = estimatedPosition + advanceOffset;
 
       double viewportHeight = controller.position.viewportDimension;
       
-      // Position the sentence at the top 1/3 of the screen for better readability
-      double targetPosition = estimatedPosition - (viewportHeight * 0.2);
+      // Position the advanced content in the middle of the screen
+      double targetPosition = advancedPosition - (viewportHeight * 0.5);
 
       double maxScroll = controller.position.maxScrollExtent;
       targetPosition = targetPosition.clamp(0.0, maxScroll);
 
       double currentScroll = controller.offset;
-      double sentenceScreenPosition = estimatedPosition - currentScroll;
+      double currentScreenPosition = estimatedPosition - currentScroll;
 
-      // More aggressive scrolling for sentence-based navigation
-      bool shouldScroll = sentenceScreenPosition < viewportHeight * 0.1 ||
-          sentenceScreenPosition > viewportHeight * 0.8;
+      log('📏 SCROLL DEBUG: Estimated position: ${estimatedPosition.toStringAsFixed(1)}');
+      log('🚀 SCROLL DEBUG: Advanced position: ${advancedPosition.toStringAsFixed(1)}');
+      log('🎯 SCROLL DEBUG: Target position: ${targetPosition.toStringAsFixed(1)}');
+      log('📱 SCROLL DEBUG: Current scroll: ${currentScroll.toStringAsFixed(1)}');
+      log('📍 SCROLL DEBUG: Screen position: ${currentScreenPosition.toStringAsFixed(1)}');
+
+      // Trigger scroll when current sentence is approaching the bottom half of screen
+      bool shouldScroll = currentScreenPosition > viewportHeight * 0.6 ||
+          currentScreenPosition < viewportHeight * 0.1;
+
+      log('⚡ SCROLL DEBUG: Should scroll: $shouldScroll');
 
       if (shouldScroll && autoScrollSpeed > 0) {
         double distance = (targetPosition - currentScroll).abs();
-        int duration = (distance * autoScrollSpeed / 100).clamp(300, 1200).toInt();
+        int duration = (distance * autoScrollSpeed / 100).clamp(400, 1500).toInt();
+
+        log('🏃 SCROLL DEBUG: Starting scroll animation - Distance: ${distance.toStringAsFixed(1)}, Duration: ${duration}ms');
 
         controller.animateTo(
           targetPosition,
           duration: Duration(milliseconds: duration),
           curve: Curves.easeInOutCubic,
         );
+      } else {
+        log('⏸️ SCROLL DEBUG: No scroll needed - Speed: $autoScrollSpeed');
       }
     }
   });
@@ -640,6 +664,20 @@ int _getSentenceFromWordIndex(int wordIndex, List<String> words) {
   }
   
   return sentenceCount;
+}
+
+// Helper method to get the actual sentence text
+String _getSentenceText(int sentenceIndex, List<String> words) {
+  if (sentenceIndex < 0) return "";
+  
+  String fullText = words.join(' ');
+  List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
+  
+  if (sentenceIndex < sentences.length) {
+    return sentences[sentenceIndex].trim();
+  }
+  
+  return "";
 }
 
 // Estimate position based on sentence index
