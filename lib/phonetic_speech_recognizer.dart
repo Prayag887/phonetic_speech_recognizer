@@ -566,68 +566,96 @@ class PhoneticSpeechRecognizer {
     );
   }
 
-  void _scrollToCurrentPosition({
-    required ScrollController controller,
-    required int currentWordIndex,
-    required List<String> words,
-    required double fontSize,
-    required double lineSpace,
-    required int autoScrollSpeed,
-  }) {
-    if (!controller.hasClients || currentWordIndex < 0) return;
+ void _scrollToCurrentPosition({
+  required ScrollController controller,
+  required int currentWordIndex,
+  required List<String> words,
+  required double fontSize,
+  required double lineSpace,
+  required int autoScrollSpeed,
+}) {
+  if (!controller.hasClients || currentWordIndex < 0) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.hasClients) {
-        double estimatedPosition = _estimateWordPosition(
-          wordIndex: currentWordIndex,
-          words: words,
-          fontSize: fontSize,
-          lineSpace: lineSpace,
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (controller.hasClients) {
+      // Calculate which sentence the current word belongs to
+      int currentSentence = _getSentenceFromWordIndex(currentWordIndex, words);
+      
+      // Estimate position based on sentence rather than individual words
+      double estimatedPosition = _estimateSentencePosition(
+        sentenceIndex: currentSentence,
+        fontSize: fontSize,
+        lineSpace: lineSpace,
+      );
+
+      double viewportHeight = controller.position.viewportDimension;
+      
+      // Position the sentence at the top 1/3 of the screen for better readability
+      double targetPosition = estimatedPosition - (viewportHeight * 0.2);
+
+      double maxScroll = controller.position.maxScrollExtent;
+      targetPosition = targetPosition.clamp(0.0, maxScroll);
+
+      double currentScroll = controller.offset;
+      double sentenceScreenPosition = estimatedPosition - currentScroll;
+
+      // More aggressive scrolling for sentence-based navigation
+      bool shouldScroll = sentenceScreenPosition < viewportHeight * 0.1 ||
+          sentenceScreenPosition > viewportHeight * 0.8;
+
+      if (shouldScroll && autoScrollSpeed > 0) {
+        double distance = (targetPosition - currentScroll).abs();
+        int duration = (distance * autoScrollSpeed / 100).clamp(300, 1200).toInt();
+
+        controller.animateTo(
+          targetPosition,
+          duration: Duration(milliseconds: duration),
+          curve: Curves.easeInOutCubic,
         );
-
-        double viewportHeight = controller.position.viewportDimension;
-
-        double targetPosition = estimatedPosition - (viewportHeight * 0.3);
-
-        double maxScroll = controller.position.maxScrollExtent;
-        targetPosition = targetPosition.clamp(0.0, maxScroll);
-
-        double currentScroll = controller.offset;
-        double wordScreenPosition = estimatedPosition - currentScroll;
-
-        bool shouldScroll = wordScreenPosition < viewportHeight * 0.1 ||
-            wordScreenPosition > viewportHeight * 0.7;
-
-        if (shouldScroll && autoScrollSpeed > 0) {
-          double distance = (targetPosition - currentScroll).abs();
-          int duration =
-              (distance * autoScrollSpeed / 100).clamp(200, 1000).toInt();
-
-          controller.animateTo(
-            targetPosition,
-            duration: Duration(milliseconds: duration),
-            curve: Curves.easeInOut,
-          );
-        }
       }
-    });
+    }
+  });
+}
+
+// Helper method to determine which sentence a word index belongs to
+int _getSentenceFromWordIndex(int wordIndex, List<String> words) {
+  if (wordIndex < 0 || wordIndex >= words.length) return 0;
+  
+  int sentenceCount = 0;
+  int currentWordCount = 0;
+  
+  String fullText = words.join(' ');
+  List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
+  
+  for (String sentence in sentences) {
+    List<String> sentenceWords = sentence.trim().split(RegExp(r'\s+'));
+    if (sentence.trim().isEmpty) continue;
+    
+    if (wordIndex < currentWordCount + sentenceWords.length) {
+      return sentenceCount;
+    }
+    
+    currentWordCount += sentenceWords.length;
+    sentenceCount++;
   }
+  
+  return sentenceCount;
+}
 
-  double _estimateWordPosition({
-    required int wordIndex,
-    required List<String> words,
-    required double fontSize,
-    required double lineSpace,
-  }) {
-    if (wordIndex >= words.length || wordIndex < 0) return 0.0;
-
-    // Rough estimation: assume average of 8-10 words per line
-    int estimatedWordsPerLine = 8;
-    int estimatedLineNumber = wordIndex ~/ estimatedWordsPerLine;
-
-    double lineHeight = fontSize * lineSpace;
-    return estimatedLineNumber * lineHeight;
-  }
+// Estimate position based on sentence index
+double _estimateSentencePosition({
+  required int sentenceIndex,
+  required double fontSize,
+  required double lineSpace,
+}) {
+  if (sentenceIndex < 0) return 0.0;
+  
+  // Assume average 3-4 lines per sentence (more realistic for reading passages)
+  double linesPerSentence = 3.5;
+  double lineHeight = fontSize * lineSpace;
+  
+  return sentenceIndex * linesPerSentence * lineHeight;
+}
 
   Widget displayMistakeWords({
     required List<int> errorWordsList,
