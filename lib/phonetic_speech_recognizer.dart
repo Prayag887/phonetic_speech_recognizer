@@ -132,6 +132,47 @@ class PhoneticSpeechRecognizer {
     return sentenceCounts;
   }
 
+  /// Helper method to calculate the position of a word in the rendered text
+  double _calculateWordPosition({
+    required int wordIndex,
+    required List<String> words,
+    required double fontSize,
+    required double lineSpace,
+    required double containerWidth,
+  }) {
+    if (wordIndex >= words.length) return 0.0;
+
+    // Estimate character width (approximately 0.6 * fontSize for most fonts)
+    double charWidth = fontSize * 0.6;
+    double spaceWidth = fontSize * 0.3;
+    double lineHeight = fontSize * lineSpace;
+
+    double currentX = 0.0;
+    double currentY = 0.0;
+    int currentLine = 0;
+
+    for (int i = 0; i <= wordIndex; i++) {
+      String word = words[i];
+      double wordWidth = word.length * charWidth;
+
+      // Check if word fits on current line
+      if (currentX + wordWidth > containerWidth && currentX > 0) {
+        // Move to next line
+        currentLine++;
+        currentY = currentLine * lineHeight;
+        currentX = 0.0;
+      }
+
+      if (i == wordIndex) {
+        break;
+      }
+
+      currentX += wordWidth + spaceWidth;
+    }
+
+    return currentY;
+  }
+
   Widget buildRealTimeHighlightedText({
     required String randomText,
     required String partialText,
@@ -143,7 +184,6 @@ class PhoneticSpeechRecognizer {
     required double fontSize,
     required double lineSpace,
     required double endOfScreen,
-    ScrollController? scrollcontroller,
     required void Function({
       int? correctPronouncationListLength,
       int? errorPronouncationListLength,
@@ -448,15 +488,18 @@ class PhoneticSpeechRecognizer {
         correctPronouncationListLength: correctWordsList.length,
         indexedSentenceCount: indexedSentenceCount);
 
-    ScrollController controller = scrollcontroller ?? ScrollController();
-
+    ScrollController controller = ScrollController();
+    ScrollController secondcontroller = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.hasClients) {
-        if (isAutoScroll && autoScrollSpeed > 0) {
-          startAutoScroll(controller, autoScrollSpeed);
-        } else {
-          controller.jumpTo(controller.offset);
-        }
+      if (controller.hasClients && isAutoScroll) {
+        _scrollToCurrentPosition(
+          controller: controller,
+          currentWordIndex: latestIndex,
+          words: originalWords,
+          fontSize: fontSize,
+          lineSpace: lineSpace,
+          autoScrollSpeed: autoScrollSpeed,
+        );
       }
     });
 
@@ -523,6 +566,69 @@ class PhoneticSpeechRecognizer {
     );
   }
 
+  void _scrollToCurrentPosition({
+    required ScrollController controller,
+    required int currentWordIndex,
+    required List<String> words,
+    required double fontSize,
+    required double lineSpace,
+    required int autoScrollSpeed,
+  }) {
+    if (!controller.hasClients || currentWordIndex < 0) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (controller.hasClients) {
+        double estimatedPosition = _estimateWordPosition(
+          wordIndex: currentWordIndex,
+          words: words,
+          fontSize: fontSize,
+          lineSpace: lineSpace,
+        );
+
+        double viewportHeight = controller.position.viewportDimension;
+
+        double targetPosition = estimatedPosition - (viewportHeight * 0.3);
+
+        double maxScroll = controller.position.maxScrollExtent;
+        targetPosition = targetPosition.clamp(0.0, maxScroll);
+
+        double currentScroll = controller.offset;
+        double wordScreenPosition = estimatedPosition - currentScroll;
+
+        bool shouldScroll = wordScreenPosition < viewportHeight * 0.1 ||
+            wordScreenPosition > viewportHeight * 0.7;
+
+        if (shouldScroll && autoScrollSpeed > 0) {
+          double distance = (targetPosition - currentScroll).abs();
+          int duration =
+              (distance * autoScrollSpeed / 100).clamp(200, 1000).toInt();
+
+          controller.animateTo(
+            targetPosition,
+            duration: Duration(milliseconds: duration),
+            curve: Curves.easeInOut,
+          );
+        }
+      }
+    });
+  }
+
+  double _estimateWordPosition({
+    required int wordIndex,
+    required List<String> words,
+    required double fontSize,
+    required double lineSpace,
+  }) {
+    if (wordIndex >= words.length || wordIndex < 0) return 0.0;
+
+    // Rough estimation: assume average of 8-10 words per line
+    int estimatedWordsPerLine = 8;
+    int estimatedLineNumber = wordIndex ~/ estimatedWordsPerLine;
+
+    double lineHeight = fontSize * lineSpace;
+    return estimatedLineNumber * lineHeight;
+  }
+
   Widget displayMistakeWords({
     required List<int> errorWordsList,
     required List<int> errorPronunciationList,
@@ -535,7 +641,7 @@ class PhoneticSpeechRecognizer {
     required double lineSpace,
   }) {
     int correctWords = correctPronouncationList.length;
-    int mispronounced = errorPronouncationList.length;
+    int mispronounced = errorPronunciationList.length;
     int skippedWords = errorWordsList.length;
 
     int totalSpokenWords = correctWords + mispronounced;
