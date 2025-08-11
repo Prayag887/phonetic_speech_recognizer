@@ -491,7 +491,39 @@ class PhoneticSpeechRecognizer {
     ScrollController controller = ScrollController();
     ScrollController secondcontroller = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.hasClients && isAutoScroll) {
+      if (controller.hasClients && isAutoScroll) {  
+         int currentSentence = _getSentenceFromWordIndex(latestIndex, originalWords);
+         double lineHeight = fontSize * lineSpace;
+        double advanceOffset = lineHeight * 2.0; // 4 lines in advance
+      
+      // Estimate position based on sentence rather than individual words
+      double estimatedPosition = _estimateSentencePosition(
+        sentenceIndex: currentSentence,
+        fontSize: fontSize,
+        lineSpace: lineSpace,
+      );
+        
+
+       double advancedPosition = estimatedPosition + advanceOffset;
+
+      double viewportHeight = controller.position.viewportDimension;
+      // Position the advanced content in the upper portion of the screen
+      double targetPosition = advancedPosition - (viewportHeight * 0.3);
+
+      double maxScroll = controller.position.maxScrollExtent;
+      targetPosition = targetPosition.clamp(0.0, maxScroll);
+
+      double currentScroll = controller.offset;
+
+      
+      double currentScreenPosition = estimatedPosition - currentScroll;
+
+           bool shouldScroll = currentScreenPosition > viewportHeight * 0.5 ||
+          currentScreenPosition < viewportHeight * 0.1;
+
+
+      if (shouldScroll) 
+      {
         _scrollToCurrentPosition(
           controller: controller,
           currentWordIndex: latestIndex,
@@ -499,7 +531,10 @@ class PhoneticSpeechRecognizer {
           fontSize: fontSize,
           lineSpace: lineSpace,
           autoScrollSpeed: autoScrollSpeed,
-        );
+        );  
+      } else {
+        startAutoScroll(controller, autoScrollSpeed);
+      }
       }
     });
 
