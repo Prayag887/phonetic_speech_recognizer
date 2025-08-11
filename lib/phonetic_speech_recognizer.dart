@@ -502,7 +502,7 @@ class PhoneticSpeechRecognizer {
                   margin: EdgeInsets.symmetric(vertical: 2),
                   padding: EdgeInsets.symmetric(horizontal: 2),
                   decoration: BoxDecoration(
-                    color: backgroundColor.withValues(alpha: 0.1),
+                    // color: backgroundColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
