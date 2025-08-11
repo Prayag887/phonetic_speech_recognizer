@@ -583,7 +583,7 @@ class PhoneticSpeechRecognizer {
       
       // Scroll in advance - add 3-4 lines ahead of current position
       double lineHeight = fontSize * lineSpace;
-      double advanceOffset = lineHeight * 4.0; // 4 lines in advance
+      double advanceOffset = lineHeight * 2.0; // 4 lines in advance
       
       // Estimate position based on sentence rather than individual words
       double estimatedPosition = _estimateSentencePosition(
