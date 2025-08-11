@@ -22,6 +22,7 @@ enum PhoneticType {
 class PhoneticSpeechRecognizer {
   final Map<String, List<String>> homophones = Homophones.homophones;
 
+  ScrollController controller = ScrollController();
   // Function words that should always be highlighted as correct
   static const Set<String> functionWords = {'a', 'an', "i"};
 
@@ -202,8 +203,8 @@ class PhoneticSpeechRecognizer {
     List<String> partialWords =
         partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    final int maxLookahead = 2;
-    final int maxSkipLimit = 2;
+    final int maxLookahead = 4;
+    final int maxSkipLimit = 4;
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
@@ -487,54 +488,50 @@ class PhoneticSpeechRecognizer {
         errorPronouncationListLength: errorWordsPronunciationList.length,
         correctPronouncationListLength: correctWordsList.length,
         indexedSentenceCount: indexedSentenceCount);
-
-    ScrollController controller = ScrollController();
     ScrollController secondcontroller = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.hasClients && isAutoScroll) {  
-         int currentSentence = _getSentenceFromWordIndex(latestIndex, originalWords);
-         double lineHeight = fontSize * lineSpace;
-        double advanceOffset = lineHeight * 2.0; // 4 lines in advance
-      
-      // Estimate position based on sentence rather than individual words
-      double estimatedPosition = _estimateSentencePosition(
-        sentenceIndex: currentSentence,
-        fontSize: fontSize,
-        lineSpace: lineSpace,
-      );
-        
+      if (controller.hasClients && isAutoScroll) {
+        int currentSentence =
+            _getSentenceFromWordIndex(latestIndex, originalWords);
+        double lineHeight = fontSize * lineSpace;
+        double advanceOffset = lineHeight * 1.0; // 4 lines in advance
 
-       double advancedPosition = estimatedPosition + advanceOffset;
-
-      double viewportHeight = controller.position.viewportDimension;
-      // Position the advanced content in the upper portion of the screen
-      double targetPosition = advancedPosition - (viewportHeight * 0.3);
-
-      double maxScroll = controller.position.maxScrollExtent;
-      targetPosition = targetPosition.clamp(0.0, maxScroll);
-
-      double currentScroll = controller.offset;
-
-      
-      double currentScreenPosition = estimatedPosition - currentScroll;
-
-           bool shouldScroll = currentScreenPosition > viewportHeight * 0.5 ||
-          currentScreenPosition < viewportHeight * 0.1;
-
-
-      if (shouldScroll) 
-      {
-        _scrollToCurrentPosition(
-          controller: controller,
-          currentWordIndex: latestIndex,
-          words: originalWords,
+        // Estimate position based on sentence rather than individual words
+        double estimatedPosition = _estimateSentencePosition(
+          sentenceIndex: currentSentence,
           fontSize: fontSize,
           lineSpace: lineSpace,
-          autoScrollSpeed: autoScrollSpeed,
-        );  
-      } else {
-        startAutoScroll(controller, autoScrollSpeed);
-      }
+        );
+
+        double advancedPosition = estimatedPosition + advanceOffset;
+
+        double viewportHeight = controller.position.viewportDimension;
+        // Position the advanced content in the upper portion of the screen
+        double targetPosition = advancedPosition - (viewportHeight * 0.3);
+
+        double maxScroll = controller.position.maxScrollExtent;
+        targetPosition = targetPosition.clamp(0.0, maxScroll);
+
+        double currentScroll = controller.offset;
+
+        double currentScreenPosition = estimatedPosition - currentScroll;
+
+        bool shouldScroll = currentScreenPosition < viewportHeight * 0.5;
+
+        print('shouldScroll: $shouldScroll');
+        if (shouldScroll) {
+          _scrollToCurrentPosition(
+            controller: controller,
+            currentWordIndex: latestIndex,
+            words: originalWords,
+            fontSize: fontSize,
+            lineSpace: lineSpace,
+            scrollSpeedPerSecond: 20,
+            // autoScrollSpeed: autoScrollSpeed,
+          );
+        } else {
+          isAutoScroll = false;
+        }
       }
     });
 
@@ -601,117 +598,105 @@ class PhoneticSpeechRecognizer {
     );
   }
 
- void _scrollToCurrentPosition({
-  required ScrollController controller,
-  required int currentWordIndex,
-  required List<String> words,
-  required double fontSize,
-  required double lineSpace,
-  required int autoScrollSpeed,
-}) {
-  if (!controller.hasClients || currentWordIndex < 0) return;
+  void _scrollToCurrentPosition({
+    required ScrollController controller,
+    required int currentWordIndex,
+    required List<String> words,
+    required double fontSize,
+    required double lineSpace,
+    required double scrollSpeedPerSecond, // pixels per second
+  }) {
+    if (!controller.hasClients || currentWordIndex < 0) return;
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (controller.hasClients) {
-      // Calculate which sentence the current word belongs to
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!controller.hasClients) return;
+
       int currentSentence = _getSentenceFromWordIndex(currentWordIndex, words);
-      
-      // Scroll in advance - add 3-4 lines ahead of current position
-      double lineHeight = fontSize * lineSpace;
-      double advanceOffset = lineHeight * 2.0; // 4 lines in advance
-      
-      // Estimate position based on sentence rather than individual words
+
       double estimatedPosition = _estimateSentencePosition(
         sentenceIndex: currentSentence,
         fontSize: fontSize,
         lineSpace: lineSpace,
       );
-      
-      // Add the advance offset to scroll ahead
-      double advancedPosition = estimatedPosition + advanceOffset;
-
-      double viewportHeight = controller.position.viewportDimension;
-      
-      // Position the advanced content in the upper portion of the screen
-      double targetPosition = advancedPosition - (viewportHeight * 0.3);
 
       double maxScroll = controller.position.maxScrollExtent;
-      targetPosition = targetPosition.clamp(0.0, maxScroll);
+      estimatedPosition = estimatedPosition.clamp(0.0, maxScroll);
+      if (estimatedPosition <= 100) {
+        estimatedPosition = 100;
+      }
 
-      double currentScroll = controller.offset;
-      double currentScreenPosition = estimatedPosition - currentScroll;
+      // Cancel any running scroll animation for smoother control
+      controller.jumpTo(controller.offset);
 
-      // Trigger scroll when current sentence is approaching the middle of screen
-      bool shouldScroll = currentScreenPosition > viewportHeight * 0.5 ||
-          currentScreenPosition < viewportHeight * 0.1;
+      // Calculate distance
+      double distance = estimatedPosition - controller.offset;
 
-      if (shouldScroll && autoScrollSpeed > 0) {
-        double distance = (targetPosition - currentScroll).abs();
-        int duration = (distance * autoScrollSpeed / 100).clamp(400, 1500).toInt();
+      // Determine time from speed
+      int durationMs = (distance.abs() / scrollSpeedPerSecond * 1000).round();
 
+      if (durationMs > 0) {
         controller.animateTo(
-          targetPosition,
-          duration: Duration(milliseconds: duration),
-          curve: Curves.easeInOutCubic,
+          estimatedPosition,
+          duration: Duration(milliseconds: durationMs),
+          curve: Curves.linear, // constant speed
         );
       }
-    }
-  });
-}
+    });
+  }
 
 // Helper method to determine which sentence a word index belongs to
-int _getSentenceFromWordIndex(int wordIndex, List<String> words) {
-  if (wordIndex < 0 || wordIndex >= words.length) return 0;
-  
-  int sentenceCount = 0;
-  int currentWordCount = 0;
-  
-  String fullText = words.join(' ');
-  List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
-  
-  for (String sentence in sentences) {
-    List<String> sentenceWords = sentence.trim().split(RegExp(r'\s+'));
-    if (sentence.trim().isEmpty) continue;
-    
-    if (wordIndex < currentWordCount + sentenceWords.length) {
-      return sentenceCount;
+  int _getSentenceFromWordIndex(int wordIndex, List<String> words) {
+    if (wordIndex < 0 || wordIndex >= words.length) return 0;
+
+    int sentenceCount = 0;
+    int currentWordCount = 0;
+
+    String fullText = words.join(' ');
+    List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
+
+    for (String sentence in sentences) {
+      List<String> sentenceWords = sentence.trim().split(RegExp(r'\s+'));
+      if (sentence.trim().isEmpty) continue;
+
+      if (wordIndex < currentWordCount + sentenceWords.length) {
+        return sentenceCount;
+      }
+
+      currentWordCount += sentenceWords.length;
+      sentenceCount++;
     }
-    
-    currentWordCount += sentenceWords.length;
-    sentenceCount++;
+
+    return sentenceCount;
   }
-  
-  return sentenceCount;
-}
 
 // Helper method to get the actual sentence text
-String _getSentenceText(int sentenceIndex, List<String> words) {
-  if (sentenceIndex < 0) return "";
-  
-  String fullText = words.join(' ');
-  List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
-  
-  if (sentenceIndex < sentences.length) {
-    return sentences[sentenceIndex].trim();
+  String _getSentenceText(int sentenceIndex, List<String> words) {
+    if (sentenceIndex < 0) return "";
+
+    String fullText = words.join(' ');
+    List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
+
+    if (sentenceIndex < sentences.length) {
+      return sentences[sentenceIndex].trim();
+    }
+
+    return "";
   }
-  
-  return "";
-}
 
 // Estimate position based on sentence index
-double _estimateSentencePosition({
-  required int sentenceIndex,
-  required double fontSize,
-  required double lineSpace,
-}) {
-  if (sentenceIndex < 0) return 0.0;
-  
-  // Assume average 3-4 lines per sentence (more realistic for reading passages)
-  double linesPerSentence = 3.5;
-  double lineHeight = fontSize * lineSpace;
-  
-  return sentenceIndex * linesPerSentence * lineHeight;
-}
+  double _estimateSentencePosition({
+    required int sentenceIndex,
+    required double fontSize,
+    required double lineSpace,
+  }) {
+    if (sentenceIndex < 0) return 0.0;
+
+    // Assume average 3-4 lines per sentence (more realistic for reading passages)
+    double linesPerSentence = 3;
+    double lineHeight = fontSize * lineSpace;
+
+    return sentenceIndex * linesPerSentence * lineHeight;
+  }
 
   Widget displayMistakeWords({
     required List<int> errorWordsList,
@@ -928,13 +913,6 @@ double _estimateSentencePosition({
     );
   }
 
-  /* does this recognize get the result:
-  {overallSimilarity=1.0, correctedPhrase=The toys are inside the box., accepted=true, reason=Perfect word match - all content words found,
-  wordAnalysis=[{recognizedWord=the, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=toys, confidence=1.0, phoneticContentSimilarity=1.0},
-  {recognizedWord=are, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=inside, confidence=1.0, phoneticContentSimilarity=1.0},
-  {recognizedWord=the, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=box, confidence=1.0, phoneticContentSimilarity=1.0}],
-  summary={totalWords=6, averageConfidence=1.0, averagePhoneticSimilarity=1.0, strongWords=6, weakWords=0}}, ifyes then prnt it as RESULT LIBS: ....
-  */
   static Future<dynamic> recognize({
     required PhoneticType type,
     String? languageCode,
