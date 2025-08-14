@@ -507,7 +507,7 @@ class PhoneticSpeechRecognizer {
        double advancedPosition = estimatedPosition + advanceOffset;
 
       double viewportHeight = controller.position.viewportDimension;
-      // Position the advanced content in the upper portion of the screen
+
       double targetPosition = advancedPosition - (viewportHeight * 0.3);
 
       double maxScroll = controller.position.maxScrollExtent;
@@ -533,7 +533,7 @@ class PhoneticSpeechRecognizer {
           autoScrollSpeed: autoScrollSpeed,
         );  
       } else {
-        startAutoScroll(controller, autoScrollSpeed);
+        startAutoScroll(controller, autoScrollSpeed); 
       }
       }
     });
@@ -1042,4 +1042,432 @@ double _estimateSentencePosition({
 
     return false;
   }
+   Widget buildRealTimeHighlightedTextForConversation({
+    required String randomText,
+    required String partialText,
+    required Color highlightCorrectColor,
+    required Color defaultTextColor,
+    required Color highlightWrongColor,
+    required bool isAutoScroll,
+    required int autoScrollSpeed,
+    required double fontSize,
+    required double lineSpace,
+    required double endOfScreen,
+    required void Function({
+      int? correctPronouncationListLength,
+      int? errorPronouncationListLength,
+      int? errorWordsIndexesLength,
+      int? indexedSentenceCount,
+    }) callback,
+  }) {
+    String cleanText(String text) {
+      return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
+    }
+
+    List<int> sentenceCountLookup = _buildSentenceCountLookup(randomText);
+
+    List<String> originalWords = randomText.split(RegExp(r'\s+'));
+    List<String> targetWords = originalWords.map(cleanText).toList();
+    List<String> partialWords =
+        partialText.split(RegExp(r'\s+')).map(cleanText).toList();
+
+    final int maxLookahead = 2;
+    final int maxSkipLimit = 2;
+    final Set<int> matchedIndexes = {};
+    final Set<int> skippedIndexes = {};
+    final Set<int> mispronounceIndexes = {};
+    final List<String> errorBuffer = [];
+    final int consecutiveErrorThreshold = 2;
+
+    int targetIndex = 0;
+    int lastProcessedIndex = -1;
+
+    List<int> errorWordsIndexList = [];
+    List<int> errorWordsPronunciationList = [];
+    List<int> correctWordsList = [];
+
+    bool isHomophone(String word1, String word2) {
+      if (word1 == word2) return true;
+      if (homophones.containsKey(word1)) {
+        return homophones[word1]!.contains(word2);
+      }
+      return false;
+    }
+
+    bool isMetaphoneMatch(String word1, String word2) {
+      List<String> metaphone1 = DoubleMetaphone.encode(word1);
+      List<String> metaphone2 = DoubleMetaphone.encode(word2);
+
+      return (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[0]) ||
+          (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[1]) ||
+          (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[1]) ||
+          (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[0]);
+    }
+
+    bool isFunctionWord(String word) {
+      return functionWords.contains(word.toLowerCase());
+    }
+
+    double wordSimilarity(String word1, String word2) {
+      if (word1.length <= 3 || word2.length <= 3) {
+        return word1 == word2 ? 1.0 : 0.0;
+      }
+
+      List<List<int>> dp = List.generate(
+        word1.length + 1,
+        (_) => List.filled(word2.length + 1, 0),
+      );
+
+      for (int i = 0; i <= word1.length; i++) {
+        dp[i][0] = i;
+      }
+
+      for (int j = 0; j <= word2.length; j++) {
+        dp[0][j] = j;
+      }
+
+      for (int i = 1; i <= word1.length; i++) {
+        for (int j = 1; j <= word2.length; j++) {
+          int cost = word1[i - 1] == word2[j - 1] ? 0 : 1;
+          dp[i][j] = [
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + cost
+          ].reduce((a, b) => a < b ? a : b);
+        }
+      }
+
+      int distance = dp[word1.length][word2.length];
+      int maxLength = word1.length > word2.length ? word1.length : word2.length;
+      return 1.0 - (distance / maxLength);
+    }
+
+    bool isExactMatch(String word1, String word2) {
+      if (isFunctionWord(word1) && isFunctionWord(word2)) {
+        return true;
+      }
+
+      return word1 == word2 ||
+          isHomophone(word1, word2) ||
+          isMetaphoneMatch(word1, word2);
+    }
+
+    bool isSimilarMatch(String word1, String word2) {
+      if (isFunctionWord(word1) || isFunctionWord(word2)) {
+        return false;
+      }
+
+      if (isHomophone(word1, word2) || isMetaphoneMatch(word1, word2)) {
+        return false;
+      }
+
+      if (word1.length >= 4 && word2.length >= 4) {
+        double similarity = wordSimilarity(word1, word2);
+        return similarity > 0.75 && similarity < 1.0;
+      }
+      return false;
+    }
+
+    bool wordsMatch(String word1, String word2) {
+      if (isFunctionWord(word1) && isFunctionWord(word2)) {
+        return true;
+      }
+
+      if (isExactMatch(word1, word2)) return true;
+
+      if (word1.length >= 4 && word2.length >= 4) {
+        return wordSimilarity(word1, word2) > 0.75;
+      }
+      return false;
+    }
+
+    int findPatternInTarget(List<String> pattern, int startIndex) {
+      if (pattern.isEmpty) return -1;
+
+      for (int i = 0; i <= targetWords.length - pattern.length; i++) {
+        bool match = true;
+        for (int j = 0; j < pattern.length; j++) {
+          if (!wordsMatch(pattern[j], targetWords[i + j])) {
+            match = false;
+            break;
+          }
+        }
+
+        if (match) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    for (int partialIndex = 0;
+        partialIndex < partialWords.length;
+        partialIndex++) {
+      String partialWord = partialWords[partialIndex];
+      bool found = false;
+
+      for (int i = targetIndex;
+          i < targetIndex + maxLookahead && i < targetWords.length;
+          i++) {
+        if (isExactMatch(targetWords[i], partialWord)) {
+          matchedIndexes.add(i);
+          lastProcessedIndex = i;
+          targetIndex = i + 1;
+          found = true;
+          errorBuffer.clear();
+          break;
+        } else if (isSimilarMatch(targetWords[i], partialWord)) {
+          mispronounceIndexes.add(i);
+          lastProcessedIndex = i;
+          targetIndex = i + 1;
+          found = true;
+          errorBuffer.clear();
+          break;
+        }
+      }
+
+      if (!found) {
+        errorBuffer.add(partialWord);
+
+        if (errorBuffer.length >= consecutiveErrorThreshold) {
+          int newIndex = findPatternInTarget(errorBuffer, 0);
+
+          if (newIndex >= 0) {
+            int oldTargetIndex = targetIndex;
+            int skipCount = newIndex - oldTargetIndex;
+
+            if (skipCount <= maxSkipLimit) {
+              for (int j = 0; j < errorBuffer.length; j++) {
+                if (isExactMatch(errorBuffer[j], targetWords[newIndex + j])) {
+                  matchedIndexes.add(newIndex + j);
+                } else if (isSimilarMatch(
+                    errorBuffer[j], targetWords[newIndex + j])) {
+                  mispronounceIndexes.add(newIndex + j);
+                } else {
+                  matchedIndexes.add(newIndex + j);
+                }
+              }
+
+              if (skipCount > 0) {
+                for (int i = oldTargetIndex; i < newIndex; i++) {
+                  skippedIndexes.add(i);
+                }
+              }
+
+              lastProcessedIndex = newIndex + errorBuffer.length - 1;
+              targetIndex = newIndex + errorBuffer.length;
+              errorBuffer.clear();
+            } else {
+              while (errorBuffer.length > consecutiveErrorThreshold - 1) {
+                errorBuffer.removeAt(0);
+              }
+            }
+          } else {
+            while (errorBuffer.length > consecutiveErrorThreshold - 1) {
+              errorBuffer.removeAt(0);
+            }
+          }
+        }
+      }
+    }
+
+    void autoHighlightFunctionalWords() {
+      List<int> allMatchedIndexes = [...matchedIndexes, ...mispronounceIndexes];
+      allMatchedIndexes.sort();
+
+      for (int i = 0; i < allMatchedIndexes.length - 1; i++) {
+        int currentIndex = allMatchedIndexes[i];
+        int nextIndex = allMatchedIndexes[i + 1];
+
+        for (int j = currentIndex + 1; j < nextIndex; j++) {
+          if (isFunctionWord(targetWords[j]) &&
+              !matchedIndexes.contains(j) &&
+              !mispronounceIndexes.contains(j)) {
+            matchedIndexes.add(j);
+            skippedIndexes.remove(j);
+          }
+        }
+      }
+
+      if (allMatchedIndexes.isNotEmpty) {
+        int firstMatchedIndex = allMatchedIndexes.first;
+        for (int i = 0; i < firstMatchedIndex; i++) {
+          if (isFunctionWord(targetWords[i]) &&
+              !matchedIndexes.contains(i) &&
+              !mispronounceIndexes.contains(i)) {
+            if (firstMatchedIndex - i <= 2) {
+              matchedIndexes.add(i);
+              skippedIndexes.remove(i);
+            }
+          }
+        }
+      }
+    }
+
+    autoHighlightFunctionalWords();
+
+    for (int index = 0; index < originalWords.length; index++) {
+      if (matchedIndexes.contains(index)) {
+        // Correctly pronounced
+        correctWordsList.add(index);
+        log('Correct word at index $index: "${originalWords[index]}"');
+      } else if (mispronounceIndexes.contains(index)) {
+        // Incorrectly pronounced
+        errorWordsPronunciationList.add(index);
+        log('Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+      } else if (skippedIndexes.contains(index)) {
+        // Skipped/not attempted
+        errorWordsIndexList.add(index);
+        log('Skipped word at index $index: "${originalWords[index]}"');
+      } else {
+        // Unaccounted for - this shouldn't happen if your logic is complete
+        errorWordsIndexList.add(index);
+        // log('Unaccounted word at index $index: "${originalWords[index]}"');
+      }
+    }
+
+    int latestIndex = -1;
+
+    for (int index in matchedIndexes) {
+      if (index > latestIndex) latestIndex = index;
+    }
+    for (int index in mispronounceIndexes) {
+      if (index > latestIndex) latestIndex = index;
+    }
+    for (int index in skippedIndexes) {
+      if (index > latestIndex) latestIndex = index;
+    }
+
+    if (lastProcessedIndex > latestIndex) {
+      latestIndex = lastProcessedIndex;
+    }
+
+    int indexedSentenceCount = 0;
+    if (latestIndex >= 0 && latestIndex < sentenceCountLookup.length) {
+      indexedSentenceCount = sentenceCountLookup[latestIndex];
+    }
+
+    errorWordsIndexes = errorWordsIndexList;
+    errorPronouncationList = errorWordsPronunciationList;
+    correctPronouncationList = correctWordsList;
+
+    callback(
+        errorWordsIndexesLength: errorWordsIndexList.length,
+        errorPronouncationListLength: errorWordsPronunciationList.length,
+        correctPronouncationListLength: correctWordsList.length,
+        indexedSentenceCount: indexedSentenceCount);
+
+    ScrollController controller = ScrollController();
+    ScrollController secondcontroller = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (controller.hasClients && isAutoScroll) {  
+         int currentSentence = _getSentenceFromWordIndex(latestIndex, originalWords);
+         double lineHeight = fontSize * lineSpace;
+        double advanceOffset = lineHeight * 2.0; // 4 lines in advance
+      
+      // Estimate position based on sentence rather than individual words
+      double estimatedPosition = _estimateSentencePosition(
+        sentenceIndex: currentSentence,
+        fontSize: fontSize,
+        lineSpace: lineSpace,
+      );
+        
+
+       double advancedPosition = estimatedPosition + advanceOffset;
+
+      double viewportHeight = controller.position.viewportDimension;
+
+      double targetPosition = advancedPosition - (viewportHeight * 0.3);
+
+      double maxScroll = controller.position.maxScrollExtent;
+      targetPosition = targetPosition.clamp(0.0, maxScroll);
+
+      double currentScroll = controller.offset;
+
+      
+      double currentScreenPosition = estimatedPosition - currentScroll;
+
+           bool shouldScroll = currentScreenPosition > viewportHeight * 0.5 ||
+          currentScreenPosition < viewportHeight * 0.1;
+
+
+      if (shouldScroll) 
+      {
+        _scrollToCurrentPosition(
+          controller: controller,
+          currentWordIndex: latestIndex,
+          words: originalWords,
+          fontSize: fontSize,
+          lineSpace: lineSpace,
+          autoScrollSpeed: autoScrollSpeed,
+        );  
+      } else {
+        startAutoScroll(controller, autoScrollSpeed); 
+      }
+      }
+    });
+
+    return SingleChildScrollView(
+      controller: controller,
+      child: Padding(
+        padding: EdgeInsets.only(top: endOfScreen),
+        child: RichText(
+          text: TextSpan(
+            children: List.generate(originalWords.length, (index) {
+              String word = originalWords[index];
+              Color wordColor;
+              Color borderColor;
+              Color backgroundColor = Color(0xFFFFFFFF);
+              FontWeight weight = FontWeight.normal;
+
+              if (matchedIndexes.contains(index)) {
+                wordColor = highlightCorrectColor;
+                backgroundColor = highlightCorrectColor;
+                borderColor = highlightCorrectColor;
+              } else if (mispronounceIndexes.contains(index)) {
+                wordColor = highlightCorrectColor;
+                borderColor = highlightCorrectColor;
+                backgroundColor = highlightCorrectColor;
+                weight = FontWeight.normal;
+              } else if (skippedIndexes.contains(index)) {
+                wordColor = highlightCorrectColor;
+                backgroundColor = highlightCorrectColor;
+                borderColor = Colors.blue;
+                weight = FontWeight.normal;
+              } else if (index < targetIndex) {
+                wordColor = highlightWrongColor;
+                borderColor = highlightWrongColor;
+                backgroundColor = highlightWrongColor;
+                weight = FontWeight.normal;
+              } else {
+                wordColor = defaultTextColor;
+                borderColor = Color(0xFFFFFFFF);
+              }
+
+              return WidgetSpan(
+                child: Container(
+                  margin: EdgeInsets.symmetric(vertical: 2),
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  decoration: BoxDecoration(
+                    color: backgroundColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    word,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      height: lineSpace,
+                      fontWeight: weight,
+                      color: wordColor,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
+    );
+  }
+
 }

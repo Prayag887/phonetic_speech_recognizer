@@ -41,7 +41,10 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var isProcessing: Boolean = false
   private var activity: Activity? = null
   private var activityBinding: ActivityPluginBinding? = null
-
+  private var audioManager: AudioManager? = null
+  private var originalStreamVolumes = mutableMapOf<Int, Int>()
+  private var wasMuted = false
+  private var originalRingerMode = AudioManager.RINGER_MODE_NORMAL
   // Create a single instance of LanguageHandlers that will be reused
   private lateinit var languageHandlers: LanguageHandlers
 
@@ -57,7 +60,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     // Initialize LanguageHandlers with plugin instance reference
     languageHandlers = LanguageHandlers(context)
     languageHandlers.setPluginInstance(this)
-
+audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     // Pre-initialize SpeechRecognizer
     initializeSpeechRecognizer()
   }
