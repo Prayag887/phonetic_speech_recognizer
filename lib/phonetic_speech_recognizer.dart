@@ -7,17 +7,6 @@ import 'package:flutter/services.dart';
 
 import 'double_metaphone.dart';
 import 'homophones.dart';
-class WordMatchStatus {
-  final String word;
-  final bool isMatched;
-  final bool isSpoken;
-
-  WordMatchStatus({
-    required this.word,
-    required this.isMatched,
-    required this.isSpoken,
-  });
-}
 
 enum PhoneticType {
   alphabet,
@@ -183,94 +172,239 @@ class PhoneticSpeechRecognizer {
 
     return currentY;
   }
-List<WordMatchStatus> getConversationWordMatching({
-  required String expectedText,
-  required String spokenText,
-}) {
-  if (expectedText.isEmpty) return [];
+Widget buildConversationHighlightedText({
+    required String expectedText,
+    required String partialText,
+    Color highlightCorrectColor = const Color(0xFF008000), // Green
+    Color highlightWrongColor = const Color(0xFF800000), // Red
+    Color defaultTextColor = Colors.black,
+    double fontSize = 15.0,
+    FontWeight fontWeight = FontWeight.w300,
+    void Function({
+      int? correctCount,
+      int? errorCount,
+      int? skippedCount,
+    })? callback,
+  }) {
+    String cleanText(String text) {
+      return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
+    }
 
-  // Clean and split the texts
-  String cleanText(String text) {
-    return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
-  }
+    List<String> originalWords = expectedText.split(RegExp(r'\s+'));
+    List<String> targetWords = originalWords.map(cleanText).toList();
+    List<String> partialWords = partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-  List<String> originalWords = expectedText.split(RegExp(r'\s+'));
-  List<String> targetWords = originalWords.map(cleanText).toList();
-  List<String> spokenWords = spokenText.split(RegExp(r'\s+')).map(cleanText).toList();
+    final Set<int> matchedIndexes = {};
+    final Set<int> mispronounceIndexes = {};
+    final Set<int> skippedIndexes = {};
 
-  // Remove empty strings
-  targetWords = targetWords.where((w) => w.isNotEmpty).toList();
-  spokenWords = spokenWords.where((w) => w.isNotEmpty).toList();
+    int targetIndex = 0;
 
-  if (targetWords.isEmpty) return [];
+    List<int> correctList = [];
+    List<int> errorList = [];
+    List<int> skippedList = [];
 
-  // Initialize result list
-  List<WordMatchStatus> result = [];
+    bool isHomophone(String word1, String word2) {
+      if (word1 == word2) return true;
+      if (homophones.containsKey(word1)) {
+        return homophones[word1]!.contains(word2);
+      }
+      return false;
+    }
 
-  // For real-time matching, we'll use a more lenient approach
-  Set<int> spokenWordsUsed = {};
+    bool isMetaphoneMatch(String word1, String word2) {
+      List<String> metaphone1 = DoubleMetaphone.encode(word1);
+      List<String> metaphone2 = DoubleMetaphone.encode(word2);
 
-  for (int i = 0; i < targetWords.length; i++) {
-    String targetWord = targetWords[i];
-    bool isMatched = false;
-    bool isSpoken = false;
+      return (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[0]) ||
+          (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[1]) ||
+          (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[1]) ||
+          (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[0]);
+    }
 
-    // Strategy 1: Sequential matching (for real-time speech)
-    if (i < spokenWords.length && !spokenWordsUsed.contains(i)) {
-      String currentSpokenWord = spokenWords[i];
-      
-      if (_wordsMatchConversation(targetWord, currentSpokenWord)) {
-        isMatched = true;
-        isSpoken = true;
-        spokenWordsUsed.add(i);
-      } else {
-        isSpoken = true; // Word position has been spoken, but doesn't match
+    bool isFunctionWord(String word) {
+      return functionWords.contains(word.toLowerCase());
+    }
+
+    double wordSimilarity(String word1, String word2) {
+      if (word1.length <= 3 || word2.length <= 3) {
+        return word1 == word2 ? 1.0 : 0.0;
+      }
+
+      List<List<int>> dp = List.generate(
+        word1.length + 1,
+        (_) => List.filled(word2.length + 1, 0),
+      );
+
+      for (int i = 0; i <= word1.length; i++) {
+        dp[i][0] = i;
+      }
+
+      for (int j = 0; j <= word2.length; j++) {
+        dp[0][j] = j;
+      }
+
+      for (int i = 1; i <= word1.length; i++) {
+        for (int j = 1; j <= word2.length; j++) {
+          int cost = word1[i - 1] == word2[j - 1] ? 0 : 1;
+          dp[i][j] = [
+            dp[i - 1][j] + 1,
+            dp[i][j - 1] + 1,
+            dp[i - 1][j - 1] + cost
+          ].reduce((a, b) => a < b ? a : b);
+        }
+      }
+
+      int distance = dp[word1.length][word2.length];
+      int maxLength = word1.length > word2.length ? word1.length : word2.length;
+      return 1.0 - (distance / maxLength);
+    }
+
+    bool isExactMatch(String word1, String word2) {
+      if (isFunctionWord(word1) && isFunctionWord(word2)) {
+        return true;
+      }
+
+      return word1 == word2 ||
+          isHomophone(word1, word2) ||
+          isMetaphoneMatch(word1, word2);
+    }
+
+    bool isSimilarMatch(String word1, String word2) {
+      if (isFunctionWord(word1) || isFunctionWord(word2)) {
+        return false;
+      }
+
+      if (isHomophone(word1, word2) || isMetaphoneMatch(word1, word2)) {
+        return false;
+      }
+
+      if (word1.length >= 4 && word2.length >= 4) {
+        double similarity = wordSimilarity(word1, word2);
+        return similarity > 0.75 && similarity < 1.0;
+      }
+      return false;
+    }
+
+    // Reuse existing matching functions
+    for (int partialIndex = 0; partialIndex < partialWords.length; partialIndex++) {
+      String partialWord = partialWords[partialIndex];
+      bool found = false;
+
+      for (int i = targetIndex; i < targetWords.length; i++) {
+        if (isExactMatch(targetWords[i], partialWord)) {
+          matchedIndexes.add(i);
+          targetIndex = i + 1;
+          found = true;
+          break;
+        } else if (isSimilarMatch(targetWords[i], partialWord)) {
+          mispronounceIndexes.add(i);
+          targetIndex = i + 1;
+          found = true;
+          break;
+        }
+      }
+
+      if (!found && targetIndex < targetWords.length) {
+        skippedIndexes.add(targetIndex);
+        targetIndex++;
       }
     }
-    
-    // Strategy 2: If no sequential match, look for the word anywhere in spoken text
-    if (!isMatched && spokenWords.isNotEmpty) {
-      for (int j = 0; j < spokenWords.length; j++) {
-        if (!spokenWordsUsed.contains(j)) {
-          if (_wordsMatchConversation(targetWord, spokenWords[j])) {
-            isMatched = true;
-            isSpoken = true;
-            spokenWordsUsed.add(j);
-            break;
+
+    void autoHighlightFunctionalWords() {
+      List<int> allMatchedIndexes = [...matchedIndexes, ...mispronounceIndexes];
+      allMatchedIndexes.sort();
+
+      for (int i = 0; i < allMatchedIndexes.length - 1; i++) {
+        int currentIndex = allMatchedIndexes[i];
+        int nextIndex = allMatchedIndexes[i + 1];
+
+        for (int j = currentIndex + 1; j < nextIndex; j++) {
+          if (isFunctionWord(targetWords[j]) &&
+              !matchedIndexes.contains(j) &&
+              !mispronounceIndexes.contains(j)) {
+            matchedIndexes.add(j);
+            skippedIndexes.remove(j);
           }
         }
       }
-      
-      // If we haven't found a match but we've spoken past this position
-      if (!isSpoken && i < spokenWords.length) {
-        isSpoken = true;
-      }
-    }
 
-    // Strategy 3: Check if we're currently speaking this word (partial matching)
-    if (!isMatched && !isSpoken && spokenWords.isNotEmpty) {
-      String lastSpokenWord = spokenWords.last;
-      
-      // Check if the last spoken word could be a partial match
-      if (_isPartialMatch(targetWord, lastSpokenWord) || 
-          _isPartialMatch(lastSpokenWord, targetWord)) {
-        isSpoken = true;
-        // Only mark as matched if similarity is high enough
-        if (_calculateWordSimilarity(targetWord, lastSpokenWord) > 0.7) {
-          isMatched = true;
+      if (allMatchedIndexes.isNotEmpty) {
+        int firstMatchedIndex = allMatchedIndexes.first;
+        for (int i = 0; i < firstMatchedIndex; i++) {
+          if (isFunctionWord(targetWords[i]) &&
+              !matchedIndexes.contains(i) &&
+              !mispronounceIndexes.contains(i)) {
+            if (firstMatchedIndex - i <= 2) {
+              matchedIndexes.add(i);
+              skippedIndexes.remove(i);
+            }
+          }
         }
       }
     }
 
-    result.add(WordMatchStatus(
-      word: originalWords[i], 
-      isMatched: isMatched,
-      isSpoken: isSpoken,
-    ));
-  }
+    autoHighlightFunctionalWords();
 
-  return result;
-}
+    // Classify indices
+    for (int index = 0; index < originalWords.length; index++) {
+      if (matchedIndexes.contains(index)) {
+        correctList.add(index);
+      } else if (mispronounceIndexes.contains(index)) {
+        errorList.add(index);
+      } else {
+        skippedList.add(index);
+      }
+    }
+
+    // Invoke callback if provided
+    callback?.call(
+      correctCount: correctList.length,
+      errorCount: errorList.length,
+      skippedCount: skippedList.length,
+    );
+
+    // Build RichText spans
+    List<TextSpan> textSpans = [];
+    for (int i = 0; i < originalWords.length; i++) {
+      String word = originalWords[i];
+      Color wordColor = defaultTextColor;
+
+      if (matchedIndexes.contains(i)) {
+        wordColor = highlightCorrectColor;
+      } else if (mispronounceIndexes.contains(i)) {
+        wordColor = highlightWrongColor;
+      } // Unspoken/skipped remain default
+
+      textSpans.add(
+        TextSpan(
+          text: word,
+          style: TextStyle(
+            color: wordColor,
+            fontSize: fontSize,
+            fontWeight: fontWeight,
+          ),
+        ),
+      );
+
+      if (i < originalWords.length - 1) {
+        textSpans.add(
+          TextSpan(
+            text: ' ',
+            style: TextStyle(
+              color: defaultTextColor,
+              fontSize: fontSize,
+              fontWeight: fontWeight,
+            ),
+          ),
+        );
+      }
+    }
+
+    return RichText(
+      text: TextSpan(children: textSpans),
+    );
+  }
   Widget buildRealTimeHighlightedText({
     required String randomText,
     required String partialText,
@@ -1140,121 +1274,4 @@ double _estimateSentencePosition({
 
     return false;
   }
-  // Add this function to your PhoneticSpeechRecognizer class
-
-
-
-// Helper function for conversation word matching
-bool _wordsMatchConversation(String word1, String word2) {
-  if (word1.isEmpty || word2.isEmpty) return false;
-  
-  // Exact match
-  if (word1 == word2) return true;
-  
-  // Function words are always considered correct
-  if (_isFunctionWordConversation(word1) && _isFunctionWordConversation(word2)) {
-    return true;
-  }
-  
-  // Check homophones
-  if (_isHomophoneMatch(word1, word2)) return true;
-  
-  // Check metaphone (phonetic similarity)
-  if (_isMetaphoneMatchConversation(word1, word2)) return true;
-  
-  // Similarity check for longer words
-  if (word1.length >= 4 && word2.length >= 4) {
-    return _calculateWordSimilarity(word1, word2) > 0.8;
-  }
-  
-  // For shorter words, be more strict
-  if (word1.length <= 3 && word2.length <= 3) {
-    return _calculateWordSimilarity(word1, word2) > 0.9;
-  }
-  
-  return false;
-}
-
-// Check if word is a function word (articles, prepositions, etc.)
-bool _isFunctionWordConversation(String word) {
-  const Set<String> functionWords = {
-    'a', 'an', 'the', 'i', 'you', 'he', 'she', 'it', 'we', 'they',
-    'am', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
-    'in', 'on', 'at', 'by', 'for', 'with', 'to', 'from', 'of', 'and', 'or', 'but'
-  };
-  
-  return functionWords.contains(word.toLowerCase());
-}
-
-// Check for homophone matches
-bool _isHomophoneMatch(String word1, String word2) {
-  if (word1 == word2) return true;
-  if (homophones.containsKey(word1)) {
-    return homophones[word1]!.contains(word2);
-  }
-  if (homophones.containsKey(word2)) {
-    return homophones[word2]!.contains(word1);
-  }
-  return false;
-}
-
-// Check metaphone matching for conversation
-bool _isMetaphoneMatchConversation(String word1, String word2) {
-  try {
-    List<String> metaphone1 = DoubleMetaphone.encode(word1);
-    List<String> metaphone2 = DoubleMetaphone.encode(word2);
-
-    return (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[0]) ||
-        (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[1]) ||
-        (metaphone1[0].isNotEmpty && metaphone1[0] == metaphone2[1]) ||
-        (metaphone1[1].isNotEmpty && metaphone1[1] == metaphone2[0]);
-  } catch (e) {
-    return false;
-  }
-}
-
-// Check if one word is a partial match of another (for words being spoken)
-bool _isPartialMatch(String fullWord, String partialWord) {
-  if (partialWord.length < 2) return false;
-  
-  return fullWord.startsWith(partialWord) || 
-         partialWord.startsWith(fullWord) ||
-         fullWord.contains(partialWord) ||
-         partialWord.contains(fullWord);
-}
-
-// Calculate word similarity using Levenshtein distance
-double _calculateWordSimilarity(String word1, String word2) {
-  if (word1 == word2) return 1.0;
-  if (word1.isEmpty || word2.isEmpty) return 0.0;
-
-  List<List<int>> dp = List.generate(
-    word1.length + 1,
-    (_) => List.filled(word2.length + 1, 0),
-  );
-
-  for (int i = 0; i <= word1.length; i++) {
-    dp[i][0] = i;
-  }
-
-  for (int j = 0; j <= word2.length; j++) {
-    dp[0][j] = j;
-  }
-
-  for (int i = 1; i <= word1.length; i++) {
-    for (int j = 1; j <= word2.length; j++) {
-      int cost = word1[i - 1] == word2[j - 1] ? 0 : 1;
-      dp[i][j] = [
-        dp[i - 1][j] + 1,      // deletion
-        dp[i][j - 1] + 1,      // insertion
-        dp[i - 1][j - 1] + cost // substitution
-      ].reduce((a, b) => a < b ? a : b);
-    }
-  }
-
-  int distance = dp[word1.length][word2.length];
-  int maxLength = word1.length > word2.length ? word1.length : word2.length;
-  return 1.0 - (distance / maxLength);
-}
 }
