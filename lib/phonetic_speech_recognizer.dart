@@ -738,13 +738,6 @@ class PhoneticSpeechRecognizer {
     );
   }
 
-  /* does this recognize get the result:
-  {overallSimilarity=1.0, correctedPhrase=The toys are inside the box., accepted=true, reason=Perfect word match - all content words found,
-  wordAnalysis=[{recognizedWord=the, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=toys, confidence=1.0, phoneticContentSimilarity=1.0},
-  {recognizedWord=are, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=inside, confidence=1.0, phoneticContentSimilarity=1.0},
-  {recognizedWord=the, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=box, confidence=1.0, phoneticContentSimilarity=1.0}],
-  summary={totalWords=6, averageConfidence=1.0, averagePhoneticSimilarity=1.0, strongWords=6, weakWords=0}}, ifyes then prnt it as RESULT LIBS: ....
-  */
   static Future<dynamic> recognize({
     required PhoneticType type,
     String? languageCode,

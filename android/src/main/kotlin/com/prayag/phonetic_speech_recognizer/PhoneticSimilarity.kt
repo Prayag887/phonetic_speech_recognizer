@@ -146,32 +146,63 @@ class PhoneticSimilarity {
         val results = mutableListOf<WordAnalysisResult>()
         val usedExpectedWords = mutableSetOf<Int>()
 
+        // Debug initial state
+        println("=== WORD ANALYSIS DEBUG ===")
+        println("Expected words: $expectedWords")
+        println("Recognized words: $recognizedWords")
+        println("Word results count: ${wordResults.size}")
+
+        wordResults.forEachIndexed { i, result ->
+            println("WordResult[$i]: word='${result.word}', bestMatch='${result.bestMatch}', bestScore=${result.bestScore}")
+        }
+
         // Create reverse mapping from recognized words to expected words
         val recognizedToExpectedMap = mutableMapOf<Int, Int>()
 
+        // FIXED: Only map if the recognized word actually exists in expected words
         for (i in wordResults.indices) {
             val result = wordResults[i]
             if (result.bestMatch != null) {
                 // Find which recognized word(s) this expected word matched with
-                val matchedWords = result.bestMatch.split(" ")
+                val matchedWords = result.bestMatch.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
+                println("Processing expected word '${result.word}' with matched words: $matchedWords")
+
                 for (j in recognizedWords.indices) {
-                    if (matchedWords.contains(recognizedWords[j]) && j !in recognizedToExpectedMap) {
+                    val recognizedWord = recognizedWords[j]
+
+                    // CRITICAL FIX: Only map if the recognized word actually exists in expected words
+                    if (matchedWords.contains(recognizedWord) &&
+                        j !in recognizedToExpectedMap &&
+                        expectedWords.any { it.equals(recognizedWord, ignoreCase = true) }) {
+
                         recognizedToExpectedMap[j] = i
                         usedExpectedWords.add(i)
+                        println("  → Mapped recognized[$j]='$recognizedWord' to expected[$i]='${result.word}'")
                         break
+                    } else if (matchedWords.contains(recognizedWord) && j !in recognizedToExpectedMap) {
+                        // This recognized word was matched but doesn't exist in expected words
+                        println("  ⚠️ BLOCKED mapping: recognized[$j]='$recognizedWord' not found in expected words")
                     }
                 }
             }
         }
+
+        println("Final mapping: $recognizedToExpectedMap")
+        println("Used expected words: $usedExpectedWords")
 
         // Generate results for each recognized word
         for (j in recognizedWords.indices) {
             val recognizedWord = recognizedWords[j]
             val recognizedPhonetic = doubleMetaphone.doubleMetaphone(recognizedWord)
 
+            println("\n--- Processing recognized word[$j]: '$recognizedWord' ---")
+
             if (j in recognizedToExpectedMap) {
                 // This recognized word has a match in expected words
-                val matchedResult = wordResults[recognizedToExpectedMap[j]!!]
+                val expectedIndex = recognizedToExpectedMap[j]!!
+                val matchedResult = wordResults[expectedIndex]
+
+                println("  MATCHED: '$recognizedWord' → expected[$expectedIndex]='${matchedResult.word}'")
 
                 // Calculate confidence (combination of all algorithms)
                 val confidence = calculateWordConfidence(
@@ -186,6 +217,8 @@ class PhoneticSimilarity {
                     recognizedWord = recognizedWord
                 )
 
+                println("  Confidence: $confidence, Phonetic similarity: $phoneticContentSimilarity")
+
                 results.add(WordAnalysisResult(
                     recognizedWord = recognizedWord,
                     confidence = confidence,
@@ -193,13 +226,140 @@ class PhoneticSimilarity {
                 ))
             } else {
                 // This recognized word doesn't match any expected word
-                // Find the best possible match for confidence calculation
+                println("  UNMATCHED: '$recognizedWord' - finding best phonetic match...")
+
+                var bestExpectedMatch = ""
+                var bestPhoneticScore = 0.0
+                var bestExpectedIndex = -1
+
+                for (k in expectedWords.indices) {
+                    if (k in usedExpectedWords) {
+                        println("    Skipping expected[$k]='${expectedWords[k]}' (already used)")
+                        continue
+                    }
+
+                    val expectedPhonetic = doubleMetaphone.doubleMetaphone(expectedWords[k])
+                    val phoneticScore = calculateMetaphoneSimilarity(recognizedPhonetic, expectedPhonetic)
+
+                    println("    vs expected[$k]='${expectedWords[k]}': phonetic score = $phoneticScore")
+
+                    if (phoneticScore > bestPhoneticScore) {
+                        bestPhoneticScore = phoneticScore
+                        bestExpectedMatch = expectedWords[k]
+                        bestExpectedIndex = k
+                    }
+                }
+
+                println("  Best match: '$bestExpectedMatch' (index: $bestExpectedIndex) with score: $bestPhoneticScore")
+
+                // FIXED: Apply significant penalty for unmatched words (especially extra words like "not")
+                val baseConfidence = if (bestExpectedMatch.isNotEmpty()) {
+                    calculateWordConfidence(bestExpectedMatch, recognizedWord, bestPhoneticScore)
+                } else {
+                    0.3 // Base confidence for unmatched words
+                }
+
+                // Apply significant penalty for extra words that don't exist in expected
+                val extraWordPenalty = if (expectedWords.any { it.equals(recognizedWord, ignoreCase = true) }) {
+                    0.8 // Less penalty if word exists in expected but wasn't mapped
+                } else {
+                    0.4 // Heavy penalty for completely extra words like "not"
+                }
+
+                val confidence = minOf(baseConfidence * extraWordPenalty, 0.6) // Cap at 0.6 for unmatched words
+
+                val phoneticContentSimilarity = if (bestExpectedMatch.isNotEmpty()) {
+                    val baseSimilarity = calculatePurePhoneticSimilarity(bestExpectedMatch, recognizedWord)
+                    baseSimilarity * extraWordPenalty // Apply same penalty
+                } else {
+                    0.2 // Low similarity for unmatched words
+                }
+
+                println("  Final confidence: $confidence (base: $baseConfidence, penalty: $extraWordPenalty)")
+                println("  Phonetic similarity: $phoneticContentSimilarity")
+
+                results.add(WordAnalysisResult(
+                    recognizedWord = recognizedWord,
+                    confidence = confidence,
+                    phoneticContentSimilarity = phoneticContentSimilarity
+                ))
+            }
+        }
+
+        println("\n=== FINAL RESULTS ===")
+        results.forEachIndexed { i, result ->
+            println("Result[$i]: word='${result.recognizedWord}', confidence=${result.confidence}, similarity=${result.phoneticContentSimilarity}")
+        }
+        println("========================\n")
+
+        return results
+    }
+
+    /**
+     * Alternative: Stricter version that completely blocks mapping of extra words
+     */
+    private fun generateWordAnalysisResultsStrict(
+        recognizedWords: List<String>,
+        wordResults: List<WordMatchResult>,
+        expectedWords: List<String>
+    ): List<WordAnalysisResult> {
+        val results = mutableListOf<WordAnalysisResult>()
+        val usedExpectedWords = mutableSetOf<Int>()
+        val recognizedToExpectedMap = mutableMapOf<Int, Int>()
+
+        // STRICT VERSION: Only create mappings for recognized words that exist in expected words
+        for (j in recognizedWords.indices) {
+            val recognizedWord = recognizedWords[j]
+
+            // Find the exact expected word that matches this recognized word
+            val expectedIndex = expectedWords.indexOfFirst { it.equals(recognizedWord, ignoreCase = true) }
+
+            if (expectedIndex != -1 && expectedIndex !in usedExpectedWords) {
+                // Direct mapping: recognized word exists in expected words
+                recognizedToExpectedMap[j] = expectedIndex
+                usedExpectedWords.add(expectedIndex)
+                println("Direct mapping: recognized[$j]='$recognizedWord' → expected[$expectedIndex]='${expectedWords[expectedIndex]}'")
+            }
+        }
+
+        // Generate results for each recognized word
+        for (j in recognizedWords.indices) {
+            val recognizedWord = recognizedWords[j]
+
+            if (j in recognizedToExpectedMap) {
+                // This recognized word has a direct match in expected words
+                val expectedIndex = recognizedToExpectedMap[j]!!
+                val expectedWord = expectedWords[expectedIndex]
+
+                // Find the corresponding WordMatchResult
+                val matchedResult = wordResults.find { it.word == expectedWord }
+
+                val confidence = if (matchedResult != null) {
+                    calculateWordConfidence(
+                        expectedWord = expectedWord,
+                        recognizedWord = recognizedWord,
+                        phoneticMatch = matchedResult.bestScore
+                    )
+                } else {
+                    1.0 // Perfect match if found directly
+                }
+
+                val phoneticContentSimilarity = calculatePurePhoneticSimilarity(expectedWord, recognizedWord)
+
+                results.add(WordAnalysisResult(
+                    recognizedWord = recognizedWord,
+                    confidence = confidence,
+                    phoneticContentSimilarity = phoneticContentSimilarity
+                ))
+            } else {
+                // This recognized word is extra/unmatched - apply heavy penalties
                 var bestExpectedMatch = ""
                 var bestPhoneticScore = 0.0
 
                 for (k in expectedWords.indices) {
                     if (k in usedExpectedWords) continue
 
+                    val recognizedPhonetic = doubleMetaphone.doubleMetaphone(recognizedWord)
                     val expectedPhonetic = doubleMetaphone.doubleMetaphone(expectedWords[k])
                     val phoneticScore = calculateMetaphoneSimilarity(recognizedPhonetic, expectedPhonetic)
 
@@ -209,16 +369,18 @@ class PhoneticSimilarity {
                     }
                 }
 
-                val confidence = if (bestExpectedMatch.isNotEmpty()) {
+                // Heavy penalty for extra words
+                val baseConfidence = if (bestExpectedMatch.isNotEmpty()) {
                     calculateWordConfidence(bestExpectedMatch, recognizedWord, bestPhoneticScore)
                 } else {
-                    0.3 // Base confidence for unmatched words
+                    0.3
                 }
 
+                val confidence = minOf(baseConfidence * 0.3, 0.4) // Heavy penalty, cap at 0.4
                 val phoneticContentSimilarity = if (bestExpectedMatch.isNotEmpty()) {
-                    calculatePurePhoneticSimilarity(bestExpectedMatch, recognizedWord)
+                    calculatePurePhoneticSimilarity(bestExpectedMatch, recognizedWord) * 0.3
                 } else {
-                    0.2 // Low similarity for unmatched words
+                    0.1
                 }
 
                 results.add(WordAnalysisResult(

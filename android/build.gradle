@@ -28,12 +28,9 @@ allprojects {
 apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 
-
 android {
     namespace = "com.prayag.phonetic_speech_recognizer"
-
     compileSdk = 34
-
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -53,12 +50,14 @@ android {
         minSdk = 24
     }
 
-    dependencies {
-        testImplementation("org.jetbrains.kotlin:kotlin-test")
-        testImplementation("org.mockito:mockito-core:5.0.0")
+    packagingOptions {
+        pickFirst '**/libc++_shared.so'
+        pickFirst '**/libjnidispatch.so'
+        pickFirst '**/libvosk.so'
+        pickFirst '**/libjna.so'
 
-
-        implementation("org.apache.commons:commons-text:1.13.1")
+        exclude 'META-INF/AL2.0'
+        exclude 'META-INF/LGPL2.1'
     }
 
     testOptions {
@@ -66,28 +65,39 @@ android {
             useJUnitPlatform()
 
             testLogging {
-               events "passed", "skipped", "failed", "standardOut", "standardError"
-               outputs.upToDateWhen {false}
-               showStandardStreams = true
+                events "passed", "skipped", "failed", "standardOut", "standardError"
+                outputs.upToDateWhen {false}
+                showStandardStreams = true
             }
         }
     }
 }
 
+// Force resolution strategy for JNA conflicts
+configurations.all {
+    resolutionStrategy {
+        force 'net.java.dev.jna:jna:5.13.0'
+    }
+}
+
 dependencies {
+    testImplementation 'org.jetbrains.kotlin:kotlin-test'
+    testImplementation 'org.mockito:mockito-core:5.0.0'
+
     implementation 'com.google.firebase:firebase-crashlytics-buildtools:3.0.3'
     implementation 'org.apache.commons:commons-lang3:3.12.0'
+    implementation 'org.apache.commons:commons-text:1.13.1'
 
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3"
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 
-    implementation("androidx.core:core-ktx:1.10.1")
+    implementation 'androidx.core:core-ktx:1.10.1'
+    implementation 'androidx.activity:activity-ktx:1.7.2'
+    implementation 'androidx.documentfile:documentfile:1.0.1'
 
-    // For permission handling (recommended)
-    implementation("androidx.activity:activity-ktx:1.7.2")
-
-    // For storage access (recommended for API 29+)
-    implementation("androidx.documentfile:documentfile:1.0.1")
-
-//    implementation("com.alphacephei:vosk-api-kotlin-android:0.4.0-alpha0")
+    // Vosk with JNA conflict resolution - Groovy syntax
+    implementation('com.alphacephei:vosk-android:0.3.47') {
+        exclude group: 'net.java.dev.jna', module: 'jna'
+    }
+    implementation 'net.java.dev.jna:jna:5.13.0@aar'
 }

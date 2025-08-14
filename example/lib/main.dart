@@ -40,7 +40,7 @@ class _MyAppState extends State<MyApp> {
   final ValueNotifier<RecognitionType> _selectedTypeNotifier =
       ValueNotifier<RecognitionType>(RecognitionType.sentences);
   final ValueNotifier<String> _randomTextNotifier =
-      ValueNotifier<String>("She saw sunshine.");
+      ValueNotifier<String>("This is a house.");
   final ValueNotifier<String> _randomNumberNotifier = ValueNotifier<String>(
       RandomSentenceGenerator.generateSerialKoreanNumber());
   final ValueNotifier<String> _partialTextNotifier = ValueNotifier<String>("");
@@ -214,10 +214,14 @@ class _MyAppState extends State<MyApp> {
         _recognizedTextNotifier.value = recognizedValue;
         _confidenceNotifier.value = confidenceStr;
 
-        print("recognizedValue:::::: ${_recognizedTextNotifier.value}");
-        print("_randomTextNotifier:::::: ${_randomTextNotifier.value.length}");
+        print(
+            "recognizedValue:::::: ${_recognizedTextNotifier.value}, ${_randomTextNotifier.value}");
+        print("_randomTextNotifier:::::: ");
         // Compare recognized text with expected text (text from question like sentence or paragraph)(_randomText)
-        if (_recognizedTextNotifier.value == _randomTextNotifier.value) {
+        if (_recognizedTextNotifier.value.toLowerCase() ==
+            _randomTextNotifier.value
+                .replaceAll(RegExp(r"[^\w\s]"), "")
+                .toLowerCase()) {
           _generateRandomText();
         } else {
           _recognizedTextNotifier.value = "Recognition failed";
