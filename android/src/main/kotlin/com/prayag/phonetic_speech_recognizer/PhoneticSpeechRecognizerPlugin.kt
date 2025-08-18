@@ -42,6 +42,7 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import androidx.core.app.ActivityCompat
 import java.util.*
+import com.prayag.phonetic_speech_recognizer.Utils
 
 class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
   EventChannel.StreamHandler, ActivityAware {
@@ -68,6 +69,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var isModelReady = false
   private var isInitialized = false
 
+  private val utils = Utils()
   private val RECORD_AUDIO_PERMISSION_REQUEST = 1001
 
   private var isProcessing: Boolean = false
@@ -95,7 +97,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private val sampleRate = 16000
   private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
   private val channelConfig = AudioFormat.CHANNEL_IN_MONO
-  private val audioSource = MediaRecorder.AudioSource.MIC
+  private val audioSource = MediaRecorder.AudioSource.VOICE_RECOGNITION
 
   override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     context = binding.applicationContext
@@ -292,7 +294,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       // Try parallel download first, fallback to sequential
       val downloadSuccess = if (totalSize > 0) {
 //        tryParallelDownloadWithProgress(modelFile, totalSize) ||
-                tryOptimizedSequentialDownloadWithProgress(modelFile, totalSize)
+        tryOptimizedSequentialDownloadWithProgress(modelFile, totalSize)
       } else {
         tryOptimizedSequentialDownloadWithProgress(modelFile, totalSize)
       }
@@ -662,6 +664,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         result.success(isModelReady)
       }
 
+      "getRecordedAudio" ->{}
+
       "downloadModel" -> {
         if (isModelReady) {
           result.success(true)
@@ -721,12 +725,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
 
     try {
-      // Store the expected sentence for confidence calculation
       expectedSentence = sentence
 
-      // Create recognizer with context if sentence is provided
       recognizer = if (sentence.isNotEmpty()) {
-        // Create a grammar-based recognizer using the sentence as context
         val grammar = createGrammarFromSentence(sentence)
         Recognizer(model, sampleRate.toFloat(), grammar)
       } else {
@@ -751,6 +752,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       isRecording = true
       audioRecord?.startRecording()
 
+      // Prepare WAV file
+      val outputFile = File(context.cacheDir, "vosk_recording.wav")
+      val outputStream = FileOutputStream(outputFile)
+      val dataOutputStream = DataOutputStream(BufferedOutputStream(outputStream))
+
+      // Write placeholder WAV header (will update later when we know file size)
+      utils.writeWavHeader(dataOutputStream, sampleRate, 1, 16)
+
       // Set timeout
       timeoutHandler = Handler(Looper.getMainLooper())
       timeoutRunnable = Runnable {
@@ -764,22 +773,38 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       recordingThread = thread {
         val buffer = ByteArray(bufferSize)
 
-        while (isRecording && audioRecord != null && audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-          val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
+        try {
+          while (isRecording && audioRecord != null &&
+            audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING
+          ) {
+            val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
 
-          if (bytesRead > 0) {
-            if (recognizer?.acceptWaveForm(buffer, bytesRead) == true) {
-              val result = recognizer?.result
-              if (!result.isNullOrEmpty()) {
-                processVoskResult(result, true)
-              }
-            } else {
-              val partialResult = recognizer?.partialResult
-              if (!partialResult.isNullOrEmpty()) {
-                processPartialResult(partialResult)
+            if (bytesRead > 0) {
+              // Store raw PCM in WAV
+              dataOutputStream.write(buffer, 0, bytesRead)
+
+              // Feed Vosk
+              if (recognizer?.acceptWaveForm(buffer, bytesRead) == true) {
+                val result = recognizer?.result
+                if (!result.isNullOrEmpty()) {
+                  processVoskResult(result, true)
+                }
+              } else {
+                val partialResult = recognizer?.partialResult
+                if (!partialResult.isNullOrEmpty()) {
+                  processPartialResult(partialResult)
+                }
               }
             }
           }
+        } finally {
+          // Close WAV properly
+          dataOutputStream.flush()
+          dataOutputStream.close()
+
+          // Fix WAV header (update file sizes)
+          utils.updateWavHeader(outputFile)
+          Log.d("VoskSpeech", "Audio stored at: ${outputFile.absolutePath}")
         }
       }
 
@@ -790,25 +815,28 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
+
   private fun createGrammarFromSentence(sentence: String): String {
-    // Remove punctuation and clean the sentence
+    // Clean sentence
     val cleanSentence = sentence
       .lowercase()
-      .replace(Regex("[^a-zA-Z0-9\\s]"), "") // Remove punctuation
+      .replace(Regex("[^a-zA-Z0-9\\s]"), "")
       .trim()
 
-    val words = cleanSentence
-      .split("\\s+".toRegex())
-      .distinct()
-      .filter { it.isNotBlank() }
+    // Optional: include variations with/without small words
+    val withoutShortWords = cleanSentence.replace("\\b(is|a|the|of|and|for|up)\\b".toRegex(), "").trim()
 
-    Log.d("VoskSpeech", "Grammar words: $words")
+    // JSON array of full sentences
+    val grammar = if (withoutShortWords != cleanSentence) {
+      "[\"$cleanSentence\", \"$withoutShortWords\"]"
+    } else {
+      "[\"$cleanSentence\"]"
+    }
 
-    // Create simple JSON array for Vosk
-    val wordList = words.joinToString("\", \"", "[\"", "\"]")
-    Log.d("VoskSpeech", "Grammar JSON: $wordList")
-    return wordList
+    Log.d("VoskSpeech", "Grammar JSON: $grammar")
+    return grammar
   }
+
 
   private fun isModelValid(): Boolean {
     return model != null && isModelReady && !isModelDownloading
@@ -877,7 +905,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private fun shouldReturnExpectedSentence(confidence: Double): Boolean {
-    return confidence >= 0.8
+    return confidence >= 0.9
   }
 
   private fun processVoskResult(result: String, isFinal: Boolean) {
@@ -1001,17 +1029,17 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   //  android built in mode for numbers and paragraph mappings:
-private fun initializeSpeechRecognizer() {
-  // Only initialize if we have permission and don't already have an instance
-  if (speechRecognizer == null && hasRecordAudioPermission()) {
-    try {
-      speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
-      Log.d("SpeechRecognition", "SpeechRecognizer pre-initialized")
-    } catch (e: Exception) {
-      Log.e("SpeechRecognition", "Failed to pre-initialize SpeechRecognizer", e)
+  private fun initializeSpeechRecognizer() {
+    // Only initialize if we have permission and don't already have an instance
+    if (speechRecognizer == null && hasRecordAudioPermission()) {
+      try {
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        Log.d("SpeechRecognition", "SpeechRecognizer pre-initialized")
+      } catch (e: Exception) {
+        Log.e("SpeechRecognition", "Failed to pre-initialize SpeechRecognizer", e)
+      }
     }
   }
-}
 
   fun startRecognition(lang: String, mapper: (Map<String, Double>) -> Any, timeoutMillis: Int, paragraph: String = "", keepListening: Boolean) {
     // Set processing flags

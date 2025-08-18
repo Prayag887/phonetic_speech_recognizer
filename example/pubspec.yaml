@@ -8,6 +8,8 @@ dependencies:
     sdk: flutter
   flutter_sound: ^9.28.0
   path_provider: ^2.1.2
+  just_audio: ^0.9.42
+
 
   phonetic_speech_recognizer:
     path: ../

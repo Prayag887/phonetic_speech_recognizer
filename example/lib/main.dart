@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:developer';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:phonetic_speech_recognizer/phonetic_speech_recognizer.dart';
 import 'package:phonetic_speech_recognizer_example/randomsetencegenerator.dart';
 
@@ -57,6 +59,9 @@ class _MyAppState extends State<MyApp> {
   final ValueNotifier<bool> _showDetectedAnswerNotifier =
       ValueNotifier<bool>(false);
 
+  late AudioPlayer _audioPlayer;
+  final ValueNotifier<bool> _isPlayingNotifier = ValueNotifier<bool>(false);
+
   final int _timeoutDuration = 12000;
   Timer? _timer;
   Timer? _answerDisplayTimer; // NEW: Timer for answer display
@@ -88,11 +93,57 @@ class _MyAppState extends State<MyApp> {
     _detectedAnswerNotifier.dispose(); // NEW: Dispose new notifiers
     _showDetectedAnswerNotifier.dispose(); // NEW: Dispose new notifiers
 
+    _audioPlayer.dispose();
+    _isPlayingNotifier.dispose();
     super.dispose();
+
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+
+    // Listen to player state changes
+    _audioPlayer.playerStateStream.listen((state) {
+      _isPlayingNotifier.value = state.playing;
+
+      // Reset when playback completes
+      if (state.processingState == ProcessingState.completed) {
+        _isPlayingNotifier.value = false;
+      }
+    });
   }
 
   Future<void> _requestAudioPermission() async {
     _startRecognition();
+  }
+
+  Future<void> _toggleAudioPlayback() async {
+    try {
+      final audioFile = File(
+          '/data/user/0/com.prayag.phonetic_speech_recognizer_example/cache/vosk_recording.wav');
+
+      if (!await audioFile.exists()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Audio file not found')),
+        );
+        return;
+      }
+
+      if (_audioPlayer.playing) {
+        await _audioPlayer.stop();
+      } else {
+        await _audioPlayer.setFilePath(audioFile.path);
+        await _audioPlayer.play();
+      }
+    } catch (e) {
+      print('Error playing audio: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error playing audio: $e')),
+      );
+    }
   }
 
   void stopRecognition() {
@@ -120,17 +171,20 @@ class _MyAppState extends State<MyApp> {
       _detectedAnswerNotifier.value = '';
 
       // Check answer and proceed to next sentence
-      _checkAnswerAndProceedToNext();
+      _checkAnswerAndProceedToNext(detectedText);
     });
   }
 
   // NEW: Method to check answer and proceed to next sentence
-  void _checkAnswerAndProceedToNext() {
-    // Your existing logic for checking answers is already in _startRecognition
-    // This method can be used for any additional processing after the 3-second display
-
-    // Compare recognized text with expected text
+  void _checkAnswerAndProceedToNext(String detectedText) {
     bool isCorrect = false;
+
+    print(
+        "checking the answer:::: ${detectedText.toLowerCase()} ::: ${_randomTextNotifier.value.toLowerCase()}");
+    if (detectedText.toLowerCase() == _randomTextNotifier.value.toLowerCase()) {
+      print("this is correct");
+      _generateRandomText();
+    }
 
     if (_selectedTypeNotifier.value == RecognitionType.koreanNumbers) {
       String insideBrackets = _randomNumberNotifier.value.substring(
@@ -644,37 +698,71 @@ class _MyAppState extends State<MyApp> {
                 },
               ),
               const SizedBox(height: 20),
-              ValueListenableBuilder<bool>(
-                valueListenable: _isListeningNotifier,
-                builder: (context, isListening, child) {
-                  return ValueListenableBuilder<bool>(
-                    valueListenable: _isTextReceivedNotifier,
-                    builder: (context, isTextReceived, child) {
-                      return GestureDetector(
-                        onTapDown: (_) => _requestAudioPermission(),
-                        onLongPressEnd: (_) {
-                          if (_isRealTimeNotifier.value) {
-                            log("error words list: ${recognizer.errorWordsIndexes}");
-                            stopRecognition(); // Stop recognition immediately if _isRealTime is true
-                          } else {
-                            isTextReceived
-                                ? stopRecognition()
-                                : log("Still analyzing");
-                          }
+
+              // Row containing both microphone and play buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Microphone button
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _isListeningNotifier,
+                    builder: (context, isListening, child) {
+                      return ValueListenableBuilder<bool>(
+                        valueListenable: _isTextReceivedNotifier,
+                        builder: (context, isTextReceived, child) {
+                          return GestureDetector(
+                            onTapDown: (_) => _requestAudioPermission(),
+                            onLongPressEnd: (_) {
+                              if (_isRealTimeNotifier.value) {
+                                log("error words list: ${recognizer.errorWordsIndexes}");
+                                stopRecognition(); // Stop recognition immediately if _isRealTime is true
+                              } else {
+                                isTextReceived
+                                    ? stopRecognition()
+                                    : log("Still analyzing");
+                              }
+                            },
+                            child: Container(
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: isListening ? Colors.red : Colors.blue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.mic,
+                                  color: Colors.white, size: 32),
+                            ),
+                          );
                         },
+                      );
+                    },
+                  ),
+
+                  SizedBox(width: 20), // Space between buttons
+
+                  // Play button
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _isPlayingNotifier,
+                    builder: (context, isPlaying, child) {
+                      return GestureDetector(
+                        onTap: () => _toggleAudioPlayback(),
                         child: Container(
                           padding: EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: isListening ? Colors.red : Colors.blue,
+                            color: isPlaying ? Colors.orange : Colors.green,
                             shape: BoxShape.circle,
                           ),
-                          child: Icon(Icons.mic, color: Colors.white, size: 32),
+                          child: Icon(
+                            isPlaying ? Icons.stop : Icons.play_arrow,
+                            color: Colors.white,
+                            size: 32,
+                          ),
                         ),
                       );
                     },
-                  );
-                },
+                  ),
+                ],
               ),
+
               SizedBox(height: 10),
               ValueListenableBuilder<double>(
                 valueListenable: _progressNotifier,
