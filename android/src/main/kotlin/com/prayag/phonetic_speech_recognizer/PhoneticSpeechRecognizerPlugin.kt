@@ -721,6 +721,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
 
     try {
+      // Store the expected sentence for confidence calculation
+      expectedSentence = sentence
+
       // Create recognizer with context if sentence is provided
       recognizer = if (sentence.isNotEmpty()) {
         // Create a grammar-based recognizer using the sentence as context
@@ -811,18 +814,102 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     return model != null && isModelReady && !isModelDownloading
   }
 
+  private fun calculateConfidence(recognizedText: String, expectedSentence: String): Double {
+    if (expectedSentence.isEmpty()) {
+      return 1.0 // If no expected sentence, return full confidence
+    }
+
+    // Clean both sentences for comparison
+    val cleanRecognized = recognizedText.lowercase()
+      .replace(Regex("[^a-zA-Z0-9\\s]"), "")
+      .trim()
+      .split("\\s+".toRegex())
+      .filter { it.isNotBlank() }
+
+    val cleanExpected = expectedSentence.lowercase()
+      .replace(Regex("[^a-zA-Z0-9\\s]"), "")
+      .trim()
+      .split("\\s+".toRegex())
+      .filter { it.isNotBlank() }
+
+    if (cleanExpected.isEmpty()) {
+      return 1.0
+    }
+
+    Log.d("VoskSpeech", "Recognized words: $cleanRecognized")
+    Log.d("VoskSpeech", "Expected words: $cleanExpected")
+
+    // Calculate word-level accuracy
+    var matchingWords = 0
+    var totalWords = cleanExpected.size
+
+    // Check each expected word against recognized words
+    for (expectedWord in cleanExpected) {
+      if (cleanRecognized.contains(expectedWord)) {
+        matchingWords++
+      }
+    }
+
+    // Also consider word order and sequence
+    var sequenceScore = 0.0
+    val minLength = minOf(cleanRecognized.size, cleanExpected.size)
+
+    for (i in 0 until minLength) {
+      if (i < cleanRecognized.size && i < cleanExpected.size) {
+        if (cleanRecognized[i] == cleanExpected[i]) {
+          sequenceScore += 1.0
+        }
+      }
+    }
+
+    // Normalize sequence score
+    if (cleanExpected.isNotEmpty()) {
+      sequenceScore /= cleanExpected.size
+    }
+
+    // Calculate final confidence
+    val wordAccuracy = matchingWords.toDouble() / totalWords
+    val finalConfidence = (wordAccuracy * 0.7 + sequenceScore * 0.3) // 70% word matching, 30% sequence
+
+    Log.d("VoskSpeech", "Word accuracy: $wordAccuracy, Sequence score: $sequenceScore, Final confidence: $finalConfidence")
+
+    return minOf(1.0, maxOf(0.0, finalConfidence))
+  }
+
+  private fun shouldReturnExpectedSentence(confidence: Double): Boolean {
+    return confidence >= 0.8
+  }
+
   private fun processVoskResult(result: String, isFinal: Boolean) {
     try {
       val jsonResult = JSONObject(result)
-      val text = jsonResult.optString("text", "")
+      val recognizedText = jsonResult.optString("text", "")
 
-      if (isFinal && text.isNotEmpty()) {
+      if (isFinal && recognizedText.isNotEmpty()) {
         Handler(Looper.getMainLooper()).post {
+          // Calculate actual confidence based on expected sentence
+          val actualConfidence = calculateConfidence(recognizedText, expectedSentence)
+
+          // Determine what text to return
+          val finalText = if (shouldReturnExpectedSentence(actualConfidence) && expectedSentence.isNotEmpty()) {
+            Log.d("VoskSpeech", "High confidence ($actualConfidence), returning expected sentence")
+            expectedSentence
+          } else {
+            Log.d("VoskSpeech", "Lower confidence ($actualConfidence), returning recognized text")
+            recognizedText
+          }
+
           val resultMap = mapOf(
-            "correctedPhrase" to text,
-            "confidence" to 1.0,
-            "detailedAnalysis" to false
+            "correctedPhrase" to finalText,
+            "confidence" to actualConfidence,
+            "detailedAnalysis" to mapOf(
+              "recognizedText" to recognizedText,
+              "expectedText" to expectedSentence,
+              "actualConfidence" to actualConfidence
+            )
           )
+
+          Log.d("VoskSpeech", "Final result - Text: $finalText, Confidence: $actualConfidence")
           activeResult?.success(resultMap)
           stopRecognition()
         }
@@ -839,10 +926,18 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       if (partial.isNotEmpty()) {
         Handler(Looper.getMainLooper()).post {
+          // Calculate confidence for partial result too
+          val partialConfidence = calculateConfidence(partial, expectedSentence) * 0.8 // Reduce confidence for partial results
+
           val resultMap = mapOf(
             "correctedPhrase" to partial,
-            "confidence" to 0.5,
-            "detailedAnalysis" to false
+            "confidence" to partialConfidence,
+            "detailedAnalysis" to mapOf(
+              "recognizedText" to partial,
+              "expectedText" to expectedSentence,
+              "actualConfidence" to partialConfidence,
+              "isPartial" to true
+            )
           )
           eventSink?.success(resultMap)
         }
@@ -852,38 +947,60 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
+  // Add this property at class level to store expected sentence
+  private var expectedSentence: String = ""
+
+
   private fun stopRecognition() {
+    if (!isRecording) return
     isRecording = false
 
     try {
-      audioRecord?.stop()
-      audioRecord?.release()
-      audioRecord = null
-
-      // Get final result before closing recognizer
-      val finalResult = recognizer?.finalResult
-      if (!finalResult.isNullOrEmpty() && activeResult != null) {
-        processVoskResult(finalResult, true)
+      // 1. Stop the recording thread first
+      recordingThread?.let { thread ->
+        thread.interrupt()
+        thread.join(200) // wait briefly to avoid race
       }
-
-      recognizer?.close()
-      recognizer = null
-
-      recordingThread?.interrupt()
       recordingThread = null
 
-      timeoutHandler?.removeCallbacks(timeoutRunnable!!)
-      timeoutHandler = null
+      // 2. Stop and release AudioRecord safely
+      audioRecord?.apply {
+        try {
+          stop()
+        } catch (e: Exception) {
+          Log.w("VoskSpeech", "AudioRecord stop failed", e)
+        }
+        try {
+          release()
+        } catch (e: Exception) {
+          Log.w("VoskSpeech", "AudioRecord release failed", e)
+        }
+      }
+      audioRecord = null
+
+      // 3. Get final result before closing recognizer
+      recognizer?.let { rec ->
+        val finalResult = rec.finalResult
+        if (!finalResult.isNullOrEmpty() && activeResult != null) {
+          processVoskResult(finalResult, true)
+        }
+        rec.close()
+      }
+      recognizer = null
+
+      // 4. Clean up handler
+      timeoutRunnable?.let { r ->
+        timeoutHandler?.removeCallbacks(r)
+      }
       timeoutRunnable = null
+      timeoutHandler = null
 
     } catch (e: Exception) {
       Log.e("VoskSpeech", "Error stopping recognition", e)
     }
   }
 
-
-
-//  android built in mode for numbers and paragraph mappings:
+  //  android built in mode for numbers and paragraph mappings:
 private fun initializeSpeechRecognizer() {
   // Only initialize if we have permission and don't already have an instance
   if (speechRecognizer == null && hasRecordAudioPermission()) {
