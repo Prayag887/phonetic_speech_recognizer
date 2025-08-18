@@ -19,6 +19,51 @@ enum PhoneticType {
   paragraphsMapping
 }
 
+/// Download progress data class
+class DownloadProgress {
+  final int progress;
+  final String status;
+  final int downloadedBytes;
+  final int totalBytes;
+  final int downloadedMB;
+  final int totalMB;
+
+  DownloadProgress({
+    required this.progress,
+    required this.status,
+    required this.downloadedBytes,
+    required this.totalBytes,
+    required this.downloadedMB,
+    required this.totalMB,
+  });
+
+  factory DownloadProgress.fromMap(Map<String, dynamic> map) {
+    return DownloadProgress(
+      progress: map['progress'] ?? 0,
+      status: map['status'] ?? '',
+      downloadedBytes: map['downloadedBytes'] ?? 0,
+      totalBytes: map['totalBytes'] ?? 0,
+      downloadedMB: map['downloadedMB'] ?? 0,
+      totalMB: map['totalMB'] ?? 0,
+    );
+  }
+
+  double get progressPercent => progress / 100.0;
+
+  String get formattedProgress {
+    if (totalMB > 0) {
+      return '$downloadedMB MB / $totalMB MB';
+    } else {
+      return '$downloadedMB MB downloaded';
+    }
+  }
+
+  @override
+  String toString() {
+    return 'DownloadProgress(progress: $progress%, status: $status, size: $formattedProgress)';
+  }
+}
+
 class PhoneticSpeechRecognizer {
   final Map<String, List<String>> homophones = Homophones.homophones;
 
@@ -31,6 +76,50 @@ class PhoneticSpeechRecognizer {
 
   static const MethodChannel _channel =
       MethodChannel('phonetic_speech_recognizer');
+
+  static const EventChannel _downloadProgressChannel =
+      EventChannel('download_model_progress');
+  static Stream<DownloadProgress>? _downloadProgressStream;
+
+  static StreamSubscription<DownloadProgress>? _progressSubscription;
+
+  /// Get download progress stream
+  static Stream<DownloadProgress> get downloadProgressStream {
+    _downloadProgressStream ??= _downloadProgressChannel
+        .receiveBroadcastStream("download_progress")
+        .map((data) =>
+            DownloadProgress.fromMap(Map<String, dynamic>.from(data)));
+    return _downloadProgressStream!;
+  }
+
+  /// Download model with progress tracking
+  static Future<bool> downloadModelWithProgress() async {
+    try {
+      // Start listening to progress and log only percentage
+      _progressSubscription?.cancel();
+      _progressSubscription = downloadProgressStream.listen(
+        (progress) {
+          print('${progress.progress}%');
+        },
+      );
+
+      final result = await _channel.invokeMethod('downloadModel');
+      return result ?? false;
+    } catch (e) {
+      print('Error downloading model: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> isModelReady() async {
+    try {
+      final result = await _channel.invokeMethod('isModelReady');
+      return result ?? false;
+    } catch (e) {
+      print('Error checking model status: $e');
+      return false;
+    }
+  }
 
   static Future<String?> getPlatformVersion() async {
     try {

@@ -19,8 +19,15 @@ class LanguageHandlers(private val context: Context) {
      * Handles alphabet recognition using Vosk
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
-    fun handleAlphabetRecognition(timeoutMillis: Int) {
-        pluginInstance?.startVoskRecognition(timeoutMillis, "")
+    fun handleAlphabetRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
+        Log.d("VoskSpeech", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
+        if (languageCode == null) {
+            pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
+            pluginInstance?.activeResult = null
+            return
+        }
+
+        pluginInstance?.startVoskRecognition(timeoutMillis, sentence)
     }
 
     /**
@@ -29,8 +36,15 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      * @param languageCode the language code for the recognition
      */
-    fun handleAllLanguages(timeoutMillis: Int, languageCode: String) {
-        pluginInstance?.startVoskRecognition(timeoutMillis, "")
+    fun handleAllLanguages(languageCode: String?, timeoutMillis: Int, sentence: String) {
+        Log.d("VoskSpeech", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
+        if (languageCode == null) {
+            pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
+            pluginInstance?.activeResult = null
+            return
+        }
+
+        pluginInstance?.startVoskRecognition(timeoutMillis, sentence)
     }
 
     /**
@@ -38,8 +52,15 @@ class LanguageHandlers(private val context: Context) {
      *
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
-    fun handleKoreanAlphabetRecognition(timeoutMillis: Int) {
-        pluginInstance?.startVoskRecognition(timeoutMillis, "")
+    fun handleKoreanAlphabetRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
+        Log.d("VoskSpeech", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
+        if (languageCode == null) {
+            pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
+            pluginInstance?.activeResult = null
+            return
+        }
+
+        pluginInstance?.startVoskRecognition(timeoutMillis, sentence)
     }
 
     /**
@@ -49,7 +70,19 @@ class LanguageHandlers(private val context: Context) {
      * @param sentence the sentence context for better recognition
      */
     fun handleNumberRecognition(timeoutMillis: Int, sentence: String) {
-        pluginInstance?.startVoskRecognition(timeoutMillis, sentence)
+        val lang = if (listOf("0","1", "2", "3", "4", "5", "6", "7", "8", "9", "10").any { sentence.contains(it) }) {
+            "ne-NP"
+        } else {
+            "hi-IN"
+        }
+
+        pluginInstance?.startRecognition(
+            paragraph = "",
+            lang = lang,
+            mapper = { text -> Mapper().mapNumbersIncludingSpellings(text.keys.first(), PhoneticMapping.phoneticNumbersMapping) },
+            timeoutMillis = timeoutMillis,
+            keepListening = false
+        )
     }
 
     /**
@@ -78,15 +111,29 @@ class LanguageHandlers(private val context: Context) {
      * @param paragraph the paragraph to recognize
      */
     fun handleParagraphMapping(languageCode: String?, timeoutMillis: Int, paragraph: String) {
-        Log.d("VoskSpeech", "PARAGRAPH FROM FLUTTER SIDE: \"$paragraph\"")
+        Log.d("SpeechRecognition", "PARAGRAPH FROM FLUTTER SIDE: \"$paragraph\"")
         if (languageCode == null) {
             pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
             pluginInstance?.activeResult = null
             return
         }
 
-        pluginInstance?.startVoskRecognition(timeoutMillis, paragraph)
+        val words = paragraph.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
+
+        pluginInstance?.startRecognition(
+            paragraph = paragraph,
+            lang = languageCode,
+            mapper = { text ->
+                if (languageCode == "en-US") {
+                    pluginInstance?.updateHighlightedText(text.keys.first(), words, paragraph)
+                }
+                text
+            },
+            timeoutMillis = timeoutMillis,
+            keepListening = true
+        )
     }
+
 
     /**
      * Handles Japanese recognition using Vosk
@@ -94,8 +141,15 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      * @param type the type of recognition
      */
-    fun handleJapaneseRecognition(timeoutMillis: Int, type: String) {
-        pluginInstance?.startVoskRecognition(timeoutMillis, "")
+    fun handleJapaneseRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
+        Log.d("VoskSpeech", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
+        if (languageCode == null) {
+            pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
+            pluginInstance?.activeResult = null
+            return
+        }
+
+        pluginInstance?.startVoskRecognition(timeoutMillis, sentence)
     }
 
     /**
@@ -104,8 +158,15 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      * @param type the type of recognition
      */
-    fun handleKoreanNumberRecognition(timeoutMillis: Int, type: String) {
-        pluginInstance?.startVoskRecognition(timeoutMillis, "")
+    fun handleKoreanNumberRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
+        Log.d("VoskSpeech", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
+        if (languageCode == null) {
+            pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
+            pluginInstance?.activeResult = null
+            return
+        }
+
+        pluginInstance?.startVoskRecognition(timeoutMillis, sentence)
     }
 
     /**

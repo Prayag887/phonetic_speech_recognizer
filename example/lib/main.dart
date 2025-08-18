@@ -36,6 +36,8 @@ class _MyAppState extends State<MyApp> {
       ValueNotifier<String>("Press the button to start");
   final ValueNotifier<bool> _isListeningNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(1.0);
+  final ValueNotifier<int> _modelDownloadProgressNotifier =
+      ValueNotifier<int>(1);
   final ValueNotifier<double> _confidenceNotifier = ValueNotifier<double>(0.0);
   final ValueNotifier<RecognitionType> _selectedTypeNotifier =
       ValueNotifier<RecognitionType>(RecognitionType.sentences);
@@ -49,8 +51,15 @@ class _MyAppState extends State<MyApp> {
       ValueNotifier<bool>(false);
   final ValueNotifier<bool> _isRealTimeNotifier = ValueNotifier<bool>(false);
 
-  final int _timeoutDuration = 12000000;
+  // NEW: ValueNotifiers for detected answer display
+  final ValueNotifier<String> _detectedAnswerNotifier =
+      ValueNotifier<String>('');
+  final ValueNotifier<bool> _showDetectedAnswerNotifier =
+      ValueNotifier<bool>(false);
+
+  final int _timeoutDuration = 12000;
   Timer? _timer;
+  Timer? _answerDisplayTimer; // NEW: Timer for answer display
   Ticker? _ticker;
   String _latestPartialText = '';
 
@@ -60,6 +69,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void dispose() {
     _timer?.cancel();
+    _answerDisplayTimer?.cancel(); // NEW: Cancel answer display timer
     subscription?.cancel();
     _ticker?.dispose();
 
@@ -75,6 +85,8 @@ class _MyAppState extends State<MyApp> {
     _newTextNotifier.dispose();
     _isTextReceivedNotifier.dispose();
     _isRealTimeNotifier.dispose();
+    _detectedAnswerNotifier.dispose(); // NEW: Dispose new notifiers
+    _showDetectedAnswerNotifier.dispose(); // NEW: Dispose new notifiers
 
     super.dispose();
   }
@@ -92,6 +104,52 @@ class _MyAppState extends State<MyApp> {
     _isListeningNotifier.value = false;
     _progressNotifier.value = 1.0;
     _partialTextNotifier.value = "";
+  }
+
+  // NEW: Method to display detected answer for 3 seconds
+  void _showDetectedAnswerForDuration(String detectedText) {
+    _detectedAnswerNotifier.value = detectedText;
+    _showDetectedAnswerNotifier.value = true;
+
+    // Cancel any existing timer
+    _answerDisplayTimer?.cancel();
+
+    // Hide the detected answer after 3 seconds and then proceed to next sentence
+    _answerDisplayTimer = Timer(Duration(seconds: 3), () {
+      _showDetectedAnswerNotifier.value = false;
+      _detectedAnswerNotifier.value = '';
+
+      // Check answer and proceed to next sentence
+      _checkAnswerAndProceedToNext();
+    });
+  }
+
+  // NEW: Method to check answer and proceed to next sentence
+  void _checkAnswerAndProceedToNext() {
+    // Your existing logic for checking answers is already in _startRecognition
+    // This method can be used for any additional processing after the 3-second display
+
+    // Compare recognized text with expected text
+    bool isCorrect = false;
+
+    if (_selectedTypeNotifier.value == RecognitionType.koreanNumbers) {
+      String insideBrackets = _randomNumberNotifier.value.substring(
+          _randomNumberNotifier.value.indexOf('(') + 1,
+          _randomNumberNotifier.value.indexOf(')'));
+      isCorrect = insideBrackets.contains(_recognizedTextNotifier.value);
+    } else {
+      isCorrect = _recognizedTextNotifier.value.toLowerCase() ==
+          _randomTextNotifier.value
+              .replaceAll(RegExp(r"[^\w\s]"), "")
+              .toLowerCase();
+    }
+
+    if (isCorrect) {
+      _generateRandomText();
+    } else {
+      _recognizedTextNotifier.value = "Recognition failed";
+      _confidenceNotifier.value = 0.0;
+    }
   }
 
   void _listenForPartialResults() {
@@ -118,6 +176,10 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _startRecognition() async {
+    PhoneticSpeechRecognizer.downloadProgressStream.listen((progress) {
+      _modelDownloadProgressNotifier.value = progress.progress;
+    });
+
     if (_isListeningNotifier.value) return;
 
     _isTextReceivedNotifier.value = false;
@@ -217,39 +279,23 @@ class _MyAppState extends State<MyApp> {
         print(
             "recognizedValue:::::: ${_recognizedTextNotifier.value}, ${_randomTextNotifier.value}");
         print("_randomTextNotifier:::::: ");
-        // Compare recognized text with expected text (text from question like sentence or paragraph)(_randomText)
-        if (_recognizedTextNotifier.value.toLowerCase() ==
-            _randomTextNotifier.value
-                .replaceAll(RegExp(r"[^\w\s]"), "")
-                .toLowerCase()) {
-          _generateRandomText();
-        } else {
-          _recognizedTextNotifier.value = "Recognition failed";
-          _confidenceNotifier.value = 0.0;
-        }
+
+        // NEW: Show detected answer for 3 seconds instead of immediately checking
+        _showDetectedAnswerForDuration(recognizedValue);
       } else {
         // When sendKeyOnly is true, result is just string
-        _recognizedTextNotifier.value =
-            result?.toString() ?? "Recognition failed";
+        final recognizedValue = result?.toString() ?? "Recognition failed";
+        _recognizedTextNotifier.value = recognizedValue;
+
         if (result != null && result.toString().isNotEmpty) {
           _confidenceNotifier.value = 1.0;
+          // NEW: Show detected answer for 3 seconds
+          _showDetectedAnswerForDuration(recognizedValue);
         } else {
           _confidenceNotifier.value = 0.0;
         }
-
-        if (_selectedTypeNotifier.value == RecognitionType.koreanNumbers) {
-          String insideBrackets = _randomNumberNotifier.value.substring(
-              _randomNumberNotifier.value.indexOf('(') + 1,
-              _randomNumberNotifier.value.indexOf(')'));
-          if (insideBrackets.contains(_recognizedTextNotifier.value)) {
-            _generateRandomText();
-          }
-        } else {
-          if (_recognizedTextNotifier.value == _randomTextNotifier.value) {
-            _generateRandomText();
-          }
-        }
       }
+
       _isTextReceivedNotifier.value = _recognizedTextNotifier.value.isNotEmpty;
 
       if (!_isRealTimeNotifier.value) stopRecognition();
@@ -399,6 +445,50 @@ class _MyAppState extends State<MyApp> {
         .length;
   }
 
+  PreferredSizeWidget buildDownloadProgressBar(
+      Stream<DownloadProgress> progressStream) {
+    return PreferredSize(
+      preferredSize:
+          const Size.fromHeight(40.0), // enough height for text + bar
+      child: StreamBuilder<DownloadProgress>(
+        stream: progressStream,
+        builder: (context, snapshot) {
+          final progressValue = snapshot.data?.progress ?? 0;
+          final progress = progressValue / 100;
+          final isComplete = progressValue >= 100;
+
+          if (isComplete) return const SizedBox.shrink();
+
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: Colors.white, // background for better visibility
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "${progressValue.toStringAsFixed(0)}%",
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                LinearProgressIndicator(
+                  value: snapshot.hasData ? progress : null,
+                  minHeight: 6,
+                  backgroundColor: Colors.grey[300],
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _displayMistakes() {
     return ValueListenableBuilder<String>(
       valueListenable: _randomTextNotifier,
@@ -420,10 +510,13 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    PhoneticSpeechRecognizer.downloadModelWithProgress();
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Speech Recognizer'),
+          // bottom: buildDownloadProgressBar(
+          //     PhoneticSpeechRecognizer.downloadProgressStream),
           actions: [
             PopupMenuButton<RecognitionType>(
               onSelected: (RecognitionType type) {
@@ -484,6 +577,52 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
               ),
+
+              // NEW: Display detected answer section
+              ValueListenableBuilder<String>(
+                valueListenable: _detectedAnswerNotifier,
+                builder: (context, detectedAnswer, child) {
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: _showDetectedAnswerNotifier,
+                    builder: (context, showDetectedAnswer, child) {
+                      return showDetectedAnswer && detectedAnswer.isNotEmpty
+                          ? Container(
+                              margin: EdgeInsets.symmetric(vertical: 10),
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                border:
+                                    Border.all(color: Colors.green, width: 2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    "Detected Answer:",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green[700],
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    detectedAnswer,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      color: Colors.black87,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Container();
+                    },
+                  );
+                },
+              ),
+
               SizedBox(height: 10),
               ValueListenableBuilder<bool>(
                 valueListenable: _isTextReceivedNotifier,

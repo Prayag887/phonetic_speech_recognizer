@@ -34,6 +34,14 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import kotlin.concurrent.thread
 import kotlin.math.min
+import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import androidx.core.app.ActivityCompat
+import java.util.*
 
 class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
   EventChannel.StreamHandler, ActivityAware {
@@ -41,7 +49,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private lateinit var context: Context
   private lateinit var channel: MethodChannel
   private lateinit var eventChannel: EventChannel
+  private lateinit var eventChannelDownload: EventChannel
   private var eventSink: EventChannel.EventSink? = null
+  private var eventSinkDownload: EventChannel.EventSink? = null
   var activeResult: MethodChannel.Result? = null
 
   private var model: Model? = null
@@ -60,6 +70,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
   private val RECORD_AUDIO_PERMISSION_REQUEST = 1001
 
+  private var isProcessing: Boolean = false
+  private var isListening = false
+
   // Model configuration
   private val modelUrl = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip"
   private val modelFileName = "vosk-model-en-us-0.22-lgraph.zip"
@@ -75,6 +88,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   // Create a single instance of LanguageHandlers that will be reused
   private lateinit var languageHandlers: LanguageHandlers
 
+
+  private var speechRecognizer: SpeechRecognizer? = null
+
   // Audio configuration
   private val sampleRate = 16000
   private val audioFormat = AudioFormat.ENCODING_PCM_16BIT
@@ -89,12 +105,19 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     eventChannel = EventChannel(binding.binaryMessenger, "phonetic_speech_recognizer/partial_results")
     eventChannel.setStreamHandler(this)
 
+    eventChannelDownload = EventChannel(binding.binaryMessenger, "download_model_progress")
+    eventChannelDownload.setStreamHandler(this)
+
+
     // Initialize LanguageHandlers with plugin instance reference
     languageHandlers = LanguageHandlers(context)
     languageHandlers.setPluginInstance(this)
 
     // Initialize Vosk in background
     initializeVosk()
+
+//    android built in mode for numbers and paragraph mappings:
+    initializeSpeechRecognizer()
   }
 
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
@@ -116,6 +139,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     channel.setMethodCallHandler(null)
     eventChannel.setStreamHandler(null)
+    eventChannel.setStreamHandler(null)
     cleanup()
     executorService.shutdown()
     downloadExecutorService.shutdown()
@@ -134,11 +158,35 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-    eventSink = events
+    // Handle different event channels based on arguments
+    val channelName = arguments as? String
+    when (channelName) {
+      "download_progress" -> eventSinkDownload = events
+      else -> eventSink = events
+    }
   }
 
   override fun onCancel(arguments: Any?) {
-    eventSink = null
+    val channelName = arguments as? String
+    when (channelName) {
+      "download_progress" -> eventSinkDownload = null
+      else -> eventSink = null
+    }
+  }
+
+  private fun sendDownloadProgress(progress: Int, status: String, downloaded: Long = 0, total: Long = 0) {
+    Handler(Looper.getMainLooper()).post {
+      val progressData = mapOf(
+        "progress" to progress,
+        "status" to status,
+        "downloadedBytes" to downloaded,
+        "totalBytes" to total,
+        "downloadedMB" to (downloaded / 1024 / 1024).toInt(),
+        "totalMB" to (total / 1024 / 1024).toInt()
+      )
+      eventSinkDownload?.success(progressData)
+      Log.d("VoskSpeech", "Progress sent: $progress% - $status")
+    }
   }
 
   private fun initializeVosk() {
@@ -214,65 +262,67 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     isModelDownloading = true
 
     try {
-      Log.d("VoskSpeech", "Starting fast download from: $modelUrl")
+      sendDownloadProgress(0, "Initializing download...")
+      Log.d("VoskSpeech", "Starting enhanced download from: $modelUrl")
 
       modelFile.parentFile?.mkdirs()
       if (modelDir.exists()) deleteDirectory(modelDir)
       modelDir.mkdirs()
 
+      sendDownloadProgress(5, "Connecting to server...")
+
       val url = URL(modelUrl)
       val connection = url.openConnection() as HttpURLConnection
-      connection.connectTimeout = 10_000
-      connection.readTimeout = 20_000
+      connection.connectTimeout = connectionTimeout
+      connection.readTimeout = readTimeout
       connection.instanceFollowRedirects = true
-      connection.setRequestProperty("Accept-Encoding", "identity") // avoid gzip overhead
+      connection.setRequestProperty("Accept-Encoding", "identity")
+      connection.setRequestProperty("User-Agent", "Vosk-Android-Plugin-Enhanced")
 
       if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+        sendDownloadProgress(0, "Server error: HTTP ${connection.responseCode}")
         Log.e("VoskSpeech", "Server returned HTTP ${connection.responseCode}")
         return null
       }
 
       val totalSize = connection.contentLengthLong
-      Log.d("VoskSpeech", "File size: $totalSize bytes")
+      sendDownloadProgress(10, "Download started...", 0, totalSize)
+      Log.d("VoskSpeech", "File size: ${totalSize / 1024 / 1024}MB")
 
-      // Fast stream copy with large buffer
-      connection.inputStream.use { input ->
-        FileOutputStream(modelFile).use { output ->
-          val buffer = ByteArray(512 * 1024) // 512 KB
-          var bytesRead: Int
-          var downloaded: Long = 0
-          while (input.read(buffer).also { bytesRead = it } != -1) {
-            output.write(buffer, 0, bytesRead)
-            downloaded += bytesRead
-            if (totalSize > 0) {
-              val progress = (downloaded * 100 / totalSize).toInt()
-              Log.d("VoskSpeech", "Download progress: $progress%")
-            }
-          }
-          output.flush()
-        }
+      // Try parallel download first, fallback to sequential
+      val downloadSuccess = if (totalSize > 0) {
+//        tryParallelDownloadWithProgress(modelFile, totalSize) ||
+                tryOptimizedSequentialDownloadWithProgress(modelFile, totalSize)
+      } else {
+        tryOptimizedSequentialDownloadWithProgress(modelFile, totalSize)
       }
 
+      if (!downloadSuccess) {
+        sendDownloadProgress(0, "Download failed")
+        return null
+      }
+
+      sendDownloadProgress(80, "Download completed, extracting...")
       Log.d("VoskSpeech", "Download completed, starting extraction...")
 
-      // Extract in background thread for speed
-      val extractThread = Thread {
-        extractZipFileWithProgress(modelFile, modelDir.parentFile!!)
-        if (!isValidModel(modelDir)) {
-          Log.e("VoskSpeech", "Model extraction failed or incomplete")
-          deleteDirectory(modelDir)
-          modelFile.delete()
-        } else {
-          modelFile.delete()
-          Log.d("VoskSpeech", "Model ready at: ${modelDir.absolutePath}")
-        }
-      }
-      extractThread.start()
-      extractThread.join() // Wait if you must return synchronously
+      // Extract with progress updates
+      extractZipFileWithProgress(modelFile, modelDir.parentFile!!)
 
-      return modelDir.absolutePath
+      if (!isValidModel(modelDir)) {
+        sendDownloadProgress(0, "Model validation failed")
+        Log.e("VoskSpeech", "Model extraction failed or incomplete")
+        deleteDirectory(modelDir)
+        modelFile.delete()
+        return null
+      } else {
+        modelFile.delete()
+        sendDownloadProgress(100, "Model ready!")
+        Log.d("VoskSpeech", "Model ready at: ${modelDir.absolutePath}")
+        return modelDir.absolutePath
+      }
 
     } catch (e: Exception) {
+      sendDownloadProgress(0, "Download error: ${e.message}")
       Log.e("VoskSpeech", "Error downloading model", e)
       modelFile.delete()
       deleteDirectory(modelDir)
@@ -283,72 +333,72 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
 
-  private fun tryParallelDownload(modelFile: File): Boolean {
-    try {
-      // First, get the file size and check if server supports range requests
-      val url = URL(modelUrl)
-      val headConnection = url.openConnection() as HttpURLConnection
-      headConnection.requestMethod = "HEAD"
-      headConnection.connectTimeout = connectionTimeout
-      headConnection.readTimeout = readTimeout
-      headConnection.setRequestProperty("User-Agent", "Vosk-Android-Plugin-Enhanced")
-
-      val totalSize = headConnection.contentLengthLong
-      val acceptRanges = headConnection.getHeaderField("Accept-Ranges")
-      headConnection.disconnect()
-
-      if (totalSize <= 0 || acceptRanges?.lowercase() != "bytes") {
-        Log.d("VoskSpeech", "Server doesn't support range requests or unknown file size, falling back to sequential")
-        return false
-      }
-
-      Log.d("VoskSpeech", "Starting parallel download. Total size: ${totalSize / 1024 / 1024}MB")
-
-      // Calculate chunk size and number of parts
-      val numParts = min(4, (totalSize / chunkSize).toInt().coerceAtLeast(1))
-      val partSize = totalSize / numParts
-      val downloadedSize = AtomicLong(0)
-
-      // Create temporary files for each part
-      val partFiles = mutableListOf<File>()
-      val futures = mutableListOf<CompletableFuture<Boolean>>()
-
-      for (i in 0 until numParts) {
-        val start = i * partSize
-        val end = if (i == numParts - 1) totalSize - 1 else (i + 1) * partSize - 1
-        val partFile = File(modelFile.parent, "${modelFile.name}.part$i")
-        partFiles.add(partFile)
-
-        val future = CompletableFuture.supplyAsync({
-          downloadPart(start, end, partFile, downloadedSize, totalSize)
-        }, downloadExecutorService)
-
-        futures.add(future)
-      }
-
-      // Wait for all parts to complete
-      val results = futures.map { it.get(10, TimeUnit.MINUTES) }
-
-      if (results.all { it }) {
-        // Combine all parts
-        combineParts(partFiles, modelFile)
-
-        // Clean up part files
-        partFiles.forEach { it.delete() }
-
-        Log.d("VoskSpeech", "Parallel download completed successfully")
-        return true
-      } else {
-        // Clean up on failure
-        partFiles.forEach { it.delete() }
-        return false
-      }
-
-    } catch (e: Exception) {
-      Log.e("VoskSpeech", "Parallel download failed", e)
-      return false
-    }
-  }
+//  private fun tryParallelDownload(modelFile: File): Boolean {
+//    try {
+//      // First, get the file size and check if server supports range requests
+//      val url = URL(modelUrl)
+//      val headConnection = url.openConnection() as HttpURLConnection
+//      headConnection.requestMethod = "HEAD"
+//      headConnection.connectTimeout = connectionTimeout
+//      headConnection.readTimeout = readTimeout
+//      headConnection.setRequestProperty("User-Agent", "Vosk-Android-Plugin-Enhanced")
+//
+//      val totalSize = headConnection.contentLengthLong
+//      val acceptRanges = headConnection.getHeaderField("Accept-Ranges")
+//      headConnection.disconnect()
+//
+//      if (totalSize <= 0 || acceptRanges?.lowercase() != "bytes") {
+//        Log.d("VoskSpeech", "Server doesn't support range requests or unknown file size, falling back to sequential")
+//        return false
+//      }
+//
+//      Log.d("VoskSpeech", "Starting parallel download. Total size: ${totalSize / 1024 / 1024}MB")
+//
+//      // Calculate chunk size and number of parts
+//      val numParts = min(4, (totalSize / chunkSize).toInt().coerceAtLeast(1))
+//      val partSize = totalSize / numParts
+//      val downloadedSize = AtomicLong(0)
+//
+//      // Create temporary files for each part
+//      val partFiles = mutableListOf<File>()
+//      val futures = mutableListOf<CompletableFuture<Boolean>>()
+//
+//      for (i in 0 until numParts) {
+//        val start = i * partSize
+//        val end = if (i == numParts - 1) totalSize - 1 else (i + 1) * partSize - 1
+//        val partFile = File(modelFile.parent, "${modelFile.name}.part$i")
+//        partFiles.add(partFile)
+//
+//        val future = CompletableFuture.supplyAsync({
+//          downloadPart(start, end, partFile, downloadedSize, totalSize)
+//        }, downloadExecutorService)
+//
+//        futures.add(future)
+//      }
+//
+//      // Wait for all parts to complete
+//      val results = futures.map { it.get(10, TimeUnit.MINUTES) }
+//
+//      if (results.all { it }) {
+//        // Combine all parts
+//        combineParts(partFiles, modelFile)
+//
+//        // Clean up part files
+//        partFiles.forEach { it.delete() }
+//
+//        Log.d("VoskSpeech", "Parallel download completed successfully")
+//        return true
+//      } else {
+//        // Clean up on failure
+//        partFiles.forEach { it.delete() }
+//        return false
+//      }
+//
+//    } catch (e: Exception) {
+//      Log.e("VoskSpeech", "Parallel download failed", e)
+//      return false
+//    }
+//  }
 
   private fun downloadPart(start: Long, end: Long, partFile: File, downloadedSize: AtomicLong, totalSize: Long): Boolean {
     try {
@@ -407,22 +457,23 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
-  private fun tryOptimizedSequentialDownload(modelFile: File): Boolean {
+  private fun tryOptimizedSequentialDownloadWithProgress(modelFile: File, totalSize: Long): Boolean {
     try {
+      sendDownloadProgress(20, "Starting sequential download...")
+
       val url = URL(modelUrl)
       val connection = url.openConnection() as HttpURLConnection
       connection.connectTimeout = connectionTimeout
       connection.readTimeout = readTimeout
       connection.requestMethod = "GET"
       connection.setRequestProperty("User-Agent", "Vosk-Android-Plugin-Enhanced")
-      connection.setRequestProperty("Connection", "keep-alive")
-      connection.setRequestProperty("Accept-Encoding", "identity") // Prevent compression issues
+      connection.setRequestProperty("Accept-Encoding", "identity")
 
-      val totalSize = connection.contentLengthLong
       var downloadedSize = 0L
-      var lastLogTime = System.currentTimeMillis()
+      var lastProgressUpdate = System.currentTimeMillis()
+      val actualTotalSize = if (totalSize > 0) totalSize else connection.contentLengthLong
 
-      Log.d("VoskSpeech", "Starting optimized sequential download. Total size: ${if (totalSize > 0) "${totalSize / 1024 / 1024}MB" else "Unknown"}")
+      Log.d("VoskSpeech", "Sequential download. Total size: ${if (actualTotalSize > 0) "${actualTotalSize / 1024 / 1024}MB" else "Unknown"}")
 
       connection.inputStream.buffered(bufferSize).use { input ->
         FileOutputStream(modelFile).buffered(bufferSize).use { output ->
@@ -433,28 +484,40 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             output.write(buffer, 0, bytesRead)
             downloadedSize += bytesRead
 
-            // Log progress every 2 seconds
+            // Update progress every 500ms
             val currentTime = System.currentTimeMillis()
-            if (currentTime - lastLogTime > 2000) {
-              if (totalSize > 0) {
-                val progress = ((downloadedSize * 100) / totalSize).toInt()
-                val speed = (downloadedSize / 1024) / ((currentTime - (lastLogTime - 2000)) / 1000.0)
-                Log.d("VoskSpeech", "Download progress: $progress% (${downloadedSize / 1024 / 1024}MB / ${totalSize / 1024 / 1024}MB) Speed: ${speed.toInt()} KB/s")
+            if (currentTime - lastProgressUpdate > 500) {
+              if (actualTotalSize > 0) {
+                val progress = 20 + ((downloadedSize * 50) / actualTotalSize).toInt()
+                val speed = (downloadedSize / 1024) / ((currentTime - (lastProgressUpdate - 500)) / 1000.0)
+                sendDownloadProgress(
+                  progress.coerceAtMost(70),
+                  "Downloading... ${speed.toInt()} KB/s",
+                  downloadedSize,
+                  actualTotalSize
+                )
               } else {
-                Log.d("VoskSpeech", "Downloaded: ${downloadedSize / 1024 / 1024}MB")
+                sendDownloadProgress(
+                  50,
+                  "Downloading... ${downloadedSize / 1024 / 1024}MB",
+                  downloadedSize,
+                  0
+                )
               }
-              lastLogTime = currentTime
+              lastProgressUpdate = currentTime
             }
           }
         }
       }
 
       connection.disconnect()
+      sendDownloadProgress(70, "Download completed")
       Log.d("VoskSpeech", "Sequential download completed. Total downloaded: ${downloadedSize / 1024 / 1024}MB")
       return true
 
     } catch (e: Exception) {
-      Log.e("VoskSpeech", "Optimized sequential download failed", e)
+      sendDownloadProgress(20, "Sequential download failed: ${e.message}")
+      Log.e("VoskSpeech", "Sequential download failed", e)
       return false
     }
   }
@@ -566,13 +629,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
         try {
           when (type) {
-            "alphabet" -> languageHandlers.handleAlphabetRecognition(timeoutMillis)
-            "koreanAlphabet" -> languageHandlers.handleKoreanAlphabetRecognition(timeoutMillis)
+            "alphabet" -> languageHandlers.handleAlphabetRecognition(languageCode, timeoutMillis, sentence)
+            "koreanAlphabet" -> languageHandlers.handleKoreanAlphabetRecognition(languageCode, timeoutMillis, sentence)
             "number" -> languageHandlers.handleNumberRecognition(timeoutMillis, sentence)
             "englishWordsOrSentence" -> languageHandlers.handleWordsRecognition(languageCode, timeoutMillis, sentence)
-            "japaneseAlphabet" -> languageHandlers.handleJapaneseRecognition(timeoutMillis, "hiragana")
-            "koreanNumber" -> languageHandlers.handleKoreanNumberRecognition(timeoutMillis, "katakana")
-            "allLanguageSupport" -> languageHandlers.handleAllLanguages(timeoutMillis, languageCode)
+            "japaneseAlphabet" -> languageHandlers.handleJapaneseRecognition(languageCode, timeoutMillis, sentence)
+            "koreanNumber" -> languageHandlers.handleKoreanNumberRecognition(languageCode, timeoutMillis, sentence)
+            "allLanguageSupport" -> languageHandlers.handleAllLanguages(languageCode, timeoutMillis, sentence)
             "paragraphsMapping" -> languageHandlers.handleParagraphMapping(languageCode, timeoutMillis, sentence)
             else -> {
               activeResult?.error("INVALID_TYPE", "Unsupported type", null)
@@ -818,11 +881,216 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
+
+
+//  android built in mode for numbers and paragraph mappings:
+private fun initializeSpeechRecognizer() {
+  // Only initialize if we have permission and don't already have an instance
+  if (speechRecognizer == null && hasRecordAudioPermission()) {
+    try {
+      speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+      Log.d("SpeechRecognition", "SpeechRecognizer pre-initialized")
+    } catch (e: Exception) {
+      Log.e("SpeechRecognition", "Failed to pre-initialize SpeechRecognizer", e)
+    }
+  }
+}
+
+  fun startRecognition(lang: String, mapper: (Map<String, Double>) -> Any, timeoutMillis: Int, paragraph: String = "", keepListening: Boolean) {
+    // Set processing flags
+    isProcessing = true
+    isListening = true
+
+    // Ensure we have a SpeechRecognizer instance
+    if (speechRecognizer == null) {
+      initializeSpeechRecognizer()
+    }
+
+    // If still null, create one (fallback)
+    if (speechRecognizer == null) {
+      speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+    }
+
+    val intent = if(keepListening) {
+      Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
+      }
+    } else {
+      Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
+        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
+        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
+      }
+    }
+
+    timeoutHandler = Handler(context.mainLooper)
+    val recognizedResults = mutableListOf<String>()
+    val isKeepListening = keepListening // Capture for timeout handling
+
+    timeoutRunnable = Runnable {
+      try {
+        val finalResult = if (isKeepListening) {
+          mapOf(recognizedResults.joinToString(" ") to 0.0 ) // Join all accumulated results
+        } else {
+          mapOf((recognizedResults.firstOrNull() ?: "") to 0.0)
+        }
+        activeResult?.success(mapper(finalResult))
+      } catch (e: Exception) {
+        activeResult?.error("TIMEOUT_ERROR", "Error processing timeout result", e.message)
+      }
+      speechRecognizer?.cancel()
+      cleanup()
+    }
+    timeoutHandler?.postDelayed(timeoutRunnable!!, timeoutMillis.toLong())
+
+    speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+      override fun onResults(results: Bundle) {
+        val matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+
+        if (!matches.isNullOrEmpty()) {
+          try {
+            if (keepListening) {
+              val firstMatch = matches.first()
+              recognizedResults.add(firstMatch)
+              val accumulatedText = mapOf(recognizedResults.joinToString(" ") to 0.0)
+
+              eventSink?.success(mapper(accumulatedText))
+              speechRecognizer?.startListening(intent)
+            } else {
+              recognizedResults.clear()
+              recognizedResults.addAll(matches)
+              isListening = false
+
+              // Apply the mapper to process the results
+              val mappedMatches = mapOf(matches.first() to 0.0)
+              val finalResult = mapper(mappedMatches)
+
+              Log.d("SpeechRecognition", "Final result from mapper: $finalResult")
+
+              // The mapper now returns the result directly, so just use it
+              val resultToReturn = when (finalResult) {
+                is Map<*, *> -> {
+                  try {
+                    @Suppress("UNCHECKED_CAST")
+                    finalResult as Map<String, Any>
+                  } catch (e: ClassCastException) {
+                    Log.e("SpeechRecognition", "Error casting final result", e)
+                    mapOf(
+                      "correctedPhrase" to finalResult.toString(),
+                      "confidence" to 0.0,
+                      "detailedAnalysis" to false
+                    )
+                  }
+                }
+                else -> {
+                  mapOf(
+                    "correctedPhrase" to finalResult.toString(),
+                    "confidence" to 0.0,
+                    "detailedAnalysis" to false
+                  )
+                }
+              }
+
+              Log.d("SpeechRecognition", "Sending final result: $resultToReturn")
+              activeResult?.success(resultToReturn)
+              speechRecognizer?.cancel()
+              cleanup()
+            }
+          } catch (e: Exception) {
+            Log.e("SpeechRecognition", "Error processing results", e)
+            activeResult?.error("PROCESSING_ERROR", "Error processing speech results", e.message)
+            cleanup()
+          }
+        } else {
+          if (keepListening) {
+            speechRecognizer?.startListening(intent)
+          } else {
+            isListening = false
+            activeResult?.error("NO_MATCH", "No speech recognized", null)
+            speechRecognizer?.cancel()
+            cleanup()
+          }
+        }
+      }
+
+      override fun onPartialResults(partialResults: Bundle?) {
+        partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let { partialList ->
+          if (partialList.isNotEmpty() && paragraph.isNotEmpty()) {
+            try {
+              if (keepListening) {
+                val currentPartial = partialList.firstOrNull { paragraph.contains(it) } ?: partialList.first()
+                val accumulatedText = recognizedResults.joinToString(" ")
+                val fullText = if (accumulatedText.isNotEmpty()) {
+                  mapOf("$accumulatedText $currentPartial" to 0.0)
+                } else {
+                  mapOf(currentPartial to 0.0)
+                }
+                eventSink?.success(mapper(fullText))
+              } else {
+                recognizedResults.clear()
+                recognizedResults.addAll(partialList)
+                val correctedText = languageHandlers.correctRecognizedPhrase(partialList, paragraph)
+                eventSink?.success(mapper(correctedText))
+              }
+            } catch (e: Exception) { Log.e("SpeechRecognition", "Error processing partial results", e) }
+          }
+        }
+      }
+
+      override fun onError(error: Int) {
+        if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
+                  error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                  error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
+          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
+          speechRecognizer?.startListening(intent)
+        } else {
+          isListening = false
+          Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
+          activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
+          speechRecognizer?.cancel()
+          speechRecognizer?.destroy()
+          cleanup()
+        }
+      }
+
+      override fun onRmsChanged(rmsdB: Float) {}
+      override fun onEndOfSpeech() {}
+      override fun onReadyForSpeech(params: Bundle?) {}
+      override fun onBeginningOfSpeech() {}
+      override fun onBufferReceived(buffer: ByteArray?) {}
+      override fun onEvent(eventType: Int, params: Bundle?) {}
+    })
+
+    speechRecognizer?.startListening(intent)
+  }
+
+  private fun getErrorText(errorCode: Int): String = when (errorCode) {
+    SpeechRecognizer.ERROR_AUDIO -> "Audio error"
+    SpeechRecognizer.ERROR_CLIENT -> "Client error"
+    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Permissions needed"
+    SpeechRecognizer.ERROR_NETWORK -> "Network error"
+    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Busy"
+    SpeechRecognizer.ERROR_SERVER -> "Server error"
+    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech"
+    else -> "Unknown error"
+  }
+
   private fun cleanup() {
-    stopRecognition()
-    model?.close()
-    model = null
-    isModelReady = false
-    isInitialized = false
+    isProcessing = false
+    isListening = false
+    timeoutHandler?.removeCallbacks(timeoutRunnable!!)
+    timeoutHandler = null
+    timeoutRunnable = null
+    activeResult = null
+    speechRecognizer?.cancel()
   }
 }
