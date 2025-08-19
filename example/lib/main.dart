@@ -569,8 +569,8 @@ class _MyAppState extends State<MyApp> {
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Speech Recognizer'),
-          // bottom: buildDownloadProgressBar(
-          //     PhoneticSpeechRecognizer.downloadProgressStream),
+          bottom: buildDownloadProgressBar(
+              PhoneticSpeechRecognizer.downloadProgressStream),
           actions: [
             PopupMenuButton<RecognitionType>(
               onSelected: (RecognitionType type) {
