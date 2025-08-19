@@ -52,6 +52,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.*
 import java.nio.channels.FileChannel
 import java.nio.ByteBuffer
+import com.prayag.phonetic_speech_recognizer.LanguageHandlers
 
 class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
   EventChannel.StreamHandler, ActivityAware {
@@ -136,7 +137,20 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private val channelConfig = AudioFormat.CHANNEL_IN_MONO
   private val audioSource = MediaRecorder.AudioSource.VOICE_RECOGNITION
 
+  companion object {
+    private var isPluginInitialized = false
+  }
+  private val initializationLock = Any() // For thread-safe initialization
+
   override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+    synchronized(initializationLock) {
+      if (isPluginInitialized) {
+        Log.d("VoskSpeech", "Plugin already initialized, skipping")
+        return
+      }
+      isPluginInitialized = true
+    }
+
     context = binding.applicationContext
     channel = MethodChannel(binding.binaryMessenger, "phonetic_speech_recognizer")
     channel.setMethodCallHandler(this)
@@ -153,6 +167,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     initializeVosk()
     initializeSpeechRecognizer()
   }
+
 
   override fun onAttachedToActivity(binding: ActivityPluginBinding) {
     activity = binding.activity
@@ -227,13 +242,18 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private fun initializeVosk() {
-    if (isInitialized) return
+    synchronized(initializationLock) {
+      if (isInitialized) {
+        Log.d("VoskSpeech", "Vosk already initialized, skipping")
+        return
+      }
+      isInitialized = true
+    }
 
     executorService.execute {
       try {
         LibVosk.setLogLevel(LogLevel.WARNINGS)
         Log.d("VoskSpeech", "Vosk library initialized")
-        isInitialized = true
         initializeModel()
       } catch (e: Exception) {
         Log.e("VoskSpeech", "Error initializing Vosk library", e)
@@ -281,7 +301,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   /**
-   * Ultra-fast download implementation optimized for fast CDNs
+   * fast download implementation optimized for fast CDNs
    */
   private fun downloadModelUltraFast(modelFile: File, modelDir: File): String? {
     if (!isModelDownloading.compareAndSet(false, true)) {
@@ -583,12 +603,26 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     chunkProgress: ConcurrentHashMap<Int, Long>,
     totalSize: Long
   ): CompletableFuture<Void> {
+    val isUpdating = AtomicBoolean(false) // Prevent overlapping updates
     return CompletableFuture.runAsync({
       try {
+        var lastProgress = -1 // Track last sent progress to avoid duplicates
         while (!Thread.currentThread().isInterrupted) {
-          val totalDownloaded = chunkProgress.values.sum()
-          bytesDownloaded.set(totalDownloaded)
-          updateParallelProgress(totalDownloaded, totalSize)
+          if (isUpdating.compareAndSet(false, true)) {
+            try {
+              val totalDownloaded = chunkProgress.values.sum()
+              bytesDownloaded.set(totalDownloaded)
+              val progress = ((totalDownloaded * 100) / totalSize).toInt().coerceAtMost(100)
+
+              // Only send update if progress has changed significantly
+              if (progress != lastProgress && totalDownloaded < totalSize) {
+                updateParallelProgress(totalDownloaded, totalSize)
+                lastProgress = progress
+              }
+            } finally {
+              isUpdating.set(false)
+            }
+          }
           Thread.sleep(500) // Update every 500ms
         }
       } catch (e: InterruptedException) {
@@ -598,16 +632,15 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
 
-
   private fun updateParallelProgress(downloaded: Long, total: Long) {
     val elapsedTime = (System.currentTimeMillis() - downloadStartTime.get()) / 1000.0
     val speedMBps = if (elapsedTime > 0) (downloaded / 1024.0 / 1024.0) / elapsedTime else 0.0
 
-    // Use fixed size if 'total' is unreliable
     val actualTotal = if (total > 0) total else MODEL_SIZE_BYTES
     val progress = ((downloaded * 100) / actualTotal).toInt().coerceAtMost(100)
 
     if (downloaded >= actualTotal) return
+
     sendDownloadProgress(
       progress,
       "Downloading at ${String.format("%.1f", speedMBps)} MB/s...",
