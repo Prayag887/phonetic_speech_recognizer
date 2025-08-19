@@ -43,6 +43,15 @@ import android.speech.SpeechRecognizer
 import androidx.core.app.ActivityCompat
 import java.util.*
 import com.prayag.phonetic_speech_recognizer.Utils
+import okhttp3.*
+import okio.buffer
+import okio.sink
+import okio.source
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.*
+import java.nio.channels.FileChannel
+import java.nio.ByteBuffer
 
 class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHandler,
   EventChannel.StreamHandler, ActivityAware {
@@ -64,8 +73,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var timeoutRunnable: Runnable? = null
   private var activity: Activity? = null
   private var executorService: ExecutorService = Executors.newCachedThreadPool()
-  private var downloadExecutorService: ExecutorService = Executors.newFixedThreadPool(4) // For parallel downloads
-  private var isModelDownloading = false
+  private var downloadExecutorService: ExecutorService = Executors.newFixedThreadPool(8) // Increased threads
+  private var isModelDownloading = AtomicBoolean(false)
   private var isModelReady = false
   private var isInitialized = false
 
@@ -76,21 +85,49 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var isListening = false
 
   // Model configuration
-  private val modelUrl = "https://alphacephei.com/vosk/models/vosk-model-en-us-0.22-lgraph.zip"
+  private val modelUrl = "https://agimgcdndev.b-cdn.net/vosk-assets/vosk-model-en-us-0.22-lgraph.zip"
   private val modelFileName = "vosk-model-en-us-0.22-lgraph.zip"
   private val modelDirName = "vosk-model-en-us-0.22-lgraph"
+  private val MODEL_SIZE_BYTES = 128L * 1024 * 1024 // 128 MB
 
-  // Enhanced download configuration
+  // Ultra-optimized download configuration
   private val maxRetries = 3
-  private val chunkSize = 1024 * 1024 // 1MB chunks for parallel download
-  private val connectionTimeout = 15000 // 15 seconds
+  private val maxConcurrentConnections = 8 // Increased for fast CDN
+  private val chunkSizeBytes = 2 * 1024 * 1024 // 2MB chunks for optimal CDN performance
+  private val connectionTimeout = 10000 // 10 seconds
   private val readTimeout = 30000 // 30 seconds
-  private val bufferSize = 64  * 1024 // 64KB buffer for better I/O performance
+  private val bufferSize = 128 * 1024 // 128KB buffer for maximum I/O performance
 
-  // Create a single instance of LanguageHandlers that will be reused
+  // Performance monitoring
+  private val downloadStartTime = AtomicLong(0)
+  private val bytesDownloaded = AtomicLong(0)
+
+  // Optimized HTTP client for maximum CDN performance
+  private val ultraFastClient by lazy {
+    OkHttpClient.Builder()
+      .protocols(listOf(Protocol.QUIC, Protocol.HTTP_2, Protocol.HTTP_1_1))
+      .connectTimeout(10, TimeUnit.SECONDS)
+      .readTimeout(60, TimeUnit.SECONDS)
+      .writeTimeout(60, TimeUnit.SECONDS)
+      .callTimeout(0, TimeUnit.SECONDS)
+      // Maximum connection pool for parallel downloads
+      .connectionPool(ConnectionPool(20, 5, TimeUnit.MINUTES))
+      // Aggressive connection keep-alive
+      .retryOnConnectionFailure(true)
+      // Disable compression since we're downloading already compressed files
+      .addNetworkInterceptor { chain ->
+        val request = chain.request().newBuilder()
+          .removeHeader("Accept-Encoding")
+          .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:117.0) Chrome/117.0.0.0")
+          .header("Connection", "keep-alive")
+          .header("Cache-Control", "no-cache")
+          .build()
+        chain.proceed(request)
+      }
+      .build()
+  }
+
   private lateinit var languageHandlers: LanguageHandlers
-
-
   private var speechRecognizer: SpeechRecognizer? = null
 
   // Audio configuration
@@ -110,15 +147,10 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     eventChannelDownload = EventChannel(binding.binaryMessenger, "download_model_progress")
     eventChannelDownload.setStreamHandler(this)
 
-
-    // Initialize LanguageHandlers with plugin instance reference
     languageHandlers = LanguageHandlers(context)
     languageHandlers.setPluginInstance(this)
 
-    // Initialize Vosk in background
     initializeVosk()
-
-//    android built in mode for numbers and paragraph mappings:
     initializeSpeechRecognizer()
   }
 
@@ -141,10 +173,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
     channel.setMethodCallHandler(null)
     eventChannel.setStreamHandler(null)
-    eventChannel.setStreamHandler(null)
+    eventChannelDownload.setStreamHandler(null)
     cleanup()
     executorService.shutdown()
     downloadExecutorService.shutdown()
+    ultraFastClient.dispatcher.executorService.shutdown()
+    ultraFastClient.connectionPool.evictAll()
+
     try {
       if (!executorService.awaitTermination(5, TimeUnit.SECONDS)) {
         executorService.shutdownNow()
@@ -160,7 +195,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-    // Handle different event channels based on arguments
     val channelName = arguments as? String
     when (channelName) {
       "download_progress" -> eventSinkDownload = events
@@ -176,7 +210,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
-  private fun sendDownloadProgress(progress: Int, status: String, downloaded: Long = 0, total: Long = 0) {
+  private fun sendDownloadProgress(progress: Int, status: String, downloaded: Long = 0, total: Long = 0, speedMBps: Double = 0.0) {
     Handler(Looper.getMainLooper()).post {
       val progressData = mapOf(
         "progress" to progress,
@@ -184,10 +218,11 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         "downloadedBytes" to downloaded,
         "totalBytes" to total,
         "downloadedMB" to (downloaded / 1024 / 1024).toInt(),
-        "totalMB" to (total / 1024 / 1024).toInt()
+        "totalMB" to (total / 1024 / 1024).toInt(),
+        "speedMBps" to speedMBps
       )
       eventSinkDownload?.success(progressData)
-      Log.d("VoskSpeech", "Progress sent: $progress% - $status")
+      Log.d("VoskSpeech", "Progress: $progress% - $status - Speed: ${String.format("%.1f", speedMBps)} MB/s")
     }
   }
 
@@ -199,15 +234,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         LibVosk.setLogLevel(LogLevel.WARNINGS)
         Log.d("VoskSpeech", "Vosk library initialized")
         isInitialized = true
-
-        // Start model download/initialization
         initializeModel()
-
       } catch (e: Exception) {
         Log.e("VoskSpeech", "Error initializing Vosk library", e)
-        Handler(Looper.getMainLooper()).post {
-          // Notify about initialization failure if needed
-        }
       }
     }
   }
@@ -233,15 +262,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     val modelDir = File(context.filesDir, modelDirName)
     val modelFile = File(context.filesDir, modelFileName)
 
-    // Check if model already exists and is valid
     if (modelDir.exists() && isValidModel(modelDir)) {
       Log.d("VoskSpeech", "Model already exists at: ${modelDir.absolutePath}")
       return modelDir.absolutePath
     }
 
-    // Download model if it doesn't exist or is invalid
     return try {
-      downloadModelEnhanced(modelFile, modelDir)
+      downloadModelUltraFast(modelFile, modelDir)
     } catch (e: Exception) {
       Log.e("VoskSpeech", "Failed to download model", e)
       null
@@ -249,66 +276,49 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private fun isValidModel(modelDir: File): Boolean {
-    // Basic validation - check if essential model files exist
     val requiredFiles = listOf("am", "conf", "graph", "ivector")
-    return requiredFiles.all {
-      File(modelDir, it).exists()
-    }
+    return requiredFiles.all { File(modelDir, it).exists() }
   }
 
-  private fun downloadModelEnhanced(modelFile: File, modelDir: File): String? {
-    if (isModelDownloading) {
+  /**
+   * Ultra-fast download implementation optimized for fast CDNs
+   */
+  private fun downloadModelUltraFast(modelFile: File, modelDir: File): String? {
+    if (!isModelDownloading.compareAndSet(false, true)) {
       Log.d("VoskSpeech", "Model download already in progress")
       return null
     }
-    isModelDownloading = true
 
     try {
-      sendDownloadProgress(0, "Initializing download...")
-      Log.d("VoskSpeech", "Starting enhanced download from: $modelUrl")
+      downloadStartTime.set(System.currentTimeMillis())
+      bytesDownloaded.set(0)
+
+      sendDownloadProgress(0, "Initializing ultra-fast download...")
+      Log.d("VoskSpeech", "Starting ultra-fast download from: $modelUrl")
 
       modelFile.parentFile?.mkdirs()
       if (modelDir.exists()) deleteDirectory(modelDir)
       modelDir.mkdirs()
 
-      sendDownloadProgress(5, "Connecting to server...")
-
-      val url = URL(modelUrl)
-      val connection = url.openConnection() as HttpURLConnection
-      connection.connectTimeout = connectionTimeout
-      connection.readTimeout = readTimeout
-      connection.instanceFollowRedirects = true
-      connection.setRequestProperty("Accept-Encoding", "identity")
-      connection.setRequestProperty("User-Agent", "Vosk-Android-Plugin-Enhanced")
-
-      if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-        sendDownloadProgress(0, "Server error: HTTP ${connection.responseCode}")
-        Log.e("VoskSpeech", "Server returned HTTP ${connection.responseCode}")
+      val totalSize = getFileSize()
+      if (totalSize <= 0) {
+        sendDownloadProgress(0, "Failed to get file size")
         return null
       }
 
-      val totalSize = connection.contentLengthLong
-      sendDownloadProgress(10, "Download started...", 0, totalSize)
-      Log.d("VoskSpeech", "File size: ${totalSize / 1024 / 1024}MB")
+      sendDownloadProgress(5, "File size: ${totalSize / 1024 / 1024}MB, starting download...")
 
-      // Try parallel download first, fallback to sequential
-      val downloadSuccess = if (totalSize > 0) {
-//        tryParallelDownloadWithProgress(modelFile, totalSize) ||
-        tryOptimizedSequentialDownloadWithProgress(modelFile, totalSize)
-      } else {
-        tryOptimizedSequentialDownloadWithProgress(modelFile, totalSize)
-      }
+      val success = performUltraFastDownload(modelFile, totalSize)
 
-      if (!downloadSuccess) {
+      if (!success) {
         sendDownloadProgress(0, "Download failed")
         return null
       }
 
-      sendDownloadProgress(80, "Download completed, extracting...")
-      Log.d("VoskSpeech", "Download completed, starting extraction...")
+      sendDownloadProgress(80, "Download completed! Extracting...")
+      Log.d("VoskSpeech", "Download completed in ${(System.currentTimeMillis() - downloadStartTime.get()) / 1000.0}s")
 
-      // Extract with progress updates
-      extractZipFileWithProgress(modelFile, modelDir.parentFile!!)
+      extractZipFileOptimized(modelFile, modelDir.parentFile!!)
 
       if (!isValidModel(modelDir)) {
         sendDownloadProgress(0, "Model validation failed")
@@ -319,7 +329,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       } else {
         modelFile.delete()
         sendDownloadProgress(100, "Model ready!")
-        Log.d("VoskSpeech", "Model ready at: ${modelDir.absolutePath}")
+        val totalTime = (System.currentTimeMillis() - downloadStartTime.get()) / 1000.0
+        Log.d("VoskSpeech", "Model ready at: ${modelDir.absolutePath} (Total time: ${totalTime}s)")
         return modelDir.absolutePath
       }
 
@@ -330,212 +341,342 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       deleteDirectory(modelDir)
       return null
     } finally {
-      isModelDownloading = false
+      isModelDownloading.set(false)
+    }
+  }
+
+  private fun getFileSize(): Long {
+    return try {
+      val url = URL(modelUrl)
+      val connection = url.openConnection() as HttpURLConnection
+      connection.requestMethod = "HEAD"
+      connection.instanceFollowRedirects = true
+      connection.connectTimeout = 10000
+      connection.readTimeout = 10000
+      connection.connect()
+
+      val length = connection.contentLengthLong
+      connection.disconnect()
+
+      if (length > 0) length else fetchSizeWithGET(url)
+    } catch (e: Exception) {
+      Log.e("VoskSpeech", "Error getting file size", e)
+      -1
+    }
+  }
+
+  private fun fetchSizeWithGET(url: URL): Long {
+    return try {
+      val connection = url.openConnection() as HttpURLConnection
+      connection.instanceFollowRedirects = true
+      connection.connect()
+      val length = connection.contentLengthLong
+      connection.disconnect()
+      length
+    } catch (e: Exception) {
+      -1
     }
   }
 
 
-//  private fun tryParallelDownload(modelFile: File): Boolean {
-//    try {
-//      // First, get the file size and check if server supports range requests
-//      val url = URL(modelUrl)
-//      val headConnection = url.openConnection() as HttpURLConnection
-//      headConnection.requestMethod = "HEAD"
-//      headConnection.connectTimeout = connectionTimeout
-//      headConnection.readTimeout = readTimeout
-//      headConnection.setRequestProperty("User-Agent", "Vosk-Android-Plugin-Enhanced")
-//
-//      val totalSize = headConnection.contentLengthLong
-//      val acceptRanges = headConnection.getHeaderField("Accept-Ranges")
-//      headConnection.disconnect()
-//
-//      if (totalSize <= 0 || acceptRanges?.lowercase() != "bytes") {
-//        Log.d("VoskSpeech", "Server doesn't support range requests or unknown file size, falling back to sequential")
-//        return false
-//      }
-//
-//      Log.d("VoskSpeech", "Starting parallel download. Total size: ${totalSize / 1024 / 1024}MB")
-//
-//      // Calculate chunk size and number of parts
-//      val numParts = min(4, (totalSize / chunkSize).toInt().coerceAtLeast(1))
-//      val partSize = totalSize / numParts
-//      val downloadedSize = AtomicLong(0)
-//
-//      // Create temporary files for each part
-//      val partFiles = mutableListOf<File>()
-//      val futures = mutableListOf<CompletableFuture<Boolean>>()
-//
-//      for (i in 0 until numParts) {
-//        val start = i * partSize
-//        val end = if (i == numParts - 1) totalSize - 1 else (i + 1) * partSize - 1
-//        val partFile = File(modelFile.parent, "${modelFile.name}.part$i")
-//        partFiles.add(partFile)
-//
-//        val future = CompletableFuture.supplyAsync({
-//          downloadPart(start, end, partFile, downloadedSize, totalSize)
-//        }, downloadExecutorService)
-//
-//        futures.add(future)
-//      }
-//
-//      // Wait for all parts to complete
-//      val results = futures.map { it.get(10, TimeUnit.MINUTES) }
-//
-//      if (results.all { it }) {
-//        // Combine all parts
-//        combineParts(partFiles, modelFile)
-//
-//        // Clean up part files
-//        partFiles.forEach { it.delete() }
-//
-//        Log.d("VoskSpeech", "Parallel download completed successfully")
-//        return true
-//      } else {
-//        // Clean up on failure
-//        partFiles.forEach { it.delete() }
-//        return false
-//      }
-//
-//    } catch (e: Exception) {
-//      Log.e("VoskSpeech", "Parallel download failed", e)
-//      return false
-//    }
-//  }
-
-  private fun downloadPart(start: Long, end: Long, partFile: File, downloadedSize: AtomicLong, totalSize: Long): Boolean {
+  private fun performUltraFastDownload(outputFile: File, totalSize: Long): Boolean {
     try {
-      val url = URL(modelUrl)
-      val connection = url.openConnection() as HttpURLConnection
-      connection.connectTimeout = connectionTimeout
-      connection.readTimeout = readTimeout
-      connection.requestMethod = "GET"
-      connection.setRequestProperty("User-Agent", "Vosk-Android-Plugin-Enhanced")
-      connection.setRequestProperty("Range", "bytes=$start-$end")
-      connection.setRequestProperty("Connection", "close")
+      // Check if server supports range requests
+      val supportsRanges = checkRangeSupport()
 
-      if (connection.responseCode !in 200..299) {
-        Log.e("VoskSpeech", "Part download failed with response code: ${connection.responseCode}")
-        connection.disconnect()
+      return if (supportsRanges && totalSize > chunkSizeBytes) {
+        Log.d("VoskSpeech", "Using parallel download with ${maxConcurrentConnections} connections")
+        downloadParallelUltraFast(outputFile, totalSize)
+      } else {
+        Log.d("VoskSpeech", "Using single-threaded download")
+        downloadSingleThreadedOptimized(outputFile, totalSize)
+      }
+    } catch (e: Exception) {
+      Log.e("VoskSpeech", "Download failed", e)
+      return false
+    }
+  }
+
+  private fun checkRangeSupport(): Boolean {
+    return try {
+      val request = Request.Builder()
+        .url(modelUrl)
+        .head()
+        .header("User-Agent", "Vosk-Android-Plugin-UltraFast")
+        .build()
+
+      ultraFastClient.newCall(request).execute().use { response ->
+        val acceptRanges = response.header("Accept-Ranges")
+        val supportsRanges = acceptRanges?.lowercase() == "bytes"
+        Log.d("VoskSpeech", "Range support: $supportsRanges (Accept-Ranges: $acceptRanges)")
+        supportsRanges
+      }
+    } catch (e: Exception) {
+      Log.e("VoskSpeech", "Failed to check range support", e)
+      false
+    }
+  }
+
+  private fun downloadParallelUltraFast(outputFile: File, totalSize: Long): Boolean {
+    val numChunks = min(maxConcurrentConnections, (totalSize / chunkSizeBytes).toInt().coerceAtLeast(1))
+    val chunkSize = totalSize / numChunks
+
+    Log.d("VoskSpeech", "Parallel download: $numChunks chunks of ${chunkSize / 1024 / 1024}MB each")
+
+    val tempFiles = mutableListOf<File>()
+    val downloadFutures = mutableListOf<CompletableFuture<Boolean>>()
+    val chunkProgress = ConcurrentHashMap<Int, Long>()
+
+    // Initialize chunk progress tracking
+    repeat(numChunks) { chunkProgress[it] = 0L }
+
+    // Start progress monitoring
+    val progressMonitor = startProgressMonitoring(chunkProgress, totalSize)
+
+    try {
+      // Create download tasks for each chunk
+      for (i in 0 until numChunks) {
+        val rangeStart = i * chunkSize
+        val rangeEnd = if (i == numChunks - 1) totalSize - 1 else (i + 1) * chunkSize - 1
+        val tempFile = File(outputFile.parentFile, "${outputFile.name}.part$i")
+        tempFiles.add(tempFile)
+
+        val future = CompletableFuture.supplyAsync({
+          downloadChunkUltraFast(rangeStart, rangeEnd, tempFile, i, chunkProgress)
+        }, downloadExecutorService)
+
+        downloadFutures.add(future)
+      }
+
+      // Wait for all downloads to complete
+      val results = downloadFutures.map { future ->
+        try {
+          future.get(10, TimeUnit.MINUTES)
+        } catch (e: Exception) {
+          Log.e("VoskSpeech", "Chunk download failed", e)
+          false
+        }
+      }
+
+      progressMonitor.cancel(true) // Cancel with interruption
+
+      if (results.all { it }) {
+        sendDownloadProgress(70, "Combining chunks...")
+        val success = combineChunksOptimized(tempFiles, outputFile)
+        tempFiles.forEach { it.delete() }
+        return success
+      } else {
+        tempFiles.forEach { it.delete() }
         return false
       }
 
-      connection.inputStream.use { input ->
-        FileOutputStream(partFile).use { output ->
-          val buffer = ByteArray(bufferSize)
-          var bytesRead: Int
-          var lastLogTime = System.currentTimeMillis()
-
-          while (input.read(buffer).also { bytesRead = it } != -1) {
-            output.write(buffer, 0, bytesRead)
-            val currentDownloaded = downloadedSize.addAndGet(bytesRead.toLong())
-
-            // Log progress every 2 seconds
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastLogTime > 2000) {
-              val progress = ((currentDownloaded * 100) / totalSize).toInt()
-              Log.d("VoskSpeech", "Download progress: $progress% (${currentDownloaded / 1024 / 1024}MB / ${totalSize / 1024 / 1024}MB)")
-              lastLogTime = currentTime
-            }
-          }
-        }
-      }
-
-      connection.disconnect()
-      return true
-
     } catch (e: Exception) {
-      Log.e("VoskSpeech", "Error downloading part $start-$end", e)
+      Log.e("VoskSpeech", "Parallel download failed", e)
+      tempFiles.forEach { it.delete() }
       return false
+    } finally {
+      progressMonitor.cancel(true) // Cancel with interruption
     }
   }
 
-  private fun combineParts(partFiles: List<File>, outputFile: File) {
-    FileOutputStream(outputFile).use { output ->
-      partFiles.forEach { partFile ->
-        FileInputStream(partFile).use { input ->
-          input.copyTo(output, bufferSize)
-        }
-      }
-    }
-  }
+  private fun downloadChunkUltraFast(
+    rangeStart: Long,
+    rangeEnd: Long,
+    tempFile: File,
+    chunkIndex: Int,
+    chunkProgress: ConcurrentHashMap<Int, Long>
+  ): Boolean {
+    var attempt = 0
+    while (attempt < maxRetries) {
+      try {
+        val request = Request.Builder()
+          .url(modelUrl)
+          .header("Range", "bytes=$rangeStart-$rangeEnd")
+          .header("User-Agent", "Mozilla/5.0 (Android; Mobile; rv:117.0) Chrome/117.0.0.0")
+          .header("Connection", "keep-alive")
+          .build()
 
-  private fun tryOptimizedSequentialDownloadWithProgress(modelFile: File, totalSize: Long): Boolean {
-    try {
-      sendDownloadProgress(20, "Starting sequential download...")
+        val startTime = System.currentTimeMillis()
+        ultraFastClient.newCall(request).execute().use { response ->
+          if (!response.isSuccessful && response.code != 206) {
+            Log.e("VoskSpeech", "Chunk $chunkIndex failed: HTTP ${response.code}")
+            attempt++
+            return@use
+          }
 
-      val url = URL(modelUrl)
-      val connection = url.openConnection() as HttpURLConnection
-      connection.connectTimeout = connectionTimeout
-      connection.readTimeout = readTimeout
-      connection.requestMethod = "GET"
-      connection.setRequestProperty("User-Agent", "Vosk-Android-Plugin-Enhanced")
-      connection.setRequestProperty("Accept-Encoding", "identity")
+          val responseBody = response.body ?: return false
+          var chunkDownloaded = 0L
 
-      var downloadedSize = 0L
-      var lastProgressUpdate = System.currentTimeMillis()
-      val actualTotalSize = if (totalSize > 0) totalSize else connection.contentLengthLong
-
-      Log.d("VoskSpeech", "Sequential download. Total size: ${if (actualTotalSize > 0) "${actualTotalSize / 1024 / 1024}MB" else "Unknown"}")
-
-      connection.inputStream.buffered(bufferSize).use { input ->
-        FileOutputStream(modelFile).buffered(bufferSize).use { output ->
-          val buffer = ByteArray(bufferSize)
-          var bytesRead: Int
-
-          while (input.read(buffer).also { bytesRead = it } != -1) {
-            output.write(buffer, 0, bytesRead)
-            downloadedSize += bytesRead
-
-            // Update progress every 500ms
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - lastProgressUpdate > 500) {
-              if (actualTotalSize > 0) {
-                val progress = 20 + ((downloadedSize * 50) / actualTotalSize).toInt()
-                val speed = (downloadedSize / 1024) / ((currentTime - (lastProgressUpdate - 500)) / 1000.0)
-                sendDownloadProgress(
-                  progress.coerceAtMost(70),
-                  "Downloading... ${speed.toInt()} KB/s",
-                  downloadedSize,
-                  actualTotalSize
-                )
-              } else {
-                sendDownloadProgress(
-                  50,
-                  "Downloading... ${downloadedSize / 1024 / 1024}MB",
-                  downloadedSize,
-                  0
-                )
+          responseBody.byteStream().buffered(bufferSize).use { inputStream ->
+            FileOutputStream(tempFile).buffered(bufferSize).use { outputStream ->
+              val buffer = ByteArray(bufferSize)
+              var bytesRead: Int
+              while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                val writeStart = System.currentTimeMillis()
+                outputStream.write(buffer, 0, bytesRead)
+                val writeTime = System.currentTimeMillis() - writeStart
+                chunkDownloaded += bytesRead
+                chunkProgress[chunkIndex] = chunkDownloaded
               }
-              lastProgressUpdate = currentTime
+            }
+          }
+          Log.d("VoskSpeech", "Chunk $chunkIndex completed in ${System.currentTimeMillis() - startTime}ms")
+          return true
+        }
+      } catch (e: Exception) {
+        attempt++
+        Log.e("VoskSpeech", "Chunk $chunkIndex attempt $attempt failed", e)
+        if (attempt >= maxRetries) return false
+        Thread.sleep(100 * attempt.toLong())
+      }
+    }
+    return false
+  }
+
+  private fun downloadSingleThreadedOptimized(outputFile: File, totalSize: Long): Boolean {
+    return try {
+      val request = Request.Builder()
+        .url(modelUrl)
+        .header("User-Agent", "Vosk-Android-Plugin-UltraFast")
+        .header("Connection", "keep-alive")
+        .build()
+
+      ultraFastClient.newCall(request).execute().use { response ->
+        if (!response.isSuccessful) {
+          Log.e("VoskSpeech", "Single download failed: HTTP ${response.code}")
+          return false
+        }
+
+        val responseBody = response.body ?: return false
+        var downloaded = 0L
+        var lastProgressTime = System.currentTimeMillis()
+
+        responseBody.byteStream().buffered(bufferSize).use { inputStream ->
+          FileOutputStream(outputFile).buffered(bufferSize).use { outputStream ->
+            val buffer = ByteArray(bufferSize)
+            var bytesRead: Int
+
+            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+              outputStream.write(buffer, 0, bytesRead)
+              downloaded += bytesRead
+              bytesDownloaded.set(downloaded)
+
+              val currentTime = System.currentTimeMillis()
+              if (currentTime - lastProgressTime > 500) { // Update every 500ms
+                updateSingleThreadProgress(downloaded, totalSize)
+                lastProgressTime = currentTime
+              }
+            }
+          }
+        }
+
+        Log.d("VoskSpeech", "Single-threaded download completed: ${downloaded / 1024 / 1024}MB")
+        true
+      }
+    } catch (e: Exception) {
+      Log.e("VoskSpeech", "Single-threaded download failed", e)
+      false
+    }
+  }
+
+  private fun startProgressMonitoring(
+    chunkProgress: ConcurrentHashMap<Int, Long>,
+    totalSize: Long
+  ): CompletableFuture<Void> {
+    return CompletableFuture.runAsync({
+      try {
+        while (!Thread.currentThread().isInterrupted) {
+          val totalDownloaded = chunkProgress.values.sum()
+          bytesDownloaded.set(totalDownloaded)
+          updateParallelProgress(totalDownloaded, totalSize)
+          Thread.sleep(500) // Update every 500ms
+        }
+      } catch (e: InterruptedException) {
+        Thread.currentThread().interrupt()
+      }
+    }, downloadExecutorService)
+  }
+
+
+
+  private fun updateParallelProgress(downloaded: Long, total: Long) {
+    val elapsedTime = (System.currentTimeMillis() - downloadStartTime.get()) / 1000.0
+    val speedMBps = if (elapsedTime > 0) (downloaded / 1024.0 / 1024.0) / elapsedTime else 0.0
+
+    // Use fixed size if 'total' is unreliable
+    val actualTotal = if (total > 0) total else MODEL_SIZE_BYTES
+    val progress = ((downloaded * 100) / actualTotal).toInt().coerceAtMost(100)
+
+    if (downloaded >= actualTotal) return
+    sendDownloadProgress(
+      progress,
+      "Downloading at ${String.format("%.1f", speedMBps)} MB/s...",
+      downloaded,
+      actualTotal,
+      speedMBps
+    )
+  }
+
+  private fun updateSingleThreadProgress(downloaded: Long, total: Long) {
+    val elapsedTime = (System.currentTimeMillis() - downloadStartTime.get()) / 1000.0
+    val speedMBps = if (elapsedTime > 0) (downloaded / 1024.0 / 1024.0) / elapsedTime else 0.0
+
+    val actualTotal = if (total > 0) total else MODEL_SIZE_BYTES
+    val progress = ((downloaded * 100) / actualTotal).toInt().coerceAtMost(100)
+
+    if (downloaded >= actualTotal) return
+
+    sendDownloadProgress(
+      progress,
+      "Downloading at ${String.format("%.1f", speedMBps)} MB/s...",
+      downloaded,
+      actualTotal,
+      speedMBps
+    )
+  }
+
+
+  private fun combineChunksOptimized(tempFiles: List<File>, outputFile: File): Boolean {
+    return try {
+      // Use NIO for faster file operations
+      FileOutputStream(outputFile).channel.use { outputChannel ->
+        tempFiles.forEach { tempFile ->
+          if (!tempFile.exists()) {
+            Log.e("VoskSpeech", "Temp file missing: ${tempFile.name}")
+            return false
+          }
+
+          FileInputStream(tempFile).channel.use { inputChannel ->
+            var position = 0L
+            val size = inputChannel.size()
+
+            while (position < size) {
+              val transferred = inputChannel.transferTo(position, size - position, outputChannel)
+              if (transferred <= 0) break
+              position += transferred
             }
           }
         }
       }
-
-      connection.disconnect()
-      sendDownloadProgress(70, "Download completed")
-      Log.d("VoskSpeech", "Sequential download completed. Total downloaded: ${downloadedSize / 1024 / 1024}MB")
-      return true
-
+      true
     } catch (e: Exception) {
-      sendDownloadProgress(20, "Sequential download failed: ${e.message}")
-      Log.e("VoskSpeech", "Sequential download failed", e)
-      return false
+      Log.e("VoskSpeech", "Failed to combine chunks", e)
+      false
     }
   }
 
-  private fun extractZipFileWithProgress(zipFile: File, destinationDir: File) {
-    Log.d("VoskSpeech", "Starting extraction...")
+  private fun extractZipFileOptimized(zipFile: File, destinationDir: File) {
+    Log.d("VoskSpeech", "Starting optimized extraction...")
     var extractedFiles = 0
     val startTime = System.currentTimeMillis()
 
-    ZipInputStream(BufferedInputStream(FileInputStream(zipFile), bufferSize)).use { zipInput ->
+    ZipInputStream(BufferedInputStream(FileInputStream(zipFile), bufferSize * 2)).use { zipInput ->
       var entry: ZipEntry? = zipInput.nextEntry
 
       while (entry != null) {
         val file = File(destinationDir, entry.name)
 
-        // Security check to prevent zip slip
+        // Security check
         if (!file.canonicalPath.startsWith(destinationDir.canonicalPath)) {
           throw SecurityException("Zip entry is outside target directory: ${entry.name}")
         }
@@ -543,11 +684,11 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         if (entry.isDirectory) {
           file.mkdirs()
         } else {
-          // Create parent directories if they don't exist
           file.parentFile?.mkdirs()
 
-          BufferedOutputStream(FileOutputStream(file), bufferSize).use { output ->
-            val buffer = ByteArray(bufferSize)
+          // Use larger buffer for extraction
+          BufferedOutputStream(FileOutputStream(file), bufferSize * 2).use { output ->
+            val buffer = ByteArray(bufferSize * 2)
             var bytesRead: Int
             while (zipInput.read(buffer).also { bytesRead = it } != -1) {
               output.write(buffer, 0, bytesRead)
@@ -555,8 +696,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           }
 
           extractedFiles++
-          if (extractedFiles % 100 == 0) {
-            Log.d("VoskSpeech", "Extracted $extractedFiles files...")
+          if (extractedFiles % 50 == 0) {
+            val progress = 80 + (extractedFiles * 15 / 1000).coerceAtMost(15)
+            sendDownloadProgress(progress, "Extracting... ($extractedFiles files)")
           }
         }
 
@@ -566,7 +708,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
 
     val extractionTime = (System.currentTimeMillis() - startTime) / 1000.0
-    Log.d("VoskSpeech", "Extraction completed. $extractedFiles files extracted in ${extractionTime}s")
+    Log.d("VoskSpeech", "Extraction completed: $extractedFiles files in ${extractionTime}s")
   }
 
   private fun deleteDirectory(directory: File): Boolean {
@@ -587,24 +729,11 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             PackageManager.PERMISSION_GRANTED
   }
 
-  private fun requestRecordAudioPermission() {
-//    ContextCompat.requestPermissions(
-//      this,
-//      arrayOf(android.Manifest.permission.RECORD_AUDIO),
-//      RECORD_AUDIO_PERMISSION_REQUEST
-//    )
-  }
-
   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
     when (call.method) {
       "recognize" -> {
         if (!hasRecordAudioPermission()) {
-          requestRecordAudioPermission()
-          result.error(
-            "PERMISSION_REQUESTED",
-            "Microphone permission requested from user",
-            null
-          )
+          result.error("PERMISSION_REQUESTED", "Microphone permission requested from user", null)
           return
         }
 
@@ -618,7 +747,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           return
         }
 
-        if (isModelDownloading) {
+        if (isModelDownloading.get()) {
           result.error("MODEL_DOWNLOADING", "Model is currently downloading. Please wait.", null)
           return
         }
@@ -663,8 +792,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       "isModelReady" -> {
         result.success(isModelReady)
       }
-
-      "getRecordedAudio" ->{}
 
       "downloadModel" -> {
         if (isModelReady) {
@@ -757,7 +884,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       val outputStream = FileOutputStream(outputFile)
       val dataOutputStream = DataOutputStream(BufferedOutputStream(outputStream))
 
-      // Write placeholder WAV header (will update later when we know file size)
+      // Write placeholder WAV header
       utils.writeWavHeader(dataOutputStream, sampleRate, 1, 16)
 
       // Set timeout
@@ -802,7 +929,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           dataOutputStream.flush()
           dataOutputStream.close()
 
-          // Fix WAV header (update file sizes)
+          // Fix WAV header
           utils.updateWavHeader(outputFile)
           Log.d("VoskSpeech", "Audio stored at: ${outputFile.absolutePath}")
         }
@@ -815,18 +942,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
-
   private fun createGrammarFromSentence(sentence: String): String {
-    // Clean sentence
     val cleanSentence = sentence
       .lowercase()
       .replace(Regex("[^a-zA-Z0-9\\s]"), "")
       .trim()
 
-    // Optional: include variations with/without small words
     val withoutShortWords = cleanSentence.replace("\\b(is|a|the|of|and|for|up)\\b".toRegex(), "").trim()
 
-    // JSON array of full sentences
     val grammar = if (withoutShortWords != cleanSentence) {
       "[\"$cleanSentence\", \"$withoutShortWords\"]"
     } else {
@@ -837,17 +960,15 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     return grammar
   }
 
-
   private fun isModelValid(): Boolean {
-    return model != null && isModelReady && !isModelDownloading
+    return model != null && isModelReady && !isModelDownloading.get()
   }
 
   private fun calculateConfidence(recognizedText: String, expectedSentence: String): Double {
     if (expectedSentence.isEmpty()) {
-      return 1.0 // If no expected sentence, return full confidence
+      return 1.0
     }
 
-    // Clean both sentences for comparison
     val cleanRecognized = recognizedText.lowercase()
       .replace(Regex("[^a-zA-Z0-9\\s]"), "")
       .trim()
@@ -867,18 +988,15 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     Log.d("VoskSpeech", "Recognized words: $cleanRecognized")
     Log.d("VoskSpeech", "Expected words: $cleanExpected")
 
-    // Calculate word-level accuracy
     var matchingWords = 0
-    var totalWords = cleanExpected.size
+    val totalWords = cleanExpected.size
 
-    // Check each expected word against recognized words
     for (expectedWord in cleanExpected) {
       if (cleanRecognized.contains(expectedWord)) {
         matchingWords++
       }
     }
 
-    // Also consider word order and sequence
     var sequenceScore = 0.0
     val minLength = minOf(cleanRecognized.size, cleanExpected.size)
 
@@ -890,14 +1008,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
     }
 
-    // Normalize sequence score
     if (cleanExpected.isNotEmpty()) {
       sequenceScore /= cleanExpected.size
     }
 
-    // Calculate final confidence
     val wordAccuracy = matchingWords.toDouble() / totalWords
-    val finalConfidence = (wordAccuracy * 0.7 + sequenceScore * 0.3) // 70% word matching, 30% sequence
+    val finalConfidence = (wordAccuracy * 0.7 + sequenceScore * 0.3)
 
     Log.d("VoskSpeech", "Word accuracy: $wordAccuracy, Sequence score: $sequenceScore, Final confidence: $finalConfidence")
 
@@ -915,10 +1031,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       if (isFinal && recognizedText.isNotEmpty()) {
         Handler(Looper.getMainLooper()).post {
-          // Calculate actual confidence based on expected sentence
           val actualConfidence = calculateConfidence(recognizedText, expectedSentence)
 
-          // Determine what text to return
           val finalText = if (shouldReturnExpectedSentence(actualConfidence) && expectedSentence.isNotEmpty()) {
             Log.d("VoskSpeech", "High confidence ($actualConfidence), returning expected sentence")
             expectedSentence
@@ -954,8 +1068,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       if (partial.isNotEmpty()) {
         Handler(Looper.getMainLooper()).post {
-          // Calculate confidence for partial result too
-          val partialConfidence = calculateConfidence(partial, expectedSentence) * 0.8 // Reduce confidence for partial results
+          val partialConfidence = calculateConfidence(partial, expectedSentence) * 0.8
 
           val resultMap = mapOf(
             "correctedPhrase" to partial,
@@ -975,23 +1088,19 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
-  // Add this property at class level to store expected sentence
   private var expectedSentence: String = ""
-
 
   private fun stopRecognition() {
     if (!isRecording) return
     isRecording = false
 
     try {
-      // 1. Stop the recording thread first
       recordingThread?.let { thread ->
         thread.interrupt()
-        thread.join(200) // wait briefly to avoid race
+        thread.join(200)
       }
       recordingThread = null
 
-      // 2. Stop and release AudioRecord safely
       audioRecord?.apply {
         try {
           stop()
@@ -1006,7 +1115,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
       audioRecord = null
 
-      // 3. Get final result before closing recognizer
       recognizer?.let { rec ->
         val finalResult = rec.finalResult
         if (!finalResult.isNullOrEmpty() && activeResult != null) {
@@ -1016,7 +1124,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
       recognizer = null
 
-      // 4. Clean up handler
       timeoutRunnable?.let { r ->
         timeoutHandler?.removeCallbacks(r)
       }
@@ -1028,9 +1135,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
-  //  android built in mode for numbers and paragraph mappings:
   private fun initializeSpeechRecognizer() {
-    // Only initialize if we have permission and don't already have an instance
     if (speechRecognizer == null && hasRecordAudioPermission()) {
       try {
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
@@ -1042,16 +1147,13 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   fun startRecognition(lang: String, mapper: (Map<String, Double>) -> Any, timeoutMillis: Int, paragraph: String = "", keepListening: Boolean) {
-    // Set processing flags
     isProcessing = true
     isListening = true
 
-    // Ensure we have a SpeechRecognizer instance
     if (speechRecognizer == null) {
       initializeSpeechRecognizer()
     }
 
-    // If still null, create one (fallback)
     if (speechRecognizer == null) {
       speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
     }

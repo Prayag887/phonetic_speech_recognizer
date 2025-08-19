@@ -100,4 +100,5 @@ dependencies {
         exclude group: 'net.java.dev.jna', module: 'jna'
     }
     implementation 'net.java.dev.jna:jna:5.13.0@aar'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 }
