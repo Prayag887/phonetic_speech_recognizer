@@ -111,27 +111,28 @@ class LanguageHandlers(private val context: Context) {
      * @param paragraph the paragraph to recognize
      */
     fun handleParagraphMapping(languageCode: String?, timeoutMillis: Int, paragraph: String) {
-        Log.d("SpeechRecognition", "PARAGRAPH FROM FLUTTER SIDE: \"$paragraph\"")
+        val getPartialTexts = true
+        Log.d("VoskSpeech", "Paragraph FROM FLUTTER SIDE: \"$paragraph\"")
         if (languageCode == null) {
             pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
             pluginInstance?.activeResult = null
             return
         }
 
-        val words = paragraph.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
+//        pluginInstance?.startRecognition(
+//            paragraph = paragraph,
+//            lang = languageCode,
+//            mapper = { text ->
+//                if (languageCode == "en-US") {
+//                    pluginInstance?.updateHighlightedText(text.keys.first(), words, paragraph)
+//                }
+//                text
+//            },
+//            timeoutMillis = timeoutMillis,
+//            keepListening = true
+//        )
 
-        pluginInstance?.startRecognition(
-            paragraph = paragraph,
-            lang = languageCode,
-            mapper = { text ->
-                if (languageCode == "en-US") {
-                    pluginInstance?.updateHighlightedText(text.keys.first(), words, paragraph)
-                }
-                text
-            },
-            timeoutMillis = timeoutMillis,
-            keepListening = true
-        )
+        pluginInstance?.startVoskRecognition(timeoutMillis, paragraph, getPartialTexts)
     }
 
 

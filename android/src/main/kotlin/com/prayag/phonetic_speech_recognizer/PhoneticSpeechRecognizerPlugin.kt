@@ -877,7 +877,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     return mapOf("highlights" to highlightedIndices.sortedBy { it["start"] })
   }
 
-  fun startVoskRecognition(timeoutMillis: Int, sentence: String) {
+  fun startVoskRecognition(timeoutMillis: Int, sentence: String, getPartialTexts: Boolean = false) {
     if (!isModelValid()) {
       activeResult?.error("MODEL_ERROR", "Vosk model not ready", null)
       activeResult = null
@@ -886,6 +886,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
     try {
       expectedSentence = sentence
+      shouldReturnPartialResults = getPartialTexts // Store the parameter
 
       recognizer = if (sentence.isNotEmpty()) {
         val grammar = createGrammarFromSentence(sentence)
@@ -951,7 +952,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
                 }
               } else {
                 val partialResult = recognizer?.partialResult
-                if (!partialResult.isNullOrEmpty()) {
+                if (!partialResult.isNullOrEmpty() && shouldReturnPartialResults) {
                   processPartialResult(partialResult)
                 }
               }
@@ -1080,13 +1081,16 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             "detailedAnalysis" to mapOf(
               "recognizedText" to recognizedText,
               "expectedText" to expectedSentence,
-              "actualConfidence" to actualConfidence
+              "actualConfidence" to actualConfidence,
+              "isFinal" to true
             )
           )
 
           Log.d("VoskSpeech", "Final result - Text: $finalText, Confidence: $actualConfidence")
-          activeResult?.success(resultMap)
-          stopRecognition()
+          if(isFinal) {
+            activeResult?.success(resultMap)
+            stopRecognition()
+          }
         }
       }
     } catch (e: Exception) {
@@ -1103,17 +1107,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         Handler(Looper.getMainLooper()).post {
           val partialConfidence = calculateConfidence(partial, expectedSentence) * 0.8
 
-          val resultMap = mapOf(
-            "correctedPhrase" to partial,
-            "confidence" to partialConfidence,
-            "detailedAnalysis" to mapOf(
-              "recognizedText" to partial,
-              "expectedText" to expectedSentence,
-              "actualConfidence" to partialConfidence,
-              "isPartial" to true
-            )
-          )
-          eventSink?.success(resultMap)
+          // Use your event sink pattern
+          val fullText = mapOf(partial to partialConfidence)
+          eventSink?.success(fullText)
+//          eventSink?.success(mapper(fullText))
+
+          Log.d("VoskSpeech", "Partial result sent - Text: $partial, Confidence: $partialConfidence")
         }
       }
     } catch (e: Exception) {
@@ -1122,6 +1121,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private var expectedSentence: String = ""
+  private var shouldReturnPartialResults: Boolean = false // Add this property
 
   private fun stopRecognition() {
     if (!isRecording) return
@@ -1212,12 +1212,11 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
 
     timeoutHandler = Handler(context.mainLooper)
-    val recognizedResults = mutableListOf<String>()
-    val isKeepListening = keepListening // Capture for timeout handling
+    val recognizedResults = mutableListOf<String>()// Capture for timeout handling
 
     timeoutRunnable = Runnable {
       try {
-        val finalResult = if (isKeepListening) {
+        val finalResult = if (keepListening) {
           mapOf(recognizedResults.joinToString(" ") to 0.0 ) // Join all accumulated results
         } else {
           mapOf((recognizedResults.firstOrNull() ?: "") to 0.0)
