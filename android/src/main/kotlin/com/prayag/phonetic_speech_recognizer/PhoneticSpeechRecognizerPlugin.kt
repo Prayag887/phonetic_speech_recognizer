@@ -91,6 +91,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private val modelDirName = "vosk-model-en-us-0.22-lgraph"
   private val MODEL_SIZE_BYTES = 128L * 1024 * 1024 // 128 MB
 
+  private var lastSpeechTime: Long = 0
+  private val silenceThresholdMs = 3000L // 3 sec
+
   // Ultra-optimized download configuration
   private val maxRetries = 3
   private val maxConcurrentConnections = 8 // Increased for fast CDN
@@ -886,7 +889,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
     try {
       expectedSentence = sentence
-      shouldReturnPartialResults = getPartialTexts // Store the parameter
+      shouldReturnPartialResults = getPartialTexts
 
       recognizer = if (sentence.isNotEmpty()) {
         val grammar = createGrammarFromSentence(sentence)
@@ -903,7 +906,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       audioRecord = AudioRecord(audioSource, sampleRate, channelConfig, audioFormat, bufferSize * 2)
-
       if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
         activeResult?.error("AUDIO_ERROR", "AudioRecord initialization failed", null)
         activeResult = null
@@ -913,24 +915,33 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       isRecording = true
       audioRecord?.startRecording()
 
-      // Prepare WAV file
       val outputFile = File(context.cacheDir, "vosk_recording.wav")
       val outputStream = FileOutputStream(outputFile)
       val dataOutputStream = DataOutputStream(BufferedOutputStream(outputStream))
 
-      // Write placeholder WAV header
       utils.writeWavHeader(dataOutputStream, sampleRate, 1, 16)
 
-      // Set timeout
-      timeoutHandler = Handler(Looper.getMainLooper())
-      timeoutRunnable = Runnable {
-        stopRecognition()
-        activeResult?.error("TIMEOUT", "Recognition timeout", null)
-        activeResult = null
-      }
-      timeoutHandler?.postDelayed(timeoutRunnable!!, timeoutMillis.toLong())
+      // Track silence
+      lastSpeechTime = System.currentTimeMillis()
 
-      // Start recording thread
+      // Handler that checks for silence
+      timeoutHandler = Handler(Looper.getMainLooper())
+      timeoutRunnable = object : Runnable {
+        override fun run() {
+          val now = System.currentTimeMillis()
+          if (now - lastSpeechTime >= silenceThresholdMs) {
+            stopRecognition()
+            activeResult?.error("SILENCE_TIMEOUT", "No speech detected for 5s", null)
+            activeResult = null
+          } else {
+            // re-check every second
+            timeoutHandler?.postDelayed(this, 1000)
+          }
+        }
+      }
+      timeoutHandler?.postDelayed(timeoutRunnable!!, 1000)
+
+      // Recording thread
       recordingThread = thread {
         val buffer = ByteArray(bufferSize)
 
@@ -941,29 +952,26 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             val bytesRead = audioRecord?.read(buffer, 0, buffer.size) ?: 0
 
             if (bytesRead > 0) {
-              // Store raw PCM in WAV
               dataOutputStream.write(buffer, 0, bytesRead)
 
-              // Feed Vosk
               if (recognizer?.acceptWaveForm(buffer, bytesRead) == true) {
                 val result = recognizer?.result
                 if (!result.isNullOrEmpty()) {
+                  lastSpeechTime = System.currentTimeMillis() // ✅ speech detected
                   processVoskResult(result, true)
                 }
               } else {
                 val partialResult = recognizer?.partialResult
                 if (!partialResult.isNullOrEmpty() && shouldReturnPartialResults) {
+                  lastSpeechTime = System.currentTimeMillis() // ✅ speech detected
                   processPartialResult(partialResult)
                 }
               }
             }
           }
         } finally {
-          // Close WAV properly
           dataOutputStream.flush()
           dataOutputStream.close()
-
-          // Fix WAV header
           utils.updateWavHeader(outputFile)
           Log.d("VoskSpeech", "Audio stored at: ${outputFile.absolutePath}")
         }
@@ -975,6 +983,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       activeResult = null
     }
   }
+
 
   private fun createGrammarFromSentence(sentence: String): String {
     val cleanSentence = sentence

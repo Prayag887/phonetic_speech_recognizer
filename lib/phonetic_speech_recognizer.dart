@@ -68,7 +68,9 @@ class PhoneticSpeechRecognizer {
   final Map<String, List<String>> homophones = Homophones.homophones;
 
   // Function words that should always be highlighted as correct
-  static const Set<String> functionWords = {'a', 'an', "i"};
+  static const Set<String> functionWords = {
+    'a',
+  };
 
   List<int> errorWordsIndexes = [];
   List<int> errorPronouncationList = [];
