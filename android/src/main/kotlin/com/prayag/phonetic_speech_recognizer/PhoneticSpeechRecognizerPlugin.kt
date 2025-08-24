@@ -81,6 +81,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var isModelDownloading = AtomicBoolean(false)
   private var isModelReady = false
   private var isInitialized = false
+  private var accumulatedFinalText = ""
 
   private val utils = Utils()
   private val RECORD_AUDIO_PERMISSION_REQUEST = 1001
@@ -1099,47 +1100,46 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     try {
       val jsonResult = JSONObject(result)
       val recognizedText = jsonResult.optString("text", "").trim()
-
       Log.d("VoskSpeech", "Processing result - Text: '$recognizedText', isFinal: $isFinal")
 
-      if (isFinal && recognizedText.isNotEmpty()) {
-        // Prevent duplicate final result processing
-        synchronized(this) {
-          if (hasProcessedFinalResult) {
-            Log.d("VoskSpeech", "Final result already processed, skipping")
-            return
-          }
-          hasProcessedFinalResult = true
+      if (recognizedText.isEmpty()) return
+
+      if (isFinal) {
+        // Concatenate recognized chunks
+        accumulatedFinalText = if (accumulatedFinalText.isEmpty()) {
+          recognizedText
+        } else {
+          "${accumulatedFinalText} $recognizedText"
         }
 
-        Handler(Looper.getMainLooper()).post {
-          val currentActiveResult = activeResult // Capture reference to avoid race condition
+        val actualConfidence = calculateConfidence(accumulatedFinalText, expectedSentence)
 
-          val actualConfidence = calculateConfidence(recognizedText, expectedSentence)
+        val finalText = if (shouldReturnExpectedSentence(actualConfidence) && expectedSentence.isNotEmpty()) {
+          expectedSentence
+        } else {
+          accumulatedFinalText
+        }
 
-          val finalText = if (shouldReturnExpectedSentence(actualConfidence) && expectedSentence.isNotEmpty()) {
-            Log.d("VoskSpeech", "High confidence ($actualConfidence), returning expected sentence")
-            expectedSentence
-          } else {
-            Log.d("VoskSpeech", "Lower confidence ($actualConfidence), returning recognized text")
-            recognizedText
-          }
-
-          val resultMap = mapOf(
-            "correctedPhrase" to finalText,
-            "confidence" to actualConfidence,
-            "detailedAnalysis" to mapOf(
-              "recognizedText" to recognizedText,
-              "expectedText" to expectedSentence,
-              "actualConfidence" to actualConfidence,
-              "isFinal" to true
-            )
+        val resultMap = mapOf(
+          "correctedPhrase" to finalText,
+          "confidence" to actualConfidence,
+          "detailedAnalysis" to mapOf(
+            "recognizedText" to accumulatedFinalText,
+            "expectedText" to expectedSentence,
+            "actualConfidence" to actualConfidence,
+            "isFinal" to true
           )
+        )
 
-          Log.d("VoskSpeech", "Final result - Text: $finalText, Confidence: $actualConfidence")
-          if (isFinal) {
+        Log.d("VoskSpeech", "Final result - Text: $finalText, Confidence: $actualConfidence")
+
+        Handler(Looper.getMainLooper()).post {
+          val currentActiveResult = activeResult
+          if (finalText.length >= expectedSentence.length) {
             currentActiveResult?.success(resultMap)
             stopRecognition()
+          } else {
+            Log.d("VoskSpeech", "Expected sentence longer than final text, continuing recognition...")
           }
         }
       }
@@ -1179,6 +1179,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
     Log.d("VoskSpeech", "Stopping recognition...")
     isRecording = false
+    accumulatedFinalText = ""
 
     try {
       // Stop timeout handler first
