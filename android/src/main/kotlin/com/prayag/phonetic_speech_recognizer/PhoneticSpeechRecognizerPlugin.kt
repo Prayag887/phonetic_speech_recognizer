@@ -65,6 +65,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var eventSinkDownload: EventChannel.EventSink? = null
   var activeResult: MethodChannel.Result? = null
 
+  private var hasProcessedFinalResult: Boolean = false
+  private var hasSpeechBeenDetected: Boolean = false
+
   private var model: Model? = null
   private var recognizer: Recognizer? = null
   private var audioRecord: AudioRecord? = null
@@ -890,6 +893,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     try {
       expectedSentence = sentence
       shouldReturnPartialResults = getPartialTexts
+      hasProcessedFinalResult = false // Add this flag
 
       recognizer = if (sentence.isNotEmpty()) {
         val grammar = createGrammarFromSentence(sentence)
@@ -923,25 +927,31 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       // Track silence
       lastSpeechTime = System.currentTimeMillis()
+      hasSpeechBeenDetected = false // Add this flag
 
-      // Handler that checks for silence
+      // FIXED: Handler that checks for silence
       timeoutHandler = Handler(Looper.getMainLooper())
       timeoutRunnable = object : Runnable {
         override fun run() {
           val now = System.currentTimeMillis()
-          if (now - lastSpeechTime >= silenceThresholdMs) {
-            stopRecognition()
-            activeResult?.error("SILENCE_TIMEOUT", "No speech detected for 5s", null)
+          if (now - lastSpeechTime >= silenceThresholdMs && hasSpeechBeenDetected) {
+            // Only timeout if we've detected speech and then silence
+            Log.d("VoskSpeech", "Silence timeout - processing any final results")
+            stopRecognition() // This will process final results
+          } else if (!hasSpeechBeenDetected && now - lastSpeechTime >= (silenceThresholdMs * 2)) {
+            // Extended timeout if no speech detected at all
+            activeResult?.error("SILENCE_TIMEOUT", "No speech detected", null)
             activeResult = null
+            stopRecognition()
           } else {
-            // re-check every second
+            // Continue monitoring
             timeoutHandler?.postDelayed(this, 1000)
           }
         }
       }
       timeoutHandler?.postDelayed(timeoutRunnable!!, 1000)
 
-      // Recording thread
+      // IMPROVED: Recording thread
       recordingThread = thread {
         val buffer = ByteArray(bufferSize)
 
@@ -954,17 +964,34 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             if (bytesRead > 0) {
               dataOutputStream.write(buffer, 0, bytesRead)
 
+              // Check for voice activity
+              val hasVoiceActivity = hasVoiceActivity(buffer, bytesRead)
+
               if (recognizer?.acceptWaveForm(buffer, bytesRead) == true) {
                 val result = recognizer?.result
                 if (!result.isNullOrEmpty()) {
-                  lastSpeechTime = System.currentTimeMillis() // ✅ speech detected
+                  hasSpeechBeenDetected = true
+                  lastSpeechTime = System.currentTimeMillis()
+                  Log.d("VoskSpeech", "Final result from acceptWaveForm: $result")
                   processVoskResult(result, true)
                 }
               } else {
                 val partialResult = recognizer?.partialResult
-                if (!partialResult.isNullOrEmpty() && shouldReturnPartialResults) {
-                  lastSpeechTime = System.currentTimeMillis() // ✅ speech detected
-                  processPartialResult(partialResult)
+                if (!partialResult.isNullOrEmpty()) {
+                  val partialText = extractPartialText(partialResult)
+                  if (partialText.isNotEmpty()) {
+                    hasSpeechBeenDetected = true
+                    lastSpeechTime = System.currentTimeMillis()
+
+                    if (shouldReturnPartialResults) {
+                      Log.d("VoskSpeech", "Partial result: $partialResult")
+                      processPartialResult(partialResult)
+                    }
+                  }
+                } else if (hasVoiceActivity) {
+                  // Update speech time for voice activity without recognized text
+                  lastSpeechTime = System.currentTimeMillis()
+                  hasSpeechBeenDetected = true
                 }
               }
             }
@@ -983,7 +1010,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       activeResult = null
     }
   }
-
 
   private fun createGrammarFromSentence(sentence: String): String {
     val cleanSentence = sentence
@@ -1063,17 +1089,32 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     return minOf(1.0, maxOf(0.0, finalConfidence))
   }
 
+  // FIXED: Lowered confidence threshold from 0.9 to 0.7
   private fun shouldReturnExpectedSentence(confidence: Double): Boolean {
-    return confidence >= 0.9
+    return confidence >= 0.7
   }
 
+  // FIXED: Enhanced result processing with better race condition handling
   private fun processVoskResult(result: String, isFinal: Boolean) {
     try {
       val jsonResult = JSONObject(result)
-      val recognizedText = jsonResult.optString("text", "")
+      val recognizedText = jsonResult.optString("text", "").trim()
+
+      Log.d("VoskSpeech", "Processing result - Text: '$recognizedText', isFinal: $isFinal")
 
       if (isFinal && recognizedText.isNotEmpty()) {
+        // Prevent duplicate final result processing
+        synchronized(this) {
+          if (hasProcessedFinalResult) {
+            Log.d("VoskSpeech", "Final result already processed, skipping")
+            return
+          }
+          hasProcessedFinalResult = true
+        }
+
         Handler(Looper.getMainLooper()).post {
+          val currentActiveResult = activeResult // Capture reference to avoid race condition
+
           val actualConfidence = calculateConfidence(recognizedText, expectedSentence)
 
           val finalText = if (shouldReturnExpectedSentence(actualConfidence) && expectedSentence.isNotEmpty()) {
@@ -1096,8 +1137,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           )
 
           Log.d("VoskSpeech", "Final result - Text: $finalText, Confidence: $actualConfidence")
-          if(isFinal) {
-            activeResult?.success(resultMap)
+          if (isFinal) {
+            currentActiveResult?.success(resultMap)
             stopRecognition()
           }
         }
@@ -1119,7 +1160,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           // Use your event sink pattern
           val fullText = mapOf(partial to partialConfidence)
           eventSink?.success(fullText)
-//          eventSink?.success(mapper(fullText))
+//                eventSink?.success(mapper(fullText))
 
           Log.d("VoskSpeech", "Partial result sent - Text: $partial, Confidence: $partialConfidence")
         }
@@ -1130,19 +1171,31 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private var expectedSentence: String = ""
-  private var shouldReturnPartialResults: Boolean = false // Add this property
+  private var shouldReturnPartialResults: Boolean = false
 
+  // ENHANCED: stopRecognition with better final result handling
   private fun stopRecognition() {
     if (!isRecording) return
+
+    Log.d("VoskSpeech", "Stopping recognition...")
     isRecording = false
 
     try {
+      // Stop timeout handler first
+      timeoutRunnable?.let { r ->
+        timeoutHandler?.removeCallbacks(r)
+      }
+      timeoutRunnable = null
+      timeoutHandler = null
+
+      // Stop recording thread
       recordingThread?.let { thread ->
         thread.interrupt()
         thread.join(200)
       }
       recordingThread = null
 
+      // Stop audio recording
       audioRecord?.apply {
         try {
           stop()
@@ -1157,25 +1210,57 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
       audioRecord = null
 
+      // FIXED: Always try to get final result and handle empty results better
       recognizer?.let { rec ->
-        val finalResult = rec.finalResult
-        if (!finalResult.isNullOrEmpty() && activeResult != null) {
-          processVoskResult(finalResult, true)
+        try {
+          val finalResult = rec.finalResult
+          Log.d("VoskSpeech", "Final result from recognizer: $finalResult")
+
+          if (!finalResult.isNullOrEmpty() && !hasProcessedFinalResult) {
+            processVoskResult(finalResult, true)
+          } else if (!hasProcessedFinalResult && hasSpeechBeenDetected) {
+            // If we detected speech but got no final result, create an empty result
+            Log.d("VoskSpeech", "Creating empty final result for detected speech")
+            processVoskResult("{\"text\": \"\"}", true)
+          }
+        } catch (e: Exception) {
+          Log.e("VoskSpeech", "Error getting final result", e)
         }
+
         rec.close()
       }
       recognizer = null
-
-      timeoutRunnable?.let { r ->
-        timeoutHandler?.removeCallbacks(r)
-      }
-      timeoutRunnable = null
-      timeoutHandler = null
 
     } catch (e: Exception) {
       Log.e("VoskSpeech", "Error stopping recognition", e)
     }
   }
+
+// HELPER FUNCTIONS (added to support the fixes)
+
+  // Voice activity detection using RMS energy
+  private fun hasVoiceActivity(buffer: ByteArray, bytesRead: Int): Boolean {
+    var sum = 0L
+    for (i in 0 until bytesRead step 2) {
+      if (i + 1 < bytesRead) {
+        val sample = (buffer[i].toInt() and 0xFF) or ((buffer[i + 1].toInt() and 0xFF) shl 8)
+        sum += (sample * sample)
+      }
+    }
+    val rms = Math.sqrt(sum.toDouble() / (bytesRead / 2))
+    return rms > 500 // Adjust threshold as needed
+  }
+
+  // Helper to extract partial text safely
+  private fun extractPartialText(partialResult: String): String {
+    return try {
+      val jsonResult = JSONObject(partialResult)
+      jsonResult.optString("partial", "").trim()
+    } catch (e: Exception) {
+      ""
+    }
+  }
+
 
   private fun initializeSpeechRecognizer() {
     if (speechRecognizer == null && hasRecordAudioPermission()) {
