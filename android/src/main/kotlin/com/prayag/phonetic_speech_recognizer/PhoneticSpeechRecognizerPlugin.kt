@@ -1172,7 +1172,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       Log.d("VoskSpeech", "Processing result - Text: '$recognizedText', isFinal: $isFinal")
 
-      if (isFinal && recognizedText.isNotEmpty()) {
+      if (isFinal) {
         synchronized(this) {
           if (hasProcessedFinalResult) {
             Log.d("VoskSpeech", "Final result already processed, skipping")
@@ -1303,7 +1303,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           } else if (!hasProcessedFinalResult && hasSpeechBeenDetected) {
             // If we detected speech but got no final result, create an empty result
             Log.d("VoskSpeech", "Creating empty final result for detected speech")
-            processVoskResult("{\"text\": \"\"}", true)
+            processVoskResult(" ", true)
           }
         } catch (e: Exception) {
           Log.e("VoskSpeech", "Error getting final result", e)
@@ -1480,7 +1480,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         }
       }
 
-      // ... rest of your RecognitionListener methods remain the same
       override fun onPartialResults(partialResults: Bundle?) {
         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let { partialList ->
           if (partialList.isNotEmpty() && paragraph.isNotEmpty()) {
