@@ -20,14 +20,14 @@ class LanguageHandlers(private val context: Context) {
      * @param timeoutMillis the timeout in milliseconds for the recognition
      */
     fun handleAlphabetRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
-        Log.d("VoskSpeech", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
-        if (languageCode == null) {
-            pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
-            pluginInstance?.activeResult = null
-            return
-        }
-
-        pluginInstance?.startVoskRecognition(timeoutMillis, sentence)
+        val lang = "ne-NP"
+        pluginInstance?.startRecognition(
+            paragraph = "",
+            lang = lang,
+            mapper = { text -> Mapper().mapText(text.keys.first(), PhoneticMapping.phoneticNepaliToEnglishMapping) },
+            timeoutMillis = timeoutMillis,
+            keepListening = false
+        )
     }
 
     /**
@@ -94,14 +94,70 @@ class LanguageHandlers(private val context: Context) {
      */
     fun handleWordsRecognition(languageCode: String?, timeoutMillis: Int, sentence: String) {
         Log.d("VoskSpeech", "SENTENCE FROM FLUTTER SIDE: \"$sentence\"")
+
         if (languageCode == null) {
             pluginInstance?.activeResult?.error("INVALID_LANG", "Language code required", null)
             pluginInstance?.activeResult = null
             return
         }
 
-        pluginInstance?.startVoskRecognition(timeoutMillis, sentence)
+        val trimmed = sentence.trim()
+        val wordCount = trimmed.split("\\s+".toRegex()).size
+        val isSingleWord = wordCount == 1
+        var useGrammar  = false
+
+        Log.d("VoskSpeech", "Word count: $wordCount, Single word? $isSingleWord")
+
+        if (isSingleWord) {
+            // Handle differently if needed
+            pluginInstance?.startRecognition(
+                paragraph = "", // Keep empty for word recognition
+                lang = languageCode,
+                mapper = { text ->
+                    if (languageCode == "en-US") {
+                        val context = ContextBasedDetection().detectContext(sentence)
+                        Log.d("SpeechRecognition", "Original recognition: ${text.keys.first()}")
+
+                        try {
+                            // Get detailed analysis and return it directly
+                            val detailedAnalysis = getDetailedPhraseAnalysis(
+                                listOf(text.keys.first()),
+                                sentence,
+                                context
+                            )
+
+                            Log.d("SpeechRecognition", "Returning detailed analysis directly: $detailedAnalysis")
+
+                            // Return the detailed analysis directly instead of storing it
+                            detailedAnalysis
+                        } catch (e: Exception) {
+                            Log.e("SpeechRecognition", "Error getting detailed analysis", e)
+                            // Fallback to simple correction
+                            val simpleResult = correctRecognizedPhrase(listOf(text.keys.first()), sentence, context)
+                            mapOf(
+                                "correctedPhrase" to simpleResult.keys.first(),
+                                "confidence" to simpleResult.values.first(),
+                                "detailedAnalysis" to false
+                            )
+                        }
+                    } else {
+                        // For non-English, wrap in expected format
+                        mapOf(
+                            "correctedPhrase" to text.keys.first(),
+                            "confidence" to text.values.first(),
+                            "detailedAnalysis" to false
+                        )
+                    }
+                },
+                timeoutMillis = timeoutMillis,
+                keepListening = false
+            )
+        } else {
+            pluginInstance?.startVoskRecognition(timeoutMillis = timeoutMillis, sentence = sentence, useGrammar = true)
+        }
+
     }
+
 
     /**
      * Handles paragraph mapping using Vosk
@@ -183,5 +239,18 @@ class LanguageHandlers(private val context: Context) {
         } else {
             mapOf("" to 0.0)
         }
+    }
+
+    fun getDetailedPhraseAnalysis(
+        recognizedPhrases: List<String>,
+        expectedPhrase: String,
+        context: String = ""
+    ): Map<String, Any> {
+        val simpleResult = correctRecognizedPhrase(recognizedPhrases, expectedPhrase, context)
+        return mapOf(
+            "correctedPhrase" to simpleResult.keys.first(),
+            "confidence" to simpleResult.values.first(),
+            "detailedAnalysis" to false
+        )
     }
 }

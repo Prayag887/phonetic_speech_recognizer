@@ -65,6 +65,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var eventSinkDownload: EventChannel.EventSink? = null
   var activeResult: MethodChannel.Result? = null
 
+  private var useGrammar: Boolean = false
+
   private var hasProcessedFinalResult: Boolean = false
   private var hasSpeechBeenDetected: Boolean = false
 
@@ -81,7 +83,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private var isModelDownloading = AtomicBoolean(false)
   private var isModelReady = false
   private var isInitialized = false
-  private var accumulatedFinalText = ""
 
   private val utils = Utils()
   private val RECORD_AUDIO_PERMISSION_REQUEST = 1001
@@ -606,6 +607,68 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
   }
 
+  private fun stringSimilarity(s1: String, s2: String): Double {
+    if (s1.isEmpty() || s2.isEmpty()) return 0.0
+    if (s1 == s2) return 1.0
+
+    val mtp = matches(s1, s2)
+    val m = mtp[0].toDouble()
+    if (m == 0.0) return 0.0
+
+    val j = (m / s1.length + m / s2.length + (m - mtp[1]) / m) / 3.0
+    val jw = if (j < 0.7) j else j + Math.min(0.1, 1.0 / mtp[3].toDouble()) * mtp[2] * (1 - j)
+    return jw
+  }
+
+  private fun matches(s1: String, s2: String): IntArray {
+    val max: String
+    val min: String
+    if (s1.length > s2.length) {
+      max = s1; min = s2
+    } else {
+      max = s2; min = s1
+    }
+    val range = Math.max(max.length / 2 - 1, 0)
+    val matchIndexes = IntArray(min.length) { -1 }
+    val matchFlags = BooleanArray(max.length)
+    var matches = 0
+    for (i in min.indices) {
+      val c1 = min[i]
+      val start = Math.max(i - range, 0)
+      val end = Math.min(i + range + 1, max.length)
+      for (j in start until end) {
+        if (!matchFlags[j] && c1 == max[j]) {
+          matchIndexes[i] = j
+          matchFlags[j] = true
+          matches++
+          break
+        }
+      }
+    }
+    val ms1 = CharArray(matches)
+    val ms2 = CharArray(matches)
+    var si = 0
+    for (i in min.indices) {
+      if (matchIndexes[i] != -1) {
+        ms1[si] = min[i]
+        si++
+      }
+    }
+    si = 0
+    for (j in max.indices) {
+      if (matchFlags[j]) {
+        ms2[si] = max[j]
+        si++
+      }
+    }
+    var transpositions = 0
+    for (i in ms1.indices) {
+      if (ms1[i] != ms2[i]) transpositions++
+    }
+    return intArrayOf(matches, transpositions / 2, 0, max.length)
+  }
+
+
   private fun startProgressMonitoring(
     chunkProgress: ConcurrentHashMap<Int, Long>,
     totalSize: Long
@@ -884,22 +947,28 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     return mapOf("highlights" to highlightedIndices.sortedBy { it["start"] })
   }
 
-  fun startVoskRecognition(timeoutMillis: Int, sentence: String, getPartialTexts: Boolean = false) {
+  fun startVoskRecognition(timeoutMillis: Int, sentence: String, getPartialTexts: Boolean = false, useGrammar: Boolean = false) {
+    if (isRecording) return
+
     if (!isModelValid()) {
       activeResult?.error("MODEL_ERROR", "Vosk model not ready", null)
       activeResult = null
       return
     }
 
+    this.useGrammar = useGrammar
     try {
       expectedSentence = sentence
       shouldReturnPartialResults = getPartialTexts
-      hasProcessedFinalResult = false // Add this flag
+      hasProcessedFinalResult = false
 
-      recognizer = if (sentence.isNotEmpty()) {
+      // FIXED: Use grammar based on the useGrammar parameter
+      recognizer = if (useGrammar && sentence.isNotEmpty()) {
         val grammar = createGrammarFromSentence(sentence)
+        Log.d("VoskSpeech", "Creating grammar-based recognizer with sentence: $sentence")
         Recognizer(model, sampleRate.toFloat(), grammar)
       } else {
+        Log.d("VoskSpeech", "Creating standard recognizer (no grammar)")
         Recognizer(model, sampleRate.toFloat())
       }
 
@@ -928,9 +997,9 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       // Track silence
       lastSpeechTime = System.currentTimeMillis()
-      hasSpeechBeenDetected = false // Add this flag
+      hasSpeechBeenDetected = false
 
-      // FIXED: Handler that checks for silence
+      // Handler that checks for silence
       timeoutHandler = Handler(Looper.getMainLooper())
       timeoutRunnable = object : Runnable {
         override fun run() {
@@ -952,7 +1021,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
       timeoutHandler?.postDelayed(timeoutRunnable!!, 1000)
 
-      // IMPROVED: Recording thread
+      // Recording thread
       recordingThread = thread {
         val buffer = ByteArray(bufferSize)
 
@@ -1100,53 +1169,66 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     try {
       val jsonResult = JSONObject(result)
       val recognizedText = jsonResult.optString("text", "").trim()
+
       Log.d("VoskSpeech", "Processing result - Text: '$recognizedText', isFinal: $isFinal")
 
-      if (recognizedText.isEmpty()) return
-
-      if (isFinal) {
-        // Concatenate recognized chunks
-        accumulatedFinalText = if (accumulatedFinalText.isEmpty()) {
-          recognizedText
-        } else {
-          "${accumulatedFinalText} $recognizedText"
+      if (isFinal && recognizedText.isNotEmpty()) {
+        synchronized(this) {
+          if (hasProcessedFinalResult) {
+            Log.d("VoskSpeech", "Final result already processed, skipping")
+            return
+          }
+          hasProcessedFinalResult = true
         }
-
-        val actualConfidence = calculateConfidence(accumulatedFinalText, expectedSentence)
-
-        val finalText = if (shouldReturnExpectedSentence(actualConfidence) && expectedSentence.isNotEmpty()) {
-          expectedSentence
-        } else {
-          accumulatedFinalText
-        }
-
-        val resultMap = mapOf(
-          "correctedPhrase" to finalText,
-          "confidence" to actualConfidence,
-          "detailedAnalysis" to mapOf(
-            "recognizedText" to accumulatedFinalText,
-            "expectedText" to expectedSentence,
-            "actualConfidence" to actualConfidence,
-            "isFinal" to true
-          )
-        )
-
-        Log.d("VoskSpeech", "Final result - Text: $finalText, Confidence: $actualConfidence")
 
         Handler(Looper.getMainLooper()).post {
           val currentActiveResult = activeResult
-          if (finalText.length >= expectedSentence.length) {
-            currentActiveResult?.success(resultMap)
-            stopRecognition()
+
+          val finalText: String
+          val actualConfidence: Double
+
+          if (!useGrammar) {
+            // 🔹 Single-word mode: use similarity
+            val similarity = stringSimilarity(recognizedText.lowercase(), expectedSentence.lowercase())
+            Log.d("VoskSpeech", "Single-word similarity: $similarity")
+            actualConfidence = similarity
+            finalText = if (similarity >= 0.8) {
+              Log.d("VoskSpeech", "High similarity ($similarity), returning expected sentence")
+              expectedSentence
+            } else {
+              recognizedText
+            }
           } else {
-            Log.d("VoskSpeech", "Expected sentence longer than final text, continuing recognition...")
+            // 🔹 Normal mode: use confidence calculation
+            actualConfidence = calculateConfidence(recognizedText, expectedSentence)
+            finalText = if (shouldReturnExpectedSentence(actualConfidence) && expectedSentence.isNotEmpty()) {
+              expectedSentence
+            } else {
+              recognizedText
+            }
           }
+
+          val resultMap = mapOf(
+            "correctedPhrase" to finalText,
+            "confidence" to actualConfidence,
+            "detailedAnalysis" to mapOf(
+              "recognizedText" to recognizedText,
+              "expectedText" to expectedSentence,
+              "actualConfidence" to actualConfidence,
+              "isFinal" to true
+            )
+          )
+
+          Log.d("VoskSpeech", "Final result - Text: $finalText, Confidence: $actualConfidence")
+          currentActiveResult?.success(resultMap)
+          stopRecognition()
         }
       }
     } catch (e: Exception) {
       Log.e("VoskSpeech", "Error processing Vosk result", e)
     }
   }
+
 
   private fun processPartialResult(partialResult: String) {
     try {
@@ -1179,7 +1261,6 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
     Log.d("VoskSpeech", "Stopping recognition...")
     isRecording = false
-    accumulatedFinalText = ""
 
     try {
       // Stop timeout handler first
@@ -1275,13 +1356,16 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   fun startRecognition(lang: String, mapper: (Map<String, Double>) -> Any, timeoutMillis: Int, paragraph: String = "", keepListening: Boolean) {
+    // Set processing flags
     isProcessing = true
     isListening = true
 
+    // Ensure we have a SpeechRecognizer instance
     if (speechRecognizer == null) {
       initializeSpeechRecognizer()
     }
 
+    // If still null, create one (fallback)
     if (speechRecognizer == null) {
       speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
     }
@@ -1307,11 +1391,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
 
     timeoutHandler = Handler(context.mainLooper)
-    val recognizedResults = mutableListOf<String>()// Capture for timeout handling
+    val recognizedResults = mutableListOf<String>()
+    val isKeepListening = keepListening // Capture for timeout handling
 
     timeoutRunnable = Runnable {
       try {
-        val finalResult = if (keepListening) {
+        val finalResult = if (isKeepListening) {
           mapOf(recognizedResults.joinToString(" ") to 0.0 ) // Join all accumulated results
         } else {
           mapOf((recognizedResults.firstOrNull() ?: "") to 0.0)
@@ -1395,6 +1480,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         }
       }
 
+      // ... rest of your RecognitionListener methods remain the same
       override fun onPartialResults(partialResults: Bundle?) {
         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let { partialList ->
           if (partialList.isNotEmpty() && paragraph.isNotEmpty()) {
@@ -1457,6 +1543,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech"
     else -> "Unknown error"
   }
+
 
   private fun cleanup() {
     isProcessing = false

@@ -44,7 +44,7 @@ class _MyAppState extends State<MyApp> {
   final ValueNotifier<RecognitionType> _selectedTypeNotifier =
       ValueNotifier<RecognitionType>(RecognitionType.sentences);
   final ValueNotifier<String> _randomTextNotifier =
-      ValueNotifier<String>("This is a house.");
+      ValueNotifier<String>("Bread");
   final ValueNotifier<String> _randomNumberNotifier = ValueNotifier<String>(
       RandomSentenceGenerator.generateSerialKoreanNumber());
   final ValueNotifier<String> _partialTextNotifier = ValueNotifier<String>("");
