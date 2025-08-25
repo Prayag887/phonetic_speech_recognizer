@@ -19,58 +19,12 @@ enum PhoneticType {
   paragraphsMapping
 }
 
-/// Download progress data class
-class DownloadProgress {
-  final int progress;
-  final String status;
-  final int downloadedBytes;
-  final int totalBytes;
-  final int downloadedMB;
-  final int totalMB;
-
-  DownloadProgress({
-    required this.progress,
-    required this.status,
-    required this.downloadedBytes,
-    required this.totalBytes,
-    required this.downloadedMB,
-    required this.totalMB,
-  });
-
-  factory DownloadProgress.fromMap(Map<String, dynamic> map) {
-    return DownloadProgress(
-      progress: map['progress'] ?? 0,
-      status: map['status'] ?? '',
-      downloadedBytes: map['downloadedBytes'] ?? 0,
-      totalBytes: map['totalBytes'] ?? 0,
-      downloadedMB: map['downloadedMB'] ?? 0,
-      totalMB: map['totalMB'] ?? 0,
-    );
-  }
-
-  double get progressPercent => progress / 100.0;
-
-  String get formattedProgress {
-    if (totalMB > 0) {
-      return '$downloadedMB MB / $totalMB MB';
-    } else {
-      return '$downloadedMB MB downloaded';
-    }
-  }
-
-  @override
-  String toString() {
-    return 'DownloadProgress(progress: $progress%, status: $status, size: $formattedProgress)';
-  }
-}
-
 class PhoneticSpeechRecognizer {
   final Map<String, List<String>> homophones = Homophones.homophones;
 
+  ScrollController controller = ScrollController();
   // Function words that should always be highlighted as correct
-  static const Set<String> functionWords = {
-    'a',
-  };
+  static const Set<String> functionWords = {'a', 'an', "i"};
 
   List<int> errorWordsIndexes = [];
   List<int> errorPronouncationList = [];
@@ -78,50 +32,6 @@ class PhoneticSpeechRecognizer {
 
   static const MethodChannel _channel =
       MethodChannel('phonetic_speech_recognizer');
-
-  static const EventChannel _downloadProgressChannel =
-      EventChannel('download_model_progress');
-  static Stream<DownloadProgress>? _downloadProgressStream;
-
-  static StreamSubscription<DownloadProgress>? _progressSubscription;
-
-  /// Get download progress stream
-  static Stream<DownloadProgress> get downloadProgressStream {
-    _downloadProgressStream ??= _downloadProgressChannel
-        .receiveBroadcastStream("download_progress")
-        .map((data) =>
-            DownloadProgress.fromMap(Map<String, dynamic>.from(data)));
-    return _downloadProgressStream!;
-  }
-
-  /// Download model with progress tracking
-  static Future<bool> downloadModelWithProgress() async {
-    try {
-      // Start listening to progress and log only percentage
-      _progressSubscription?.cancel();
-      _progressSubscription = downloadProgressStream.listen(
-        (progress) {
-          print('${progress.progress}%');
-        },
-      );
-
-      final result = await _channel.invokeMethod('downloadModel');
-      return result ?? false;
-    } catch (e) {
-      print('Error downloading model: $e');
-      return false;
-    }
-  }
-
-  static Future<bool> isModelReady() async {
-    try {
-      final result = await _channel.invokeMethod('isModelReady');
-      return result ?? false;
-    } catch (e) {
-      print('Error checking model status: $e');
-      return false;
-    }
-  }
 
   static Future<String?> getPlatformVersion() async {
     try {
@@ -223,6 +133,47 @@ class PhoneticSpeechRecognizer {
     return sentenceCounts;
   }
 
+  /// Helper method to calculate the position of a word in the rendered text
+  double _calculateWordPosition({
+    required int wordIndex,
+    required List<String> words,
+    required double fontSize,
+    required double lineSpace,
+    required double containerWidth,
+  }) {
+    if (wordIndex >= words.length) return 0.0;
+
+    // Estimate character width (approximately 0.6 * fontSize for most fonts)
+    double charWidth = fontSize * 0.6;
+    double spaceWidth = fontSize * 0.3;
+    double lineHeight = fontSize * lineSpace;
+
+    double currentX = 0.0;
+    double currentY = 0.0;
+    int currentLine = 0;
+
+    for (int i = 0; i <= wordIndex; i++) {
+      String word = words[i];
+      double wordWidth = word.length * charWidth;
+
+      // Check if word fits on current line
+      if (currentX + wordWidth > containerWidth && currentX > 0) {
+        // Move to next line
+        currentLine++;
+        currentY = currentLine * lineHeight;
+        currentX = 0.0;
+      }
+
+      if (i == wordIndex) {
+        break;
+      }
+
+      currentX += wordWidth + spaceWidth;
+    }
+
+    return currentY;
+  }
+
   Widget buildRealTimeHighlightedText({
     required String randomText,
     required String partialText,
@@ -234,7 +185,6 @@ class PhoneticSpeechRecognizer {
     required double fontSize,
     required double lineSpace,
     required double endOfScreen,
-    ScrollController? scrollcontroller,
     required void Function({
       int? correctPronouncationListLength,
       int? errorPronouncationListLength,
@@ -253,8 +203,8 @@ class PhoneticSpeechRecognizer {
     List<String> partialWords =
         partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    final int maxLookahead = 2;
-    final int maxSkipLimit = 2;
+    final int maxLookahead = 4;
+    final int maxSkipLimit = 4;
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
@@ -538,15 +488,49 @@ class PhoneticSpeechRecognizer {
         errorPronouncationListLength: errorWordsPronunciationList.length,
         correctPronouncationListLength: correctWordsList.length,
         indexedSentenceCount: indexedSentenceCount);
-
-    ScrollController controller = scrollcontroller ?? ScrollController();
-
+    ScrollController secondcontroller = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.hasClients) {
-        if (isAutoScroll && autoScrollSpeed > 0) {
-          startAutoScroll(controller, autoScrollSpeed);
+      if (controller.hasClients && isAutoScroll) {
+        int currentSentence =
+            _getSentenceFromWordIndex(latestIndex, originalWords);
+        double lineHeight = fontSize * lineSpace;
+        double advanceOffset = lineHeight * 1.0; // 4 lines in advance
+
+        // Estimate position based on sentence rather than individual words
+        double estimatedPosition = _estimateSentencePosition(
+          sentenceIndex: currentSentence,
+          fontSize: fontSize,
+          lineSpace: lineSpace,
+        );
+
+        double advancedPosition = estimatedPosition + advanceOffset;
+
+        double viewportHeight = controller.position.viewportDimension;
+        // Position the advanced content in the upper portion of the screen
+        double targetPosition = advancedPosition - (viewportHeight * 0.3);
+
+        double maxScroll = controller.position.maxScrollExtent;
+        targetPosition = targetPosition.clamp(0.0, maxScroll);
+
+        double currentScroll = controller.offset;
+
+        double currentScreenPosition = estimatedPosition - currentScroll;
+
+        bool shouldScroll = currentScreenPosition < viewportHeight * 0.5;
+
+        print('shouldScroll: $shouldScroll');
+        if (shouldScroll) {
+          _scrollToCurrentPosition(
+            controller: controller,
+            currentWordIndex: latestIndex,
+            words: originalWords,
+            fontSize: fontSize,
+            lineSpace: lineSpace,
+            scrollSpeedPerSecond: 20,
+            // autoScrollSpeed: autoScrollSpeed,
+          );
         } else {
-          controller.jumpTo(controller.offset);
+          isAutoScroll = false;
         }
       }
     });
@@ -614,6 +598,106 @@ class PhoneticSpeechRecognizer {
     );
   }
 
+  void _scrollToCurrentPosition({
+    required ScrollController controller,
+    required int currentWordIndex,
+    required List<String> words,
+    required double fontSize,
+    required double lineSpace,
+    required double scrollSpeedPerSecond, // pixels per second
+  }) {
+    if (!controller.hasClients || currentWordIndex < 0) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!controller.hasClients) return;
+
+      int currentSentence = _getSentenceFromWordIndex(currentWordIndex, words);
+
+      double estimatedPosition = _estimateSentencePosition(
+        sentenceIndex: currentSentence,
+        fontSize: fontSize,
+        lineSpace: lineSpace,
+      );
+
+      double maxScroll = controller.position.maxScrollExtent;
+      estimatedPosition = estimatedPosition.clamp(0.0, maxScroll);
+      if (estimatedPosition <= 100) {
+        estimatedPosition = 100;
+      }
+
+      // Cancel any running scroll animation for smoother control
+      controller.jumpTo(controller.offset);
+
+      // Calculate distance
+      double distance = estimatedPosition - controller.offset;
+
+      // Determine time from speed
+      int durationMs = (distance.abs() / scrollSpeedPerSecond * 1000).round();
+
+      if (durationMs > 0) {
+        controller.animateTo(
+          estimatedPosition,
+          duration: Duration(milliseconds: durationMs),
+          curve: Curves.linear, // constant speed
+        );
+      }
+    });
+  }
+
+// Helper method to determine which sentence a word index belongs to
+  int _getSentenceFromWordIndex(int wordIndex, List<String> words) {
+    if (wordIndex < 0 || wordIndex >= words.length) return 0;
+
+    int sentenceCount = 0;
+    int currentWordCount = 0;
+
+    String fullText = words.join(' ');
+    List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
+
+    for (String sentence in sentences) {
+      List<String> sentenceWords = sentence.trim().split(RegExp(r'\s+'));
+      if (sentence.trim().isEmpty) continue;
+
+      if (wordIndex < currentWordCount + sentenceWords.length) {
+        return sentenceCount;
+      }
+
+      currentWordCount += sentenceWords.length;
+      sentenceCount++;
+    }
+
+    return sentenceCount;
+  }
+
+// Helper method to get the actual sentence text
+  String _getSentenceText(int sentenceIndex, List<String> words) {
+    if (sentenceIndex < 0) return "";
+
+    String fullText = words.join(' ');
+    List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
+
+    if (sentenceIndex < sentences.length) {
+      return sentences[sentenceIndex].trim();
+    }
+
+    return "";
+  }
+
+// Estimate position based on sentence index
+  double _estimateSentencePosition({
+    required int sentenceIndex,
+    required double fontSize,
+    required double lineSpace,
+  }) {
+    if (sentenceIndex < 0) return 0.0;
+
+    // Assume average 3-4 lines per sentence (more realistic for reading passages)
+    double linesPerSentence = 3;
+    double lineHeight = fontSize * lineSpace;
+
+    return sentenceIndex * linesPerSentence * lineHeight;
+  }
+
   Widget displayMistakeWords({
     required List<int> errorWordsList,
     required List<int> errorPronunciationList,
@@ -626,7 +710,7 @@ class PhoneticSpeechRecognizer {
     required double lineSpace,
   }) {
     int correctWords = correctPronouncationList.length;
-    int mispronounced = errorPronouncationList.length;
+    int mispronounced = errorPronunciationList.length;
     int skippedWords = errorWordsList.length;
 
     int totalSpokenWords = correctWords + mispronounced;
