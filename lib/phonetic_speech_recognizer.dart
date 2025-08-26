@@ -295,8 +295,8 @@ class PhoneticSpeechRecognizer {
     List<String> partialWords =
         partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    final int maxLookahead = 4;
-    final int maxSkipLimit = 4;
+    final int maxLookahead = 2;
+    final int maxSkipLimit = 2;
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
