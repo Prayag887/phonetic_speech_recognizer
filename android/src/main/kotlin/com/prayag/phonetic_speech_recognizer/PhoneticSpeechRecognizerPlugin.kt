@@ -1107,22 +1107,69 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private fun createGrammarFromSentence(sentence: String): String {
+    // Normalize input
     val cleanSentence = sentence
       .lowercase()
-      .replace(Regex("[^a-zA-Z0-9\\s]"), "")
+      .replace(Regex("[^a-zA-Z0-9\\s\\.]"), "") // keep full stops for splitting
       .trim()
 
-    val withoutShortWords = cleanSentence.replace("\\b(is|a|the|of|and|for|up)\\b".toRegex(), "").trim()
+    // Count words
+    val wordCount = cleanSentence.split(Regex("\\s+")).size
 
-    val grammar = if (withoutShortWords != cleanSentence) {
-      "[\"$cleanSentence\", \"$withoutShortWords\"]"
-    } else {
-      "[\"$cleanSentence\"]"
+    // If <= 15 words, return original grammar logic
+    if (wordCount <= 15) {
+      val withoutShortWords = cleanSentence.replace(
+        "\\b(is|a|the|of|and|for|up)\\b".toRegex(),
+        ""
+      ).trim()
+
+      val grammar = if (withoutShortWords != cleanSentence) {
+        "[\"$cleanSentence\", \"$withoutShortWords\"]"
+      } else {
+        "[\"$cleanSentence\"]"
+      }
+
+      Log.d("VoskSpeech", "Grammar JSON (short): $grammar")
+      return grammar
     }
 
-    Log.d("VoskSpeech", "Grammar JSON: $grammar")
-    return grammar
+    // If > 15 words, split into sentences
+    val sentences = cleanSentence.split(".")
+      .map { it.trim() }
+      .filter { it.isNotEmpty() }
+
+    val grammarList = mutableListOf<String>()
+
+    for ((index, part) in sentences.withIndex()) {
+      val withoutShortWords = part.replace(
+        "\\b(is|a|the|of|and|for|up)\\b".toRegex(),
+        ""
+      ).trim()
+
+      // Add normal + short-word-removed variants
+      if (withoutShortWords.isNotEmpty() && withoutShortWords != part) {
+        grammarList.add(part)
+        grammarList.add(withoutShortWords)
+      } else {
+        grammarList.add(part)
+      }
+
+      // If it's the last chunk, allow "free speech" at the end
+      if (index == sentences.lastIndex) {
+        grammarList.add(".*") // regex-style wildcard for "anything goes"
+      }
+    }
+
+    val grammarJson = grammarList.joinToString(
+      prefix = "[\"",
+      separator = "\", \"",
+      postfix = "\"]"
+    )
+
+    Log.d("VoskSpeech", "Grammar JSON (long): $grammarJson")
+    return grammarJson
   }
+
 
   private fun isModelValid(): Boolean {
     return model != null && isModelReady && !isModelDownloading.get()
