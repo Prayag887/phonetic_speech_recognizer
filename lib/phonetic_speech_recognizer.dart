@@ -66,7 +66,8 @@ class DownloadProgress {
 
 class PhoneticSpeechRecognizer {
   final Map<String, List<String>> homophones = Homophones.homophones;
-
+  static Timer? _sentenceTimeoutTimer;
+  static String? _lastPartial;
   // Function words that should always be highlighted as correct
   static const Set<String> functionWords = {
     'a',
@@ -137,10 +138,13 @@ class PhoneticSpeechRecognizer {
     }
   }
 
-  static Future<bool> stopRecognition() async {
+  static Future<bool> stopRecognition({void Function()? callback}) async {
     await Future.delayed(Duration(milliseconds: 500));
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
+      if (callback != null) {
+        callback.call();
+      }
       return result;
     } catch (e) {
       throw PlatformException(code: 'STOP_ERROR', message: e.toString());
@@ -1005,14 +1009,16 @@ class PhoneticSpeechRecognizer {
     );
   }
 
+  /// Start recognition
   static Future<dynamic> recognize({
     required PhoneticType type,
     String? languageCode,
     required int timeout,
+    void Function()? callback,
+    int? timeoutPerSentence,
     String? sentence,
     bool sendKeyOnly = true,
   }) async {
-    var homoPhones = Homophones();
     if (timeout < 0) {
       throw ArgumentError('Timeout must be a positive value');
     }
@@ -1023,6 +1029,7 @@ class PhoneticSpeechRecognizer {
         'languageCode': languageCode,
         'timeout': timeout,
         'sentence': sentence,
+        'sendKeyOnly': sendKeyOnly,
       });
 
       if (raw == null) {
@@ -1030,12 +1037,7 @@ class PhoneticSpeechRecognizer {
         return "";
       }
 
-      // Print the raw response from native
       debugPrint("RESULT LIBS: Raw native response: $raw");
-      debugPrint("RESULT LIBS: Raw response type: ${raw.runtimeType}");
-
-      // ALWAYS RETURN RAW RESPONSE
-      debugPrint("RESULT LIBS: Returning raw response directly");
       return raw;
     } on PlatformException catch (e) {
       debugPrint("RESULT LIBS: Platform Exception - ${e.code}: ${e.message}");
@@ -1047,6 +1049,38 @@ class PhoneticSpeechRecognizer {
       debugPrint("RESULT LIBS: Unexpected error: $e");
       return "";
     }
+  }
+
+  /// Call this ONLY when partial text comes in
+  static void onPartialResponse({
+    required String partial,
+    int? timeoutPerSentence,
+    void Function()? callback,
+  }) {
+    debugPrint("RESULT LIBS: Partial response: $partial");
+
+    if (timeoutPerSentence != null && timeoutPerSentence > 0) {
+      if (partial == _lastPartial) {
+        // Partial hasn’t changed → start/reset the inactivity timer
+        _resetInactivityTimer(timeoutPerSentence, callback);
+      } else {
+        // Partial changed → cancel timer, update lastPartial
+        _sentenceTimeoutTimer?.cancel();
+        _lastPartial = partial;
+      }
+    }
+  }
+
+  /// Reset inactivity timer when partial is stuck
+  static void _resetInactivityTimer(
+      int timeoutPerSentence, void Function()? callback) {
+    _sentenceTimeoutTimer?.cancel(); // ensure only one active timer
+    _sentenceTimeoutTimer =
+        Timer(Duration(milliseconds: timeoutPerSentence), () {
+      debugPrint(
+          "RESULT LIBS: No new partial words for $timeoutPerSentence ms → stopping recognition");
+      stopRecognition(callback: callback);
+    });
   }
 
   /// Checks if the recognized sentence contains mandatory words.

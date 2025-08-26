@@ -316,6 +316,7 @@ class _MyAppState extends State<MyApp> {
       final result = await PhoneticSpeechRecognizer.recognize(
         languageCode: languageCode,
         type: phoneticType,
+        timeoutPerSentence: 2000,
         timeout: _timeoutDuration,
         sentence: textToRecognize,
         sendKeyOnly: sendKeyOnly,
@@ -428,11 +429,14 @@ class _MyAppState extends State<MyApp> {
                     return ValueListenableBuilder<bool>(
                       valueListenable: _isListeningNotifier,
                       builder: (context, isListening, child) {
+                        PhoneticSpeechRecognizer.onPartialResponse(
+                            partial: partialText, timeoutPerSentence: 2000);
                         if (selectedType == RecognitionType.paragraphMapping &&
                             isListening) {
                           _newTextNotifier.value =
                               "$recognizedText $partialText";
                           log("Recognized Text: ${_newTextNotifier.value}");
+
                           return recognizer.buildRealTimeHighlightedText(
                             randomText: randomText,
                             partialText: _newTextNotifier.value,
