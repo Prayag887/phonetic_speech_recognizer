@@ -153,7 +153,8 @@ class LanguageHandlers(private val context: Context) {
                 keepListening = false
             )
         } else {
-            pluginInstance?.startVoskRecognition(timeoutMillis = timeoutMillis, sentence = sentence, useGrammar = true)
+            pluginInstance?.startVoskRecognition(timeoutMillis = timeoutMillis, sentence = sentence
+            )
         }
 
     }
@@ -188,21 +189,7 @@ class LanguageHandlers(private val context: Context) {
 //            keepListening = true
 //        )
 
-//        pluginInstance?.startVoskRecognition(timeoutMillis, paragraph, getPartialTexts)
-        val words = paragraph.split(" ").map { it.trim() }.filter { it.isNotEmpty() }
-
-        pluginInstance?.startRecognition(
-            paragraph = paragraph,
-            lang = languageCode,
-            mapper = { text ->
-                if (languageCode == "en-US") {
-                    pluginInstance?.updateHighlightedText(text.keys.first(), words, paragraph)
-                }
-                text
-            },
-            timeoutMillis = timeoutMillis,
-            keepListening = true
-        )
+        pluginInstance?.startVoskRecognition(timeoutMillis, paragraph, getPartialTexts)
     }
 
 
