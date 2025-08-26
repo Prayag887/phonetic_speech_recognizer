@@ -429,8 +429,6 @@ class _MyAppState extends State<MyApp> {
                     return ValueListenableBuilder<bool>(
                       valueListenable: _isListeningNotifier,
                       builder: (context, isListening, child) {
-                        PhoneticSpeechRecognizer.onPartialResponse(
-                            partial: partialText, timeoutPerSentence: 2000);
                         if (selectedType == RecognitionType.paragraphMapping &&
                             isListening) {
                           _newTextNotifier.value =

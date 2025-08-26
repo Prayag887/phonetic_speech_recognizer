@@ -1326,80 +1326,88 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   private val recognizerLock = Object()
   private val accumulatedTextLock = Object()
 
-  // Thread-safe cleanu
-
-  // Enhanced stopRecognition with proper thread safety
+  //  stopRecognition with proper thread safety
   private fun stopRecognition() {
     if (!isRecording) return
 
     Log.d("VoskSpeech", "Stopping recognition...")
+
+    // Step 1: Stop flags
+    isListening = false
     isRecording = false
-    isListening = false  // Stop listening as well
 
-    try {
-      // Stop timeout handler first
-      timeoutRunnable?.let { r ->
-        timeoutHandler?.removeCallbacks(r)
-      }
-      timeoutRunnable = null
-      timeoutHandler = null
-
-      // Stop and wait for recording thread
-      recordingThread?.let { thread ->
-        thread.interrupt()
-        try {
-          thread.join(1000) // Wait up to 1 second
-        } catch (e: InterruptedException) {
-          Log.w("VoskSpeech", "Interrupted while waiting for recording thread to finish")
-          Thread.currentThread().interrupt()
-        }
-      }
-      recordingThread = null
-
-      // Stop audio recording
-      audioRecord?.apply {
-        try {
-          if (recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-            stop()
-          }
-          release()
-        } catch (e: Exception) {
-          Log.w("VoskSpeech", "Error stopping AudioRecord", e)
-        }
-      }
-      audioRecord = null
-
-      // Get final result safely
-      synchronized(recognizerLock) {
-        recognizer?.let { rec ->
-          try {
-            val finalResult = rec.finalResult
-            Log.d("VoskSpeech", "Final result from recognizer: $finalResult")
-
-            if (!finalResult.isNullOrEmpty() && !hasProcessedFinalResult) {
-              processVoskResult(finalResult, true)
-            } else if (!hasProcessedFinalResult && hasSpeechBeenDetected) {
-              Log.d("VoskSpeech", "Creating empty final result for detected speech")
-              processVoskResult("{\"text\": \"\"}", true)
-            }
-          } catch (e: Exception) {
-            Log.e("VoskSpeech", "Error getting final result", e)
-          }
-
-          rec.close()
-        }
-        recognizer = null
-      }
-
-      // Reset accumulated text
-      synchronized(accumulatedTextLock) {
-        accumulatedFinalText = ""
-      }
-
-    } catch (e: Exception) {
-      Log.e("VoskSpeech", "Error stopping recognition", e)
+    // Step 2: Stop timeout handler
+    timeoutRunnable?.let { r ->
+      timeoutHandler?.removeCallbacks(r)
     }
+    timeoutRunnable = null
+    timeoutHandler = null
+
+    // Step 3: Stop and wait for recording thread
+    recordingThread?.let { thread ->
+      try {
+        // Wait until the thread exits (recording loop checks isListening)
+        if (!thread.isInterrupted) thread.interrupt()
+        val joinTimeout = 2000L // 2 seconds to safely exit
+        val start = System.currentTimeMillis()
+        while (thread.isAlive && System.currentTimeMillis() - start < joinTimeout) {
+          thread.join(100)
+        }
+        if (thread.isAlive) {
+          Log.w("VoskSpeech", "Recording thread did not exit in time, force continuing")
+        }
+      } catch (e: InterruptedException) {
+        Log.w("VoskSpeech", "Interrupted while waiting for recording thread to finish")
+        Thread.currentThread().interrupt()
+      }
+    }
+    recordingThread = null
+
+    // Step 4: Stop and release AudioRecord safely
+    audioRecord?.apply {
+      try {
+        if (recordingState == AudioRecord.RECORDSTATE_RECORDING) stop()
+        release()
+      } catch (e: Exception) {
+        Log.w("VoskSpeech", "Error stopping AudioRecord", e)
+      }
+    }
+    audioRecord = null
+
+    // Step 5: Get final result safely from Vosk recognizer
+    synchronized(recognizerLock) {
+      recognizer?.let { rec ->
+        try {
+          if (!hasProcessedFinalResult) {
+            val finalResult = try {
+              rec.finalResult
+            } catch (e: Exception) {
+              Log.e("VoskSpeech", "Error reading final result", e)
+              "{\"text\": \"\"}"
+            }
+            processVoskResult(finalResult ?: "{\"text\": \"\"}", true)
+          }
+        } catch (e: Exception) {
+          Log.e("VoskSpeech", "Error processing final result", e)
+        } finally {
+          try {
+            rec.close()
+          } catch (e: Exception) {
+            Log.w("VoskSpeech", "Error closing recognizer", e)
+          }
+        }
+      }
+      recognizer = null
+    }
+
+    // Step 6: Reset accumulated text
+    synchronized(accumulatedTextLock) {
+      accumulatedFinalText = ""
+    }
+
+    Log.d("VoskSpeech", "Recognition stopped safely")
   }
+
 
 // HELPER FUNCTIONS (added to support the fixes)
 

@@ -140,6 +140,7 @@ class PhoneticSpeechRecognizer {
 
   static Future<bool> stopRecognition({void Function()? callback}) async {
     await Future.delayed(Duration(milliseconds: 500));
+    _sentenceTimeoutTimer?.cancel();
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
       if (callback != null) {
@@ -1049,38 +1050,6 @@ class PhoneticSpeechRecognizer {
       debugPrint("RESULT LIBS: Unexpected error: $e");
       return "";
     }
-  }
-
-  /// Call this ONLY when partial text comes in
-  static void onPartialResponse({
-    required String partial,
-    int? timeoutPerSentence,
-    void Function()? callback,
-  }) {
-    debugPrint("RESULT LIBS: Partial response: $partial");
-
-    if (timeoutPerSentence != null && timeoutPerSentence > 0) {
-      if (partial == _lastPartial) {
-        // Partial hasn’t changed → start/reset the inactivity timer
-        _resetInactivityTimer(timeoutPerSentence, callback);
-      } else {
-        // Partial changed → cancel timer, update lastPartial
-        _sentenceTimeoutTimer?.cancel();
-        _lastPartial = partial;
-      }
-    }
-  }
-
-  /// Reset inactivity timer when partial is stuck
-  static void _resetInactivityTimer(
-      int timeoutPerSentence, void Function()? callback) {
-    _sentenceTimeoutTimer?.cancel(); // ensure only one active timer
-    _sentenceTimeoutTimer =
-        Timer(Duration(milliseconds: timeoutPerSentence), () {
-      debugPrint(
-          "RESULT LIBS: No new partial words for $timeoutPerSentence ms → stopping recognition");
-      stopRecognition(callback: callback);
-    });
   }
 
   /// Checks if the recognized sentence contains mandatory words.
