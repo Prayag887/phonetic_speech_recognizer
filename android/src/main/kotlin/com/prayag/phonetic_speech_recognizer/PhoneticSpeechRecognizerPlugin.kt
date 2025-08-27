@@ -805,7 +805,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             "allLanguageSupport" -> languageHandlers.handleAllLanguages(languageCode, timeoutMillis, sentence)
             "paragraphsMapping" -> languageHandlers.handleParagraphMapping(languageCode, timeoutMillis, sentence)
             else -> {
-              activeResult?.error("INVALID_TYPE", "Unsupported type", null)
+              activeResult?.error("INVALID_TYPE", "Unsupported type", "error")
               activeResult = null
             }
           }
@@ -882,7 +882,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
   fun startVoskRecognition(timeoutMillis: Int, sentence: String, getPartialTexts: Boolean = false) {
     if (!isModelValid()) {
-      activeResult?.error("MODEL_ERROR", "Vosk model not ready", null)
+      activeResult?.error("MODEL_ERROR", "Vosk model not ready", "error")
       activeResult = null
       return
     }
@@ -905,14 +905,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 
       val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
       if (bufferSize == AudioRecord.ERROR || bufferSize == AudioRecord.ERROR_BAD_VALUE) {
-        activeResult?.error("AUDIO_ERROR", "Invalid audio configuration", null)
+        activeResult?.error("AUDIO_ERROR", "Invalid audio configuration", "error")
         activeResult = null
         return
       }
 
       audioRecord = AudioRecord(audioSource, sampleRate, channelConfig, audioFormat, bufferSize * 2)
       if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-        activeResult?.error("AUDIO_ERROR", "AudioRecord initialization failed", null)
+        activeResult?.error("AUDIO_ERROR", "AudioRecord initialization failed", "error")
         activeResult = null
         return
       }
@@ -942,12 +942,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           // Only process results or report timeouts, but don't stop recording
           if (now - currentLastSpeechTime >= silenceThresholdMs && currentHasSpeechDetected) {
             Log.d("VoskSpeech", "Silence detected - processing any accumulated results")
-            activeResult?.error("SILENCE_TIMEOUT", "Silence detected", null)
+            activeResult?.error("SILENCE_TIMEOUT", "Silence detected", "error")
             processFinalResultsIfAvailable()
             cleanup()
           } else if (!currentHasSpeechDetected && now - currentLastSpeechTime >= (silenceThresholdMs * 2)) {
             Log.d("VoskSpeech", "Extended silence - no speech detected")
-            activeResult?.error("SILENCE_TIMEOUT", "No speech detected", null)
+            activeResult?.error("SILENCE_TIMEOUT", "No speech detected", "error")
             activeResult = null
             cleanup()
           }
@@ -1573,7 +1573,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             speechRecognizer?.startListening(intent)
           } else {
             isListening = false
-            activeResult?.error("NO_MATCH", "No speech recognized", null)
+            activeResult?.error("NO_MATCH", "No speech recognized", "error")
             speechRecognizer?.cancel()
             cleanup()
           }
@@ -1612,14 +1612,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
 //          speechRecognizer?.startListening(intent)
           isListening = false
           Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
-          activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
+          activeResult?.error("SPEECH_ERROR", getErrorText(error), "error")
           speechRecognizer?.cancel()
           speechRecognizer?.destroy()
           cleanup()
         } else {
           isListening = false
           Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
-          activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
+          activeResult?.error("SPEECH_ERROR", getErrorText(error), "error")
           speechRecognizer?.cancel()
           speechRecognizer?.destroy()
           cleanup()
