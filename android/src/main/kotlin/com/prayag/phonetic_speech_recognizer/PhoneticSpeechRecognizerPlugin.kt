@@ -1460,11 +1460,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     }
 
     timeoutHandler = Handler(context.mainLooper)
-    val recognizedResults = mutableListOf<String>()// Capture for timeout handling
+    val recognizedResults = mutableListOf<String>()
+    val isKeepListening = keepListening // Capture for timeout handling
 
     timeoutRunnable = Runnable {
       try {
-        val finalResult = if (keepListening) {
+        val finalResult = if (isKeepListening) {
           mapOf(recognizedResults.joinToString(" ") to 0.0 ) // Join all accumulated results
         } else {
           mapOf((recognizedResults.firstOrNull() ?: "") to 0.0)
@@ -1485,51 +1486,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         if (!matches.isNullOrEmpty()) {
           try {
             if (keepListening) {
-              recognizedResults.clear()
-              recognizedResults.addAll(matches)
-              isListening = false
+              val firstMatch = matches.first()
+              recognizedResults.add(firstMatch)
+              val accumulatedText = mapOf(recognizedResults.joinToString(" ") to 0.0)
 
-              // Apply the mapper to process the results
-              val mappedMatches = mapOf(matches.first() to 0.0)
-              val finalResult = mapper(mappedMatches)
-
-              Log.d("SpeechRecognition", "Final result from mapper: $finalResult")
-
-              // The mapper now returns the result directly, so just use it
-              val resultToReturn = when (finalResult) {
-                is Map<*, *> -> {
-                  try {
-                    @Suppress("UNCHECKED_CAST")
-                    finalResult as Map<String, Any>
-                  } catch (e: ClassCastException) {
-                    Log.e("SpeechRecognition", "Error casting final result", e)
-                    mapOf(
-                      "correctedPhrase" to finalResult.toString(),
-                      "confidence" to 0.0,
-                      "detailedAnalysis" to false
-                    )
-                  }
-                }
-                else -> {
-                  mapOf(
-                    "correctedPhrase" to finalResult.toString(),
-                    "confidence" to 0.0,
-                    "detailedAnalysis" to false
-                  )
-                }
-              }
-
-              Log.d("SpeechRecognition", "Sending final result: $resultToReturn")
-              activeResult?.success(resultToReturn)
-              speechRecognizer?.cancel()
-              cleanup()
-
-//              val firstMatch = matches.first()
-//              recognizedResults.add(firstMatch)
-//              val accumulatedText = mapOf(recognizedResults.joinToString(" ") to 0.0)
-//
-//              eventSink?.success(mapper(accumulatedText))
-//              speechRecognizer?.startListening(intent)
+              eventSink?.success(mapper(accumulatedText))
+              speechRecognizer?.startListening(intent)
             } else {
               recognizedResults.clear()
               recognizedResults.addAll(matches)
@@ -1580,7 +1542,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             speechRecognizer?.startListening(intent)
           } else {
             isListening = false
-            activeResult?.error("NO_MATCH", "No speech recognized", "error")
+            activeResult?.error("NO_MATCH", "No speech recognized", null)
             speechRecognizer?.cancel()
             cleanup()
           }
@@ -1612,36 +1574,20 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       override fun onError(error: Int) {
-        if (keepListening && (
-                  error == SpeechRecognizer.ERROR_NO_MATCH ||
-                          error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
-                          error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
-                  )) {
-//          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
-//
-//          isListening = false
-//          sendErrorOnce(error)  // <-- call helper
-//          speechRecognizer?.cancel()
-//          speechRecognizer?.destroy()
-//          cleanup()
+        if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
+                  error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                  error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
           Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
           speechRecognizer?.startListening(intent)
-
         } else {
           isListening = false
           Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
-          sendErrorOnce(error)  // <-- same helper
+//          activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
           speechRecognizer?.cancel()
           speechRecognizer?.destroy()
           cleanup()
         }
       }
-
-      private fun sendErrorOnce(error: Int) {
-        activeResult?.error("SPEECH_ERROR", getErrorText(error), "error")
-        activeResult = null   // mark it consumed
-      }
-
 
       override fun onRmsChanged(rmsdB: Float) {}
       override fun onEndOfSpeech() {}
