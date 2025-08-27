@@ -1605,26 +1605,33 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       override fun onError(error: Int) {
-        if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
-                  error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
-                  error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
+        if (keepListening && (
+                  error == SpeechRecognizer.ERROR_NO_MATCH ||
+                          error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                          error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
+                  )) {
           Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
-//          speechRecognizer?.startListening(intent)
+
           isListening = false
-          Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
-          activeResult?.error("SPEECH_ERROR", getErrorText(error), "error")
+          sendErrorOnce(error)  // <-- call helper
           speechRecognizer?.cancel()
           speechRecognizer?.destroy()
           cleanup()
         } else {
           isListening = false
           Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
-          activeResult?.error("SPEECH_ERROR", getErrorText(error), "error")
+          sendErrorOnce(error)  // <-- same helper
           speechRecognizer?.cancel()
           speechRecognizer?.destroy()
           cleanup()
         }
       }
+
+      private fun sendErrorOnce(error: Int) {
+        activeResult?.error("SPEECH_ERROR", getErrorText(error), "error")
+        activeResult = null   // mark it consumed
+      }
+
 
       override fun onRmsChanged(rmsdB: Float) {}
       override fun onEndOfSpeech() {}
