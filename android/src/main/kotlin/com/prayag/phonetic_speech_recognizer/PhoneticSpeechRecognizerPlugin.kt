@@ -1248,6 +1248,8 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
               // Don't automatically stop recognition - let isListening control it
               Log.d("VoskSpeech", "Result sent, continuing to listen...")
             } else {
+
+              currentActiveResult.success(resultMap)
               Log.d("VoskSpeech", "Expected sentence longer than final text, continuing recognition...")
             }
           }
@@ -1467,12 +1469,51 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         if (!matches.isNullOrEmpty()) {
           try {
             if (keepListening) {
-              val firstMatch = matches.first()
-              recognizedResults.add(firstMatch)
-              val accumulatedText = mapOf(recognizedResults.joinToString(" ") to 0.0)
+              recognizedResults.clear()
+              recognizedResults.addAll(matches)
+              isListening = false
 
-              eventSink?.success(mapper(accumulatedText))
-              speechRecognizer?.startListening(intent)
+              // Apply the mapper to process the results
+              val mappedMatches = mapOf(matches.first() to 0.0)
+              val finalResult = mapper(mappedMatches)
+
+              Log.d("SpeechRecognition", "Final result from mapper: $finalResult")
+
+              // The mapper now returns the result directly, so just use it
+              val resultToReturn = when (finalResult) {
+                is Map<*, *> -> {
+                  try {
+                    @Suppress("UNCHECKED_CAST")
+                    finalResult as Map<String, Any>
+                  } catch (e: ClassCastException) {
+                    Log.e("SpeechRecognition", "Error casting final result", e)
+                    mapOf(
+                      "correctedPhrase" to finalResult.toString(),
+                      "confidence" to 0.0,
+                      "detailedAnalysis" to false
+                    )
+                  }
+                }
+                else -> {
+                  mapOf(
+                    "correctedPhrase" to finalResult.toString(),
+                    "confidence" to 0.0,
+                    "detailedAnalysis" to false
+                  )
+                }
+              }
+
+              Log.d("SpeechRecognition", "Sending final result: $resultToReturn")
+              activeResult?.success(resultToReturn)
+              speechRecognizer?.cancel()
+              cleanup()
+
+//              val firstMatch = matches.first()
+//              recognizedResults.add(firstMatch)
+//              val accumulatedText = mapOf(recognizedResults.joinToString(" ") to 0.0)
+//
+//              eventSink?.success(mapper(accumulatedText))
+//              speechRecognizer?.startListening(intent)
             } else {
               recognizedResults.clear()
               recognizedResults.addAll(matches)
@@ -1555,10 +1596,10 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       override fun onError(error: Int) {
-//        if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
-//                  error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
-//                  error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
-//          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
+        if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
+                  error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                  error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
+          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
 //          speechRecognizer?.startListening(intent)
           isListening = false
           Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
