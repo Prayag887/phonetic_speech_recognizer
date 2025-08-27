@@ -1107,58 +1107,20 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
   }
 
   private fun createGrammarFromSentence(sentence: String): String {
-    // Normalize input
-    val cleanSentence = sentence
-      .lowercase()
-      .replace(Regex("[^a-zA-Z0-9\\s\\.]"), "") // keep full stops for splitting
-      .trim()
-
-    // Count words
-    val wordCount = cleanSentence.split(Regex("\\s+")).size
-
-    // If <= 15 words, return original grammar logic
-    if (wordCount <= 15) {
-      val withoutShortWords = cleanSentence.replace(
-        "\\b(is|a|the|of|and|for|up)\\b".toRegex(),
-        ""
-      ).trim()
-
-      val grammar = if (withoutShortWords != cleanSentence) {
-        "[\"$cleanSentence\", \"$withoutShortWords\"]"
-      } else {
-        "[\"$cleanSentence\"]"
-      }
-
-      Log.d("VoskSpeech", "Grammar JSON (short): $grammar")
-      return grammar
-    }
-
-    // If > 15 words, split into sentences
-    val sentences = cleanSentence.split(".")
-      .map { it.trim() }
+    val words = sentence.lowercase()
+      .replace(Regex("[^a-zA-Z0-9\\s]"), "")
+      .split(Regex("\\s+"))
       .filter { it.isNotEmpty() }
 
     val grammarList = mutableListOf<String>()
 
-    for ((index, part) in sentences.withIndex()) {
-      val withoutShortWords = part.replace(
-        "\\b(is|a|the|of|and|for|up)\\b".toRegex(),
-        ""
-      ).trim()
-
-      // Add normal + short-word-removed variants
-      if (withoutShortWords.isNotEmpty() && withoutShortWords != part) {
-        grammarList.add(part)
-        grammarList.add(withoutShortWords)
-      } else {
-        grammarList.add(part)
-      }
-
-      // If it's the last chunk, allow "free speech" at the end
-      if (index == sentences.lastIndex) {
-        grammarList.add(".*") // regex-style wildcard for "anything goes"
-      }
+    // Add progressive prefixes
+    for (i in 1..words.size) {
+      val prefix = words.take(i).joinToString(" ")
+      grammarList.add(prefix)
     }
+
+    grammarList.add(".*") // allow anything after current words
 
     val grammarJson = grammarList.joinToString(
       prefix = "[\"",
@@ -1166,9 +1128,10 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       postfix = "\"]"
     )
 
-    Log.d("VoskSpeech", "Grammar JSON (long): $grammarJson")
+    Log.d("VoskSpeech", "Flexible Grammar JSON: $grammarJson")
     return grammarJson
   }
+
 
 
   private fun isModelValid(): Boolean {
@@ -1592,11 +1555,17 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       override fun onError(error: Int) {
-        if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
-                  error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
-                  error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
-          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
-          speechRecognizer?.startListening(intent)
+//        if (keepListening && (error == SpeechRecognizer.ERROR_NO_MATCH ||
+//                  error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+//                  error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY)) {
+//          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
+//          speechRecognizer?.startListening(intent)
+          isListening = false
+          Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
+          activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
+          speechRecognizer?.cancel()
+          speechRecognizer?.destroy()
+          cleanup()
         } else {
           isListening = false
           Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
