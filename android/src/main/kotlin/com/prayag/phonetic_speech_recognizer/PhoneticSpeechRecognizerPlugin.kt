@@ -943,11 +943,12 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           if (now - currentLastSpeechTime >= silenceThresholdMs && currentHasSpeechDetected) {
             Log.d("VoskSpeech", "Silence detected - processing any accumulated results")
             processFinalResultsIfAvailable()
+            cleanup()
           } else if (!currentHasSpeechDetected && now - currentLastSpeechTime >= (silenceThresholdMs * 2)) {
             Log.d("VoskSpeech", "Extended silence - no speech detected")
             activeResult?.error("SILENCE_TIMEOUT", "No speech detected", null)
             activeResult = null
-            stopListening()
+            cleanup()
           }
 
           // Continue monitoring as long as we're listening
@@ -1062,6 +1063,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     isListening = false
     stopRecognition()
   }
+
 
   // Thread-safe audio processing
   private fun processAudioBuffer(buffer: ByteArray, bytesRead: Int, hasVoiceActivity: Boolean) {
@@ -1249,6 +1251,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
               currentActiveResult.success(resultMap)
               // Don't automatically stop recognition - let isListening control it
               Log.d("VoskSpeech", "Result sent, continuing to listen...")
+              cleanup()
             } else {
 
               currentActiveResult.success(resultMap)
