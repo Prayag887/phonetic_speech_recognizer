@@ -1655,7 +1655,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     timeoutHandler?.removeCallbacks(timeoutRunnable!!)
     timeoutHandler = null
     timeoutRunnable = null
-    activeResult?.success("ERROR")
+//    activeResult?.success("ERROR")
     speechRecognizer?.cancel()
 
     isListening = false
