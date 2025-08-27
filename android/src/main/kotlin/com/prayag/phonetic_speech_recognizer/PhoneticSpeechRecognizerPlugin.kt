@@ -192,6 +192,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
     eventChannel.setStreamHandler(null)
     eventChannelDownload.setStreamHandler(null)
     cleanup()
+    stopListening()
     executorService.shutdown()
     downloadExecutorService.shutdown()
     ultraFastClient.dispatcher.executorService.shutdown()
@@ -946,6 +947,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             Log.d("VoskSpeech", "Extended silence - no speech detected")
             activeResult?.error("SILENCE_TIMEOUT", "No speech detected", null)
             activeResult = null
+            stopListening()
           }
 
           // Continue monitoring as long as we're listening
@@ -1033,7 +1035,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       Log.e("VoskSpeech", "Error starting recognition", e)
       activeResult?.error("RECOGNITION_ERROR", "Failed to start recognition", e.message)
       activeResult = null
-      cleanup()
+      stopListening()
     }
   }
 
