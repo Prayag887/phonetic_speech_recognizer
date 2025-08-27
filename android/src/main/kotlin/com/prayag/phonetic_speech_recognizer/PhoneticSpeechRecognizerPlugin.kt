@@ -1255,6 +1255,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             } else {
 
               currentActiveResult.success(resultMap)
+              cleanup()
               Log.d("VoskSpeech", "Expected sentence longer than final text, continuing recognition...")
             }
           }
@@ -1262,6 +1263,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
     } catch (e: Exception) {
       Log.e("VoskSpeech", "Error processing Vosk result", e)
+      cleanup()
     }
   }
 
