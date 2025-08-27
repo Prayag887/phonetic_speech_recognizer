@@ -817,6 +817,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
       }
 
       "stopRecognition" -> {
+        cleanup()
         stopRecognition()
         result.success(true)
       }
