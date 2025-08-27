@@ -1049,6 +1049,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           if (!finalResult.isNullOrEmpty()) {
             Log.d("VoskSpeech", "Processing accumulated final result: $finalResult")
             processVoskResult(finalResult, true)
+            cleanup()
           }
         } catch (e: Exception) {
           Log.e("VoskSpeech", "Error getting final result", e)
