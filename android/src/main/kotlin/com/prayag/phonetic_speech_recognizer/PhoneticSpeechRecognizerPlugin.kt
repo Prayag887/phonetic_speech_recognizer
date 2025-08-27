@@ -1016,7 +1016,14 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
             // Check for thread interruption
             if (Thread.currentThread().isInterrupted) {
               Log.d("VoskSpeech", "Recording thread interrupted")
-              break
+              Thread.interrupted() // This clears the interrupt status
+              Log.d("VoskSpeech", "Thread interrupt cleared - continuing recording")
+
+              // Only break if we're intentionally stopping
+              if (!isListening) {
+                Log.d("VoskSpeech", "Stopping due to isListening=false")
+                break
+              }
             }
           }
         } catch (e: Exception) {
