@@ -1610,13 +1610,16 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
                           error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
                           error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
                   )) {
+//          Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
+//
+//          isListening = false
+//          sendErrorOnce(error)  // <-- call helper
+//          speechRecognizer?.cancel()
+//          speechRecognizer?.destroy()
+//          cleanup()
           Log.d("SpeechRecognition", "Error occurred but continuing: ${getErrorText(error)}")
+          speechRecognizer?.startListening(intent)
 
-          isListening = false
-          sendErrorOnce(error)  // <-- call helper
-          speechRecognizer?.cancel()
-          speechRecognizer?.destroy()
-          cleanup()
         } else {
           isListening = false
           Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
