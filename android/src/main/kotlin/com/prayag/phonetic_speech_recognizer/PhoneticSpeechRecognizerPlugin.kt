@@ -942,6 +942,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
           // Only process results or report timeouts, but don't stop recording
           if (now - currentLastSpeechTime >= silenceThresholdMs && currentHasSpeechDetected) {
             Log.d("VoskSpeech", "Silence detected - processing any accumulated results")
+            activeResult?.error("SILENCE_TIMEOUT", "Silence detected", null)
             processFinalResultsIfAvailable()
             cleanup()
           } else if (!currentHasSpeechDetected && now - currentLastSpeechTime >= (silenceThresholdMs * 2)) {
