@@ -820,6 +820,7 @@ class PhoneticSpeechRecognizer {
     // Accuracy: correct words out of total words
     double accuracyPercentageDouble = (correctWords / totalWords) * 100;
     int accuracyPercentage = accuracyPercentageDouble.toInt();
+    AccuracyStore().accuracyPercentage = accuracyPercentage;
 
     // Split the text into words
     final List<String> words = randomText.split(' ');
@@ -1116,3 +1117,12 @@ class PhoneticSpeechRecognizer {
     return false;
   }
 }
+
+class AccuracyStore {
+  static final AccuracyStore _instance = AccuracyStore._internal();
+  factory AccuracyStore() => _instance;
+  AccuracyStore._internal();
+
+  int accuracyPercentage = 0;
+}
+

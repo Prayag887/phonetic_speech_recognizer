@@ -546,6 +546,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Widget _displayMistakes() {
+    print("accuracy percetange ${AccuracyStore().accuracyPercentage}");
     return ValueListenableBuilder<String>(
       valueListenable: _randomTextNotifier,
       builder: (context, randomText, child) {
