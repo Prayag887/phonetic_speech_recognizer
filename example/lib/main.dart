@@ -35,29 +35,29 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   // ValueNotifiers for state management
   final ValueNotifier<String> _recognizedTextNotifier =
-      ValueNotifier<String>("Press the button to start");
+  ValueNotifier<String>("Press the button to start");
   final ValueNotifier<bool> _isListeningNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(1.0);
   final ValueNotifier<int> _modelDownloadProgressNotifier =
-      ValueNotifier<int>(1);
+  ValueNotifier<int>(1);
   final ValueNotifier<double> _confidenceNotifier = ValueNotifier<double>(0.0);
   final ValueNotifier<RecognitionType> _selectedTypeNotifier =
-      ValueNotifier<RecognitionType>(RecognitionType.sentences);
+  ValueNotifier<RecognitionType>(RecognitionType.sentences);
   final ValueNotifier<String> _randomTextNotifier =
-      ValueNotifier<String>("Bread");
+  ValueNotifier<String>("Bread");
   final ValueNotifier<String> _randomNumberNotifier = ValueNotifier<String>(
       RandomSentenceGenerator.generateSerialKoreanNumber());
   final ValueNotifier<String> _partialTextNotifier = ValueNotifier<String>("");
   final ValueNotifier<String> _newTextNotifier = ValueNotifier<String>("");
   final ValueNotifier<bool> _isTextReceivedNotifier =
-      ValueNotifier<bool>(false);
+  ValueNotifier<bool>(false);
   final ValueNotifier<bool> _isRealTimeNotifier = ValueNotifier<bool>(false);
 
   // NEW: ValueNotifiers for detected answer display
   final ValueNotifier<String> _detectedAnswerNotifier =
-      ValueNotifier<String>('');
+  ValueNotifier<String>('');
   final ValueNotifier<bool> _showDetectedAnswerNotifier =
-      ValueNotifier<bool>(false);
+  ValueNotifier<bool>(false);
 
   late AudioPlayer _audioPlayer;
   final ValueNotifier<bool> _isPlayingNotifier = ValueNotifier<bool>(false);
@@ -255,9 +255,9 @@ class _MyAppState extends State<MyApp> {
     PhoneticType phoneticType;
     String languageCode;
     String textToRecognize =
-        _selectedTypeNotifier.value == RecognitionType.koreanNumbers
-            ? _randomNumberNotifier.value
-            : _randomTextNotifier.value;
+    _selectedTypeNotifier.value == RecognitionType.koreanNumbers
+        ? _randomNumberNotifier.value
+        : _randomTextNotifier.value;
 
     switch (_selectedTypeNotifier.value) {
       case RecognitionType.alphabets:
@@ -404,7 +404,7 @@ class _MyAppState extends State<MyApp> {
         _isRealTimeNotifier.value = true;
         // _randomTextNotifier.value = "I visited Bandipur, a small hill town. The streets were clean with old houses and stone paths. I walked around and saw beautiful views of the mountains. People were friendly and smiling. I ate local food and watched the sunset from the hill. Bandipur was peaceful and quiet.";
         _randomTextNotifier.value =
-            "I went to Rara Lake in Mugu. It took a long time to reach, but it was worth it. The blue water of the lake was very clear and beautiful. The mountains around the lake made it look like a painting. I sat near the lake and felt very calm and happy.";
+        "I went to Rara Lake in Mugu. It took a long time to reach, but it was worth it. The blue water of the lake was very clear and beautiful. The mountains around the lake made it look like a painting. I sat near the lake and felt very calm and happy.";
         break;
       default:
         _isRealTimeNotifier.value = false;
@@ -432,7 +432,7 @@ class _MyAppState extends State<MyApp> {
                         if (selectedType == RecognitionType.paragraphMapping &&
                             isListening) {
                           _newTextNotifier.value =
-                              "$recognizedText $partialText";
+                          "$recognizedText $partialText";
                           log("Recognized Text: ${_newTextNotifier.value}");
 
                           return recognizer.buildRealTimeHighlightedText(
@@ -448,9 +448,9 @@ class _MyAppState extends State<MyApp> {
                             endOfScreen: 300,
                             callback: (
                                 {correctPronouncationListLength,
-                                errorPronouncationListLength,
-                                errorWordsIndexesLength,
-                                indexedSentenceCount}) {
+                                  errorPronouncationListLength,
+                                  errorWordsIndexesLength,
+                                  indexedSentenceCount}) {
                               // log("Correct Pronouncation List Length: $correctPronouncationListLength");
                               // log("Error Pronouncation List Length: $errorPronouncationListLength");
                               // log("Error Words Indexes Length: $errorWordsIndexesLength");
@@ -471,9 +471,9 @@ class _MyAppState extends State<MyApp> {
                             endOfScreen: 300,
                             callback: (
                                 {correctPronouncationListLength,
-                                errorPronouncationListLength,
-                                errorWordsIndexesLength,
-                                indexedSentenceCount}) {
+                                  errorPronouncationListLength,
+                                  errorWordsIndexesLength,
+                                  indexedSentenceCount}) {
                               // log("Correct Pronouncation List Length:::::::::: $correctPronouncationListLength");
                               // log("Error Pronouncation List Length: $errorPronouncationListLength");
                               // log("Error Words Indexes Length: $errorWordsIndexesLength");
@@ -505,7 +505,7 @@ class _MyAppState extends State<MyApp> {
       Stream<DownloadProgress> progressStream) {
     return PreferredSize(
       preferredSize:
-          const Size.fromHeight(40.0), // enough height for text + bar
+      const Size.fromHeight(40.0), // enough height for text + bar
       child: StreamBuilder<DownloadProgress>(
         stream: progressStream,
         builder: (context, snapshot) {
@@ -546,6 +546,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Widget _displayMistakes() {
+    print("accuracy percetange ${AccuracyStore().accuracyPercentage}");
     return ValueListenableBuilder<String>(
       valueListenable: _randomTextNotifier,
       builder: (context, randomText, child) {
@@ -580,7 +581,7 @@ class _MyAppState extends State<MyApp> {
                 _generateRandomText();
               },
               itemBuilder: (BuildContext context) =>
-                  <PopupMenuEntry<RecognitionType>>[
+              <PopupMenuEntry<RecognitionType>>[
                 const PopupMenuItem(
                     value: RecognitionType.alphabets, child: Text('Alphabets')),
                 const PopupMenuItem(
@@ -623,7 +624,7 @@ class _MyAppState extends State<MyApp> {
                           valueListenable: _isTextReceivedNotifier,
                           builder: (context, isTextReceived, child) {
                             return progress <= 0.001 ||
-                                    (!isListening && isTextReceived)
+                                (!isListening && isTextReceived)
                                 ? _displayMistakes()
                                 : _buildHighlightedText();
                           },
@@ -643,36 +644,36 @@ class _MyAppState extends State<MyApp> {
                     builder: (context, showDetectedAnswer, child) {
                       return showDetectedAnswer && detectedAnswer.isNotEmpty
                           ? Container(
-                              margin: EdgeInsets.symmetric(vertical: 10),
-                              padding: EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.1),
-                                border:
-                                    Border.all(color: Colors.green, width: 2),
-                                borderRadius: BorderRadius.circular(8),
+                        margin: EdgeInsets.symmetric(vertical: 10),
+                        padding: EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          border:
+                          Border.all(color: Colors.green, width: 2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              "Detected Answer:",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green[700],
                               ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    "Detected Answer:",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green[700],
-                                    ),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    detectedAnswer,
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      color: Colors.black87,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              detectedAnswer,
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.black87,
                               ),
-                            )
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      )
                           : Container();
                     },
                   );
@@ -689,12 +690,12 @@ class _MyAppState extends State<MyApp> {
                       return isTextReceived
                           ? Container() // If _isTextReceived is true, show nothing
                           : Text(
-                              isListening ? "Listening..." : "",
-                              style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue),
-                            );
+                        isListening ? "Listening..." : "",
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue),
+                      );
                     },
                   );
                 },

@@ -78,10 +78,10 @@ class PhoneticSpeechRecognizer {
   List<int> correctPronouncationList = [];
 
   static const MethodChannel _channel =
-      MethodChannel('phonetic_speech_recognizer');
+  MethodChannel('phonetic_speech_recognizer');
 
   static const EventChannel _downloadProgressChannel =
-      EventChannel('download_model_progress');
+  EventChannel('download_model_progress');
   static Stream<DownloadProgress>? _downloadProgressStream;
 
   static StreamSubscription<DownloadProgress>? _progressSubscription;
@@ -91,7 +91,7 @@ class PhoneticSpeechRecognizer {
     _downloadProgressStream ??= _downloadProgressChannel
         .receiveBroadcastStream("download_progress")
         .map((data) =>
-            DownloadProgress.fromMap(Map<String, dynamic>.from(data)));
+        DownloadProgress.fromMap(Map<String, dynamic>.from(data)));
     return _downloadProgressStream!;
   }
 
@@ -101,7 +101,7 @@ class PhoneticSpeechRecognizer {
       // Start listening to progress and log only percentage
       _progressSubscription?.cancel();
       _progressSubscription = downloadProgressStream.listen(
-        (progress) {
+            (progress) {
           print('${progress.progress}%');
         },
       );
@@ -173,7 +173,7 @@ class PhoneticSpeechRecognizer {
 // The supporting function that gets the raw data stream
   Stream<dynamic> getDataStream() {
     final EventChannel _eventChannel =
-        EventChannel('phonetic_speech_recognizer/partial_results');
+    EventChannel('phonetic_speech_recognizer/partial_results');
     return _eventChannel.receiveBroadcastStream();
   }
 
@@ -201,8 +201,8 @@ class PhoneticSpeechRecognizer {
     List<String> sentences = text.split(RegExp(r'[.!?]+\s*'));
 
     for (int sentenceIndex = 0;
-        sentenceIndex < sentences.length;
-        sentenceIndex++) {
+    sentenceIndex < sentences.length;
+    sentenceIndex++) {
       String sentence = sentences[sentenceIndex].trim();
       if (sentence.isEmpty) continue;
 
@@ -214,8 +214,8 @@ class PhoneticSpeechRecognizer {
       bool hasReachedHalfway = false;
 
       for (int i = 0;
-          i < sentenceWords.length && wordIndex < words.length;
-          i++) {
+      i < sentenceWords.length && wordIndex < words.length;
+      i++) {
         // If we've reached the halfway point for the first time, increment the sentence count
         if (i >= halfwayPoint && !hasReachedHalfway) {
           currentSentenceCount++;
@@ -283,10 +283,10 @@ class PhoneticSpeechRecognizer {
     required double lineSpace,
     required double endOfScreen,
     required void Function({
-      int? correctPronouncationListLength,
-      int? errorPronouncationListLength,
-      int? errorWordsIndexesLength,
-      int? indexedSentenceCount,
+    int? correctPronouncationListLength,
+    int? errorPronouncationListLength,
+    int? errorWordsIndexesLength,
+    int? indexedSentenceCount,
     }) callback,
   }) {
     String cleanText(String text) {
@@ -298,7 +298,7 @@ class PhoneticSpeechRecognizer {
     List<String> originalWords = randomText.split(RegExp(r'\s+'));
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords =
-        partialText.split(RegExp(r'\s+')).map(cleanText).toList();
+    partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
     final int maxLookahead = 2;
     final int maxSkipLimit = 2;
@@ -344,7 +344,7 @@ class PhoneticSpeechRecognizer {
 
       List<List<int>> dp = List.generate(
         word1.length + 1,
-        (_) => List.filled(word2.length + 1, 0),
+            (_) => List.filled(word2.length + 1, 0),
       );
 
       for (int i = 0; i <= word1.length; i++) {
@@ -430,14 +430,14 @@ class PhoneticSpeechRecognizer {
     }
 
     for (int partialIndex = 0;
-        partialIndex < partialWords.length;
-        partialIndex++) {
+    partialIndex < partialWords.length;
+    partialIndex++) {
       String partialWord = partialWords[partialIndex];
       bool found = false;
 
       for (int i = targetIndex;
-          i < targetIndex + maxLookahead && i < targetWords.length;
-          i++) {
+      i < targetIndex + maxLookahead && i < targetWords.length;
+      i++) {
         if (isExactMatch(targetWords[i], partialWord)) {
           matchedIndexes.add(i);
           lastProcessedIndex = i;
@@ -589,7 +589,7 @@ class PhoneticSpeechRecognizer {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (controller.hasClients && isAutoScroll) {
         int currentSentence =
-            _getSentenceFromWordIndex(latestIndex, originalWords);
+        _getSentenceFromWordIndex(latestIndex, originalWords);
         double lineHeight = fontSize * lineSpace;
         double advanceOffset = lineHeight * 1.0; // 4 lines in advance
 
@@ -820,6 +820,7 @@ class PhoneticSpeechRecognizer {
     // Accuracy: correct words out of total words
     double accuracyPercentageDouble = (correctWords / totalWords) * 100;
     int accuracyPercentage = accuracyPercentageDouble.toInt();
+    AccuracyStore().accuracyPercentage = accuracyPercentage;
 
     // Split the text into words
     final List<String> words = randomText.split(' ');
@@ -942,7 +943,7 @@ class PhoneticSpeechRecognizer {
                       style: TextStyle(
                         color: isError ? highlightWrongColor : defaultTextColor,
                         fontWeight:
-                            isError ? FontWeight.bold : FontWeight.normal,
+                        isError ? FontWeight.bold : FontWeight.normal,
                         decoration: isError
                             ? TextDecoration.lineThrough
                             : TextDecoration.none,
@@ -1061,11 +1062,11 @@ class PhoneticSpeechRecognizer {
   /// If [andCase] is false, atleast one word in [mandatoryWordsList] must be present
   bool mandatoryWords(
       {required List<String> mandatoryWordsList,
-      required String recognizedSentence,
-      bool andCase = true}) {
+        required String recognizedSentence,
+        bool andCase = true}) {
     final lowerCaseSentence = recognizedSentence.toLowerCase();
     final lowerCaseMandatoryWords =
-        mandatoryWordsList.map((word) => word.toLowerCase()).toList();
+    mandatoryWordsList.map((word) => word.toLowerCase()).toList();
 
     if (andCase) {
       // AND case: All words must be present in order
@@ -1115,4 +1116,12 @@ class PhoneticSpeechRecognizer {
 
     return false;
   }
+}
+
+class AccuracyStore {
+  static final AccuracyStore _instance = AccuracyStore._internal();
+  factory AccuracyStore() => _instance;
+  AccuracyStore._internal();
+
+  int accuracyPercentage = 0;
 }
