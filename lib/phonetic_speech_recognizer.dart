@@ -19,19 +19,112 @@ enum PhoneticType {
   paragraphsMapping
 }
 
+/// Download progress data class
+class DownloadProgress {
+  final int progress;
+  final String status;
+  final int downloadedBytes;
+  final int totalBytes;
+  final int downloadedMB;
+  final int totalMB;
+
+  DownloadProgress({
+    required this.progress,
+    required this.status,
+    required this.downloadedBytes,
+    required this.totalBytes,
+    required this.downloadedMB,
+    required this.totalMB,
+  });
+
+  factory DownloadProgress.fromMap(Map<String, dynamic> map) {
+    return DownloadProgress(
+      progress: map['progress'] ?? 0,
+      status: map['status'] ?? '',
+      downloadedBytes: map['downloadedBytes'] ?? 0,
+      totalBytes: map['totalBytes'] ?? 0,
+      downloadedMB: map['downloadedMB'] ?? 0,
+      totalMB: map['totalMB'] ?? 0,
+    );
+  }
+
+  double get progressPercent => progress / 100.0;
+
+  String get formattedProgress {
+    if (totalMB > 0) {
+      return '$downloadedMB MB / $totalMB MB';
+    } else {
+      return '$downloadedMB MB downloaded';
+    }
+  }
+
+  @override
+  String toString() {
+    return 'DownloadProgress(progress: $progress%, status: $status, size: $formattedProgress)';
+  }
+}
+
 class PhoneticSpeechRecognizer {
   final Map<String, List<String>> homophones = Homophones.homophones;
-
-  ScrollController controller = ScrollController();
+  static Timer? _sentenceTimeoutTimer;
+  static String? _lastPartial;
   // Function words that should always be highlighted as correct
-  static const Set<String> functionWords = {'a', 'an', "i"};
+  static const Set<String> functionWords = {
+    'a',
+  };
 
   List<int> errorWordsIndexes = [];
   List<int> errorPronouncationList = [];
   List<int> correctPronouncationList = [];
 
   static const MethodChannel _channel =
-      MethodChannel('phonetic_speech_recognizer');
+  MethodChannel('phonetic_speech_recognizer');
+
+  static const EventChannel _downloadProgressChannel =
+  EventChannel('download_model_progress');
+  static Stream<DownloadProgress>? _downloadProgressStream;
+
+  static StreamSubscription<DownloadProgress>? _progressSubscription;
+
+  /// Get download progress stream
+  static Stream<DownloadProgress> get downloadProgressStream {
+    _downloadProgressStream ??= _downloadProgressChannel
+        .receiveBroadcastStream("download_progress")
+        .map((data) =>
+        DownloadProgress.fromMap(Map<String, dynamic>.from(data)));
+    return _downloadProgressStream!;
+  }
+
+  /// Download model with progress tracking
+  static Future<bool> downloadModelWithProgress() async {
+    try {
+      // Start listening to progress and log only percentage
+      _progressSubscription?.cancel();
+      _progressSubscription = downloadProgressStream.listen(
+            (progress) {
+          print('${progress.progress}%');
+        },
+      );
+
+      final result = await _channel.invokeMethod('downloadModel');
+      return result ?? false;
+    } catch (e) {
+      print('Error downloading model: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> isModelReady() async {
+    try {
+      final result = await _channel.invokeMethod('isModelReady');
+      return result ?? false;
+    } catch (e) {
+      print('Error checking model status: $e');
+      return false;
+    }
+  }
+
+  ScrollController controller = ScrollController();
 
   static Future<String?> getPlatformVersion() async {
     try {
@@ -45,10 +138,14 @@ class PhoneticSpeechRecognizer {
     }
   }
 
-  static Future<bool> stopRecognition() async {
+  static Future<bool> stopRecognition({void Function()? callback}) async {
     await Future.delayed(Duration(milliseconds: 500));
+    _sentenceTimeoutTimer?.cancel();
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
+      if (callback != null) {
+        callback.call();
+      }
       return result;
     } catch (e) {
       throw PlatformException(code: 'STOP_ERROR', message: e.toString());
@@ -76,7 +173,7 @@ class PhoneticSpeechRecognizer {
 // The supporting function that gets the raw data stream
   Stream<dynamic> getDataStream() {
     final EventChannel _eventChannel =
-        EventChannel('phonetic_speech_recognizer/partial_results');
+    EventChannel('phonetic_speech_recognizer/partial_results');
     return _eventChannel.receiveBroadcastStream();
   }
 
@@ -104,8 +201,8 @@ class PhoneticSpeechRecognizer {
     List<String> sentences = text.split(RegExp(r'[.!?]+\s*'));
 
     for (int sentenceIndex = 0;
-        sentenceIndex < sentences.length;
-        sentenceIndex++) {
+    sentenceIndex < sentences.length;
+    sentenceIndex++) {
       String sentence = sentences[sentenceIndex].trim();
       if (sentence.isEmpty) continue;
 
@@ -117,8 +214,8 @@ class PhoneticSpeechRecognizer {
       bool hasReachedHalfway = false;
 
       for (int i = 0;
-          i < sentenceWords.length && wordIndex < words.length;
-          i++) {
+      i < sentenceWords.length && wordIndex < words.length;
+      i++) {
         // If we've reached the halfway point for the first time, increment the sentence count
         if (i >= halfwayPoint && !hasReachedHalfway) {
           currentSentenceCount++;
@@ -186,10 +283,10 @@ class PhoneticSpeechRecognizer {
     required double lineSpace,
     required double endOfScreen,
     required void Function({
-      int? correctPronouncationListLength,
-      int? errorPronouncationListLength,
-      int? errorWordsIndexesLength,
-      int? indexedSentenceCount,
+    int? correctPronouncationListLength,
+    int? errorPronouncationListLength,
+    int? errorWordsIndexesLength,
+    int? indexedSentenceCount,
     }) callback,
   }) {
     String cleanText(String text) {
@@ -201,10 +298,10 @@ class PhoneticSpeechRecognizer {
     List<String> originalWords = randomText.split(RegExp(r'\s+'));
     List<String> targetWords = originalWords.map(cleanText).toList();
     List<String> partialWords =
-        partialText.split(RegExp(r'\s+')).map(cleanText).toList();
+    partialText.split(RegExp(r'\s+')).map(cleanText).toList();
 
-    final int maxLookahead = 4;
-    final int maxSkipLimit = 4;
+    final int maxLookahead = 2;
+    final int maxSkipLimit = 2;
     final Set<int> matchedIndexes = {};
     final Set<int> skippedIndexes = {};
     final Set<int> mispronounceIndexes = {};
@@ -247,7 +344,7 @@ class PhoneticSpeechRecognizer {
 
       List<List<int>> dp = List.generate(
         word1.length + 1,
-        (_) => List.filled(word2.length + 1, 0),
+            (_) => List.filled(word2.length + 1, 0),
       );
 
       for (int i = 0; i <= word1.length; i++) {
@@ -333,14 +430,14 @@ class PhoneticSpeechRecognizer {
     }
 
     for (int partialIndex = 0;
-        partialIndex < partialWords.length;
-        partialIndex++) {
+    partialIndex < partialWords.length;
+    partialIndex++) {
       String partialWord = partialWords[partialIndex];
       bool found = false;
 
       for (int i = targetIndex;
-          i < targetIndex + maxLookahead && i < targetWords.length;
-          i++) {
+      i < targetIndex + maxLookahead && i < targetWords.length;
+      i++) {
         if (isExactMatch(targetWords[i], partialWord)) {
           matchedIndexes.add(i);
           lastProcessedIndex = i;
@@ -492,7 +589,7 @@ class PhoneticSpeechRecognizer {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (controller.hasClients && isAutoScroll) {
         int currentSentence =
-            _getSentenceFromWordIndex(latestIndex, originalWords);
+        _getSentenceFromWordIndex(latestIndex, originalWords);
         double lineHeight = fontSize * lineSpace;
         double advanceOffset = lineHeight * 1.0; // 4 lines in advance
 
@@ -723,6 +820,7 @@ class PhoneticSpeechRecognizer {
     // Accuracy: correct words out of total words
     double accuracyPercentageDouble = (correctWords / totalWords) * 100;
     int accuracyPercentage = accuracyPercentageDouble.toInt();
+    AccuracyStore().accuracyPercentage = accuracyPercentage;
 
     // Split the text into words
     final List<String> words = randomText.split(' ');
@@ -845,7 +943,7 @@ class PhoneticSpeechRecognizer {
                       style: TextStyle(
                         color: isError ? highlightWrongColor : defaultTextColor,
                         fontWeight:
-                            isError ? FontWeight.bold : FontWeight.normal,
+                        isError ? FontWeight.bold : FontWeight.normal,
                         decoration: isError
                             ? TextDecoration.lineThrough
                             : TextDecoration.none,
@@ -931,6 +1029,7 @@ class PhoneticSpeechRecognizer {
         'languageCode': languageCode,
         'timeout': timeout,
         'sentence': sentence,
+        'sendKeyOnly': sendKeyOnly,
       });
 
       if (raw == null) {
@@ -938,12 +1037,7 @@ class PhoneticSpeechRecognizer {
         return "";
       }
 
-      // Print the raw response from native
       debugPrint("RESULT LIBS: Raw native response: $raw");
-      debugPrint("RESULT LIBS: Raw response type: ${raw.runtimeType}");
-
-      // ALWAYS RETURN RAW RESPONSE
-      debugPrint("RESULT LIBS: Returning raw response directly");
       return raw;
     } on PlatformException catch (e) {
       debugPrint("RESULT LIBS: Platform Exception - ${e.code}: ${e.message}");
@@ -966,11 +1060,11 @@ class PhoneticSpeechRecognizer {
   /// If [andCase] is false, atleast one word in [mandatoryWordsList] must be present
   bool mandatoryWords(
       {required List<String> mandatoryWordsList,
-      required String recognizedSentence,
-      bool andCase = true}) {
+        required String recognizedSentence,
+        bool andCase = true}) {
     final lowerCaseSentence = recognizedSentence.toLowerCase();
     final lowerCaseMandatoryWords =
-        mandatoryWordsList.map((word) => word.toLowerCase()).toList();
+    mandatoryWordsList.map((word) => word.toLowerCase()).toList();
 
     if (andCase) {
       // AND case: All words must be present in order
@@ -1020,4 +1114,12 @@ class PhoneticSpeechRecognizer {
 
     return false;
   }
+}
+
+class AccuracyStore {
+  static final AccuracyStore _instance = AccuracyStore._internal();
+  factory AccuracyStore() => _instance;
+  AccuracyStore._internal();
+
+  int accuracyPercentage = 0;
 }

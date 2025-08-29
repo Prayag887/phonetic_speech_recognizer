@@ -427,7 +427,7 @@ class LanguageHandlers(private val context: Context) {
         val result = correctRecognizedPhraseWithAnalysis(recognizedPhrases, expectedPhrase, context)
 
         return mapOf(
-            "overallSimilarity" to result.overallSimilarity,
+            "confidence" to result.overallSimilarity,
             "correctedPhrase" to result.correctedPhrase,
             "originalPhrase" to result.originalPhrase,
             "accepted" to result.accepted,

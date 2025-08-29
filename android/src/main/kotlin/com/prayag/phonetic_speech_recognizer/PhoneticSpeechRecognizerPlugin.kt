@@ -236,16 +236,17 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
         putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
-        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
       }
     } else {
       Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
         putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
-        putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
+        putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
+        putExtra(RecognizerIntent.EXTRA_PROMPT, paragraph)
+        putExtra("android.speech.extra.DICTATION_MODE", true)
       }
     }
 
@@ -283,6 +284,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
               eventSink?.success(mapper(accumulatedText))
               speechRecognizer?.startListening(intent)
             } else {
+              print("all matches: $matches")
               recognizedResults.clear()
               recognizedResults.addAll(matches)
               isListening = false
