@@ -244,6 +244,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         putExtra(RecognizerIntent.EXTRA_LANGUAGE, lang)
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+        putExtra("android.speech.extra.GET_AUDIO_FORMAT", "audio/AMR_WB")
         putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
         putExtra("android.speech.extra.EXTRA_ADDITIONAL_LANGUAGES", arrayOf(lang))
       }

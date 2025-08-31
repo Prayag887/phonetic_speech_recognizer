@@ -30,7 +30,7 @@ class PhoneticSimilarity {
 
     // Common English stop words
     private val stopWords = setOf(
-        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
+        "the", "a", "an", "or", "but", "in", "on", "at", "to", "for", "of", "with",
         "by", "is", "are", "was", "were", "be", "been", "have", "has", "had", "do", "does",
         "did", "will", "would", "could", "should", "may", "might", "can", "must", "shall",
         "this", "that", "these", "those", "i", "you", "he", "she", "it", "we", "they",
@@ -66,7 +66,7 @@ class PhoneticSimilarity {
      * Main function that returns both overall similarity and word-level analysis
      */
     fun calculatePhoneticSimilarityWithWordAnalysis(phrase1: String, phrase2: String): Pair<Double, List<WordAnalysisResult>> {
-        println("🔍 DEBUG INPUT:")
+        println("--------- DEBUG INPUT:")
         println("   phrase1 (expected): '$phrase1'")
         println("   phrase2 (recognized): '$phrase2'")
 
@@ -89,7 +89,7 @@ class PhoneticSimilarity {
         val contentWordResults = wordResults.filter { !it.isMetaphoneZero }
         val failedWords = contentWordResults.filter { !it.meetsThreshold }
 
-        println(" PER-WORD ACCURACY ANALYSIS:")
+        println("--------- PER-WORD ACCURACY ANALYSIS:")
         println("   Required threshold: 50% for content words")
         println("   Total content words: ${contentWordResults.size}")
         println("   Words meeting threshold: ${contentWordResults.count { it.meetsThreshold }}")
@@ -314,19 +314,34 @@ class PhoneticSimilarity {
 
         // Common pronunciation confusions
         val pronunciationPairs = listOf(
-            Pair("she", "c"), Pair("c", "she"),
-            Pair("she", "sea"), Pair("sea", "she"),
-            Pair("seas", "she"), Pair("she", "seas"),
-            Pair("see", "c"), Pair("c", "see"),
-            Pair("to", "two"), Pair("two", "to"),
-            Pair("too", "to"), Pair("to", "too"),
-            Pair("there", "their"), Pair("their", "there"),
-            Pair("where", "wear"), Pair("wear", "where"),
-            Pair("for", "four"), Pair("four", "for"),
-            Pair("one", "won"), Pair("won", "one"),
-            Pair("know", "no"), Pair("no", "know"),
-            Pair("right", "write"), Pair("write", "right"),
-            Pair("night", "knight"), Pair("knight", "night")
+            Pair("she", "c"),
+            Pair("c", "she"),
+            Pair("she sees", "ccs"),
+            Pair("ccs", "she sees"),
+            Pair("she", "sea"),
+            Pair("sea", "she"),
+            Pair("seas", "she"),
+            Pair("she", "seas"),
+            Pair("see", "c"),
+            Pair("c", "see"),
+            Pair("to", "two"),
+            Pair("two", "to"),
+            Pair("too", "to"),
+            Pair("to", "too"),
+            Pair("there", "their"),
+            Pair("their", "there"),
+            Pair("where", "wear"),
+            Pair("wear", "where"),
+            Pair("for", "four"),
+            Pair("four", "for"),
+            Pair("one", "won"),
+            Pair("won", "one"),
+            Pair("know", "no"),
+            Pair("no", "know"),
+            Pair("right", "write"),
+            Pair("write", "right"),
+            Pair("night", "knight"),
+            Pair("knight", "night")
         )
 
         for ((word1, word2) in pronunciationPairs) {
@@ -769,12 +784,12 @@ class PhoneticSimilarity {
     }
 
     private fun showDetailedPhoneticBreakdown(words1: List<String>, words2: List<String>) {
-        println("🔍 Detailed Phonetic Analysis:")
+        println(" Detailed Phonetic Analysis:")
 
         val metaphone1 = words1.map { doubleMetaphone.doubleMetaphone(it) }
         val metaphone2 = words2.map { doubleMetaphone.doubleMetaphone(it) }
 
-        println("📋 Expected words (phrase1):")
+        println(" Expected words (phrase1):")
         for (i in words1.indices) {
             val word1 = words1[i]
             val phone1 = metaphone1[i]
@@ -788,7 +803,7 @@ class PhoneticSimilarity {
             println("   Expected: '$word1' → [$phone1]$wordType")
         }
 
-        println("📋 Recognized words (phrase2):")
+        println(" Recognized words (phrase2):")
         for (j in words2.indices) {
             val word2 = words2[j]
             val phone2 = metaphone2[j]
