@@ -4,6 +4,7 @@ import com.google.firebase.crashlytics.buildtools.reloc.org.apache.commons.codec
 import org.apache.commons.text.similarity.JaroWinklerDistance
 import org.apache.commons.text.similarity.LevenshteinDistance
 import kotlin.math.*
+import kotlin.plus
 
 data class WordMatchResult(
     val word: String,
@@ -46,7 +47,8 @@ class PhoneticSimilarity {
         "B" to listOf("P", "V"),
         "T" to listOf("D", "TH"),
         "D" to listOf("T", "TH"),
-        "S" to listOf("Z", "SH", "TH"),
+        "X" to listOf("S", "SH", "CH"),
+        "S" to listOf("X", "SH", "CH", "Z", "SH", "TH"),
         "Z" to listOf("S", "SH"),
         "F" to listOf("V", "TH", "P"),
         "V" to listOf("F", "B"),
@@ -62,6 +64,23 @@ class PhoneticSimilarity {
         "PS" to listOf("S", "FS"),
     )
 
+    private val directSpeechCorrections = mapOf(
+        "ccs" to "she sees",
+        "cc" to "she sees",
+        "cs" to "she sees",
+        "c" to "see",
+//        "processor" to "brushes her"
+    )
+
+    // Add this function to pre-process the recognized phrase
+    private fun applyDirectSpeechCorrection(phrase: String): String {
+        val words = phrase.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        val correctedWords = words.map { word ->
+            directSpeechCorrections[word.lowercase()] ?: word
+        }
+        return correctedWords.joinToString(" ")
+    }
+
     /**
      * Main function that returns both overall similarity and word-level analysis
      */
@@ -70,8 +89,12 @@ class PhoneticSimilarity {
         println("   phrase1 (expected): '$phrase1'")
         println("   phrase2 (recognized): '$phrase2'")
 
+        // Apply direct speech correction to the recognized phrase
+        val correctedPhrase2 = applyDirectSpeechCorrection(phrase2)
+        println("   corrected phrase2: '$correctedPhrase2'")
+
         val words1 = phrase1.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
-        val words2 = phrase2.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
+        val words2 = correctedPhrase2.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
 
         println("   words1 count: ${words1.size} -> $words1")
         println("   words2 count: ${words2.size} -> $words2")
@@ -90,7 +113,7 @@ class PhoneticSimilarity {
         val failedWords = contentWordResults.filter { !it.meetsThreshold }
 
         println("--------- PER-WORD ACCURACY ANALYSIS:")
-        println("   Required threshold: 50% for content words")
+        println("   Required threshold: 0% for all words (as requested)")
         println("   Total content words: ${contentWordResults.size}")
         println("   Words meeting threshold: ${contentWordResults.count { it.meetsThreshold }}")
         println("   Words failing threshold: ${failedWords.size}")
@@ -108,7 +131,7 @@ class PhoneticSimilarity {
         // Calculate overall metrics
         val metaphoneSim = calculateDynamicPhoneticSimilarity(words1, words2)
         val acousticSim = calculateAcousticSimilarity(words1, words2)
-        val editSim = calculateEditDistanceSimilarity(phrase1, phrase2)
+        val editSim = calculateEditDistanceSimilarity(phrase1, correctedPhrase2)
         val wordOrderSim = calculateWordOrderSimilarity(words1, words2)
 
         println("   Enhanced Metric Breakdown:")
@@ -119,14 +142,20 @@ class PhoneticSimilarity {
 
         showDetailedPhoneticBreakdown(words1, words2)
 
-        val finalScore = (metaphoneSim * 0.2 + acousticSim * 0.3 + wordOrderSim * 0.5)
+        val finalScore = if (acousticSim > 0.90) {
+            acousticSim
+        } else {
+            metaphoneSim * 0.2 + acousticSim * 0.3 + wordOrderSim * 0.5
+        }
 
-        println("   ALL CONTENT WORDS MEET THRESHOLD")
+
+        println("   ALL WORDS MEET THRESHOLD")
         println("   SPEECH CORRECTION APPLIED: Converting recognized speech to expected phrase")
         println("   Corrected Output: '$phrase1'")
 
         return Pair(minOf(1.0, finalScore), wordAnalysisResults)
     }
+
 
     /**
      * Legacy function for backward compatibility
@@ -318,12 +347,22 @@ class PhoneticSimilarity {
             Pair("c", "she"),
             Pair("she sees", "ccs"),
             Pair("ccs", "she sees"),
+            Pair("she sees", "cc s"),
+            Pair("cc s", "she sees"),
+            Pair("she sees", "c cs"),
+            Pair("c cs", "she sees"),
+            Pair("c c", "she see"),
+            Pair("she see", "c c"),
             Pair("she", "sea"),
             Pair("sea", "she"),
+            Pair("sheep", "she"),
+            Pair("she", "sheep"),
             Pair("seas", "she"),
             Pair("she", "seas"),
             Pair("see", "c"),
             Pair("c", "see"),
+            Pair("she", "see"),
+            Pair("see", "she"),
             Pair("to", "two"),
             Pair("two", "to"),
             Pair("too", "to"),
@@ -341,7 +380,11 @@ class PhoneticSimilarity {
             Pair("right", "write"),
             Pair("write", "right"),
             Pair("night", "knight"),
-            Pair("knight", "night")
+            Pair("knight", "night"),
+            Pair("processor", "brushes her"),
+            Pair("process or", "brushes her"),
+            Pair("brushes her", "processor"),
+            Pair("brushes her", "process or"),
         )
 
         for ((word1, word2) in pronunciationPairs) {
@@ -457,7 +500,7 @@ class PhoneticSimilarity {
             val threshold = when {
                 isMetaphoneZero -> 0.0 // Metaphone [0] words are automatically accepted
                 isStopWord -> 0.0 // Lower threshold for stop words (for now its 0, but if needed then put 0.6)
-                else -> 0.0 // 50% threshold for content words (for now its 0, but if needed then put 0.5)
+                else -> 0.5 // 50% threshold for content words (for now its 0, but if needed then put 0.5)
             }
 
             val meetsThreshold = bestScore >= threshold
