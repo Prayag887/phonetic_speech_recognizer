@@ -340,7 +340,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         }
       }
 
-      // ... rest of your RecognitionListener methods remain the same
+
       override fun onPartialResults(partialResults: Bundle?) {
         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.let { partialList ->
           if (partialList.isNotEmpty() && paragraph.isNotEmpty()) {

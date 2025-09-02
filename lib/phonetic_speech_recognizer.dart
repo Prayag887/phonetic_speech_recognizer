@@ -19,11 +19,59 @@ enum PhoneticType {
   paragraphsMapping
 }
 
+/// Download progress data class
+class DownloadProgress {
+  final int progress;
+  final String status;
+  final int downloadedBytes;
+  final int totalBytes;
+  final int downloadedMB;
+  final int totalMB;
+
+  DownloadProgress({
+    required this.progress,
+    required this.status,
+    required this.downloadedBytes,
+    required this.totalBytes,
+    required this.downloadedMB,
+    required this.totalMB,
+  });
+
+  factory DownloadProgress.fromMap(Map<String, dynamic> map) {
+    return DownloadProgress(
+      progress: map['progress'] ?? 0,
+      status: map['status'] ?? '',
+      downloadedBytes: map['downloadedBytes'] ?? 0,
+      totalBytes: map['totalBytes'] ?? 0,
+      downloadedMB: map['downloadedMB'] ?? 0,
+      totalMB: map['totalMB'] ?? 0,
+    );
+  }
+
+  double get progressPercent => progress / 100.0;
+
+  String get formattedProgress {
+    if (totalMB > 0) {
+      return '$downloadedMB MB / $totalMB MB';
+    } else {
+      return '$downloadedMB MB downloaded';
+    }
+  }
+
+  @override
+  String toString() {
+    return 'DownloadProgress(progress: $progress%, status: $status, size: $formattedProgress)';
+  }
+}
+
 class PhoneticSpeechRecognizer {
   final Map<String, List<String>> homophones = Homophones.homophones;
-
+  static Timer? _sentenceTimeoutTimer;
+  static String? _lastPartial;
   // Function words that should always be highlighted as correct
-  static const Set<String> functionWords = {'a', 'an', "i"};
+  static const Set<String> functionWords = {
+    'a',
+  };
 
   List<int> errorWordsIndexes = [];
   List<int> errorPronouncationList = [];
@@ -31,6 +79,52 @@ class PhoneticSpeechRecognizer {
 
   static const MethodChannel _channel =
       MethodChannel('phonetic_speech_recognizer');
+
+  static const EventChannel _downloadProgressChannel =
+      EventChannel('download_model_progress');
+  static Stream<DownloadProgress>? _downloadProgressStream;
+
+  static StreamSubscription<DownloadProgress>? _progressSubscription;
+
+  /// Get download progress stream
+  static Stream<DownloadProgress> get downloadProgressStream {
+    _downloadProgressStream ??= _downloadProgressChannel
+        .receiveBroadcastStream("download_progress")
+        .map((data) =>
+            DownloadProgress.fromMap(Map<String, dynamic>.from(data)));
+    return _downloadProgressStream!;
+  }
+
+  /// Download model with progress tracking
+  static Future<bool> downloadModelWithProgress() async {
+    try {
+      // Start listening to progress and log only percentage
+      _progressSubscription?.cancel();
+      _progressSubscription = downloadProgressStream.listen(
+        (progress) {
+          print('${progress.progress}%');
+        },
+      );
+
+      final result = await _channel.invokeMethod('downloadModel');
+      return result ?? false;
+    } catch (e) {
+      print('Error downloading model: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> isModelReady() async {
+    try {
+      final result = await _channel.invokeMethod('isModelReady');
+      return result ?? false;
+    } catch (e) {
+      print('Error checking model status: $e');
+      return false;
+    }
+  }
+
+  ScrollController controller = ScrollController();
 
   static Future<String?> getPlatformVersion() async {
     try {
@@ -44,10 +138,14 @@ class PhoneticSpeechRecognizer {
     }
   }
 
-  static Future<bool> stopRecognition() async {
+  static Future<bool> stopRecognition({void Function()? callback}) async {
     await Future.delayed(Duration(milliseconds: 500));
+    _sentenceTimeoutTimer?.cancel();
     try {
       final bool result = await _channel.invokeMethod('stopRecognition');
+      if (callback != null) {
+        callback.call();
+      }
       return result;
     } catch (e) {
       throw PlatformException(code: 'STOP_ERROR', message: e.toString());
@@ -132,6 +230,47 @@ class PhoneticSpeechRecognizer {
     return sentenceCounts;
   }
 
+  /// Helper method to calculate the position of a word in the rendered text
+  double _calculateWordPosition({
+    required int wordIndex,
+    required List<String> words,
+    required double fontSize,
+    required double lineSpace,
+    required double containerWidth,
+  }) {
+    if (wordIndex >= words.length) return 0.0;
+
+    // Estimate character width (approximately 0.6 * fontSize for most fonts)
+    double charWidth = fontSize * 0.6;
+    double spaceWidth = fontSize * 0.3;
+    double lineHeight = fontSize * lineSpace;
+
+    double currentX = 0.0;
+    double currentY = 0.0;
+    int currentLine = 0;
+
+    for (int i = 0; i <= wordIndex; i++) {
+      String word = words[i];
+      double wordWidth = word.length * charWidth;
+
+      // Check if word fits on current line
+      if (currentX + wordWidth > containerWidth && currentX > 0) {
+        // Move to next line
+        currentLine++;
+        currentY = currentLine * lineHeight;
+        currentX = 0.0;
+      }
+
+      if (i == wordIndex) {
+        break;
+      }
+
+      currentX += wordWidth + spaceWidth;
+    }
+
+    return currentY;
+  }
+
   Widget buildRealTimeHighlightedText({
     required String randomText,
     required String partialText,
@@ -143,16 +282,92 @@ class PhoneticSpeechRecognizer {
     required double fontSize,
     required double lineSpace,
     required double endOfScreen,
-    ScrollController? scrollcontroller,
     required void Function({
       int? correctPronouncationListLength,
       int? errorPronouncationListLength,
       int? errorWordsIndexesLength,
       int? indexedSentenceCount,
+      bool? isCurrentSentenceCompleted,
+      int? totalSentences,
+      double? sentenceCompletionPercentage,
     }) callback,
   }) {
     String cleanText(String text) {
       return text.replaceAll(RegExp(r'[^\w\s]'), '').toLowerCase().trim();
+    }
+
+    // Helper function to split text into sentences
+    List<String> splitIntoSentences(String text) {
+      List<String> sentences = text
+          .split(RegExp(r'[.!?]+\s*'))
+          .where((s) => s.trim().isNotEmpty)
+          .toList();
+      return sentences;
+    }
+
+    // Helper function to get sentence boundaries (word indices)
+    List<List<int>> getSentenceBoundaries(String text) {
+      List<String> sentences = splitIntoSentences(text);
+      List<List<int>> boundaries = [];
+      List<String> allWords = text.split(RegExp(r'\s+'));
+
+      int wordIndex = 0;
+      for (String sentence in sentences) {
+        List<String> sentenceWords =
+            sentence.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+        List<int> sentenceBoundary = [];
+
+        for (int i = 0; i < sentenceWords.length; i++) {
+          if (wordIndex < allWords.length) {
+            sentenceBoundary.add(wordIndex);
+            wordIndex++;
+          }
+        }
+
+        if (sentenceBoundary.isNotEmpty) {
+          boundaries.add(sentenceBoundary);
+        }
+      }
+
+      return boundaries;
+    }
+
+    // Get sentence boundaries
+    List<List<int>> sentenceBoundaries = getSentenceBoundaries(randomText);
+    List<String> sentences = splitIntoSentences(randomText);
+
+    // Find the current sentence index based on the latest processed word
+    int getCurrentSentenceIndex(
+        int latestWordIndex, List<List<int>> boundaries) {
+      for (int i = 0; i < boundaries.length; i++) {
+        if (boundaries[i].contains(latestWordIndex)) {
+          return i;
+        }
+      }
+      return -1;
+    }
+
+    // Find the next sentence index that hasn't been completed
+    int findNextIncompleteSentence(
+        Set<int> matched, Set<int> mispronounced, Set<int> skipped) {
+      for (int i = 0; i < sentenceBoundaries.length; i++) {
+        List<int> sentenceWords = sentenceBoundaries[i];
+        int processedWords = 0;
+
+        for (int wordIndex in sentenceWords) {
+          if (matched.contains(wordIndex) ||
+              mispronounced.contains(wordIndex) ||
+              skipped.contains(wordIndex)) {
+            processedWords++;
+          }
+        }
+
+        double completionRatio = processedWords / sentenceWords.length;
+        if (completionRatio < 0.8) {
+          return i;
+        }
+      }
+      return sentenceBoundaries.length - 1;
     }
 
     List<int> sentenceCountLookup = _buildSentenceCountLookup(randomText);
@@ -291,6 +506,7 @@ class PhoneticSpeechRecognizer {
       return -1;
     }
 
+    // Main matching logic
     for (int partialIndex = 0;
         partialIndex < partialWords.length;
         partialIndex++) {
@@ -319,6 +535,13 @@ class PhoneticSpeechRecognizer {
 
       if (!found) {
         errorBuffer.add(partialWord);
+
+        // Mark current target index as skipped since recognizer missed it
+        if (targetIndex < targetWords.length) {
+          skippedIndexes.add(targetIndex);
+          lastProcessedIndex = targetIndex;
+          targetIndex++;
+        }
 
         if (errorBuffer.length >= consecutiveErrorThreshold) {
           int newIndex = findPatternInTarget(errorBuffer, 0);
@@ -393,32 +616,39 @@ class PhoneticSpeechRecognizer {
           }
         }
       }
+
+      // Ensure all words up to last processed index are accounted for
+      if (lastProcessedIndex >= 0) {
+        for (int i = 0; i <= lastProcessedIndex; i++) {
+          if (isFunctionWord(targetWords[i]) &&
+              !matchedIndexes.contains(i) &&
+              !mispronounceIndexes.contains(i) &&
+              !skippedIndexes.contains(i)) {
+            matchedIndexes.add(i);
+          }
+        }
+      }
     }
 
     autoHighlightFunctionalWords();
 
+    // Process word classifications
     for (int index = 0; index < originalWords.length; index++) {
       if (matchedIndexes.contains(index)) {
-        // Correctly pronounced
         correctWordsList.add(index);
-        log('Correct word at index $index: "${originalWords[index]}"');
       } else if (mispronounceIndexes.contains(index)) {
-        // Incorrectly pronounced
         errorWordsPronunciationList.add(index);
-        log('Mispronounced word at index $index: "${originalWords[index]}" -> "${targetWords[index]}"');
+        errorWordsIndexList.add(index);
       } else if (skippedIndexes.contains(index)) {
-        // Skipped/not attempted
+        errorWordsPronunciationList.add(index);
         errorWordsIndexList.add(index);
-        log('Skipped word at index $index: "${originalWords[index]}"');
       } else {
-        // Unaccounted for - this shouldn't happen if your logic is complete
         errorWordsIndexList.add(index);
-        // log('Unaccounted word at index $index: "${originalWords[index]}"');
       }
     }
 
+    // Find latest processed index
     int latestIndex = -1;
-
     for (int index in matchedIndexes) {
       if (index > latestIndex) latestIndex = index;
     }
@@ -433,6 +663,55 @@ class PhoneticSpeechRecognizer {
       latestIndex = lastProcessedIndex;
     }
 
+    // Calculate sentence completion information
+    int currentSentenceIndex =
+        getCurrentSentenceIndex(latestIndex, sentenceBoundaries);
+    bool isCurrentSentenceCompleted = false;
+    double sentenceCompletionPercentage = 0.0;
+    double accuracyPercentage = 0.0;
+
+    // If we couldn't find a current sentence based on latest index,
+    // find the next incomplete sentence
+    if (currentSentenceIndex == -1) {
+      currentSentenceIndex = findNextIncompleteSentence(
+          matchedIndexes, mispronounceIndexes, skippedIndexes);
+    }
+
+    if (currentSentenceIndex >= 0 &&
+        currentSentenceIndex < sentenceBoundaries.length) {
+      List<int> currentSentenceWords = sentenceBoundaries[currentSentenceIndex];
+
+      // Calculate completion percentage (ALL processed words count toward completion)
+      int processedWordsInSentence = 0;
+      for (int wordIndex in currentSentenceWords) {
+        if (matchedIndexes.contains(wordIndex) ||
+            mispronounceIndexes.contains(wordIndex) ||
+            skippedIndexes.contains(wordIndex)) {
+          processedWordsInSentence++;
+        }
+      }
+
+      // Calculate accuracy percentage (only correctly recognized words)
+      int correctlyRecognizedWords = 0;
+      for (int wordIndex in currentSentenceWords) {
+        if (matchedIndexes.contains(wordIndex)) {
+          correctlyRecognizedWords++;
+        }
+      }
+
+      sentenceCompletionPercentage =
+          (processedWordsInSentence / currentSentenceWords.length) * 100;
+      accuracyPercentage = processedWordsInSentence > 0
+          ? (correctlyRecognizedWords / processedWordsInSentence) * 100
+          : 0;
+
+      // Consider a sentence completed if at least 80% of words are processed
+      isCurrentSentenceCompleted = sentenceCompletionPercentage >= 80;
+
+      print(
+          "Current sentence ------- Sentence $currentSentenceIndex: $currentSentenceWords, completed: $isCurrentSentenceCompleted, completion: $sentenceCompletionPercentage%, accuracy: $accuracyPercentage%");
+    }
+
     int indexedSentenceCount = 0;
     if (latestIndex >= 0 && latestIndex < sentenceCountLookup.length) {
       indexedSentenceCount = sentenceCountLookup[latestIndex];
@@ -442,20 +721,62 @@ class PhoneticSpeechRecognizer {
     errorPronouncationList = errorWordsPronunciationList;
     correctPronouncationList = correctWordsList;
 
+    int totalProcessed = matchedIndexes.length +
+        mispronounceIndexes.length +
+        skippedIndexes.length;
+    double overallAccuracy =
+        totalProcessed > 0 ? (matchedIndexes.length / totalProcessed) * 100 : 0;
+
+    // Enhanced callback with completion and accuracy information
     callback(
-        errorWordsIndexesLength: errorWordsIndexList.length,
-        errorPronouncationListLength: errorWordsPronunciationList.length,
-        correctPronouncationListLength: correctWordsList.length,
-        indexedSentenceCount: indexedSentenceCount);
+      errorWordsIndexesLength: errorWordsIndexList.length,
+      errorPronouncationListLength: errorWordsPronunciationList.length,
+      correctPronouncationListLength: correctWordsList.length,
+      indexedSentenceCount: currentSentenceIndex,
+      isCurrentSentenceCompleted: isCurrentSentenceCompleted,
+      totalSentences: sentences.length,
+      sentenceCompletionPercentage: sentenceCompletionPercentage,
+      // accuracyPercentage: overallAccuracy, // Overall accuracy percentage
+    );
 
-    ScrollController controller = scrollcontroller ?? ScrollController();
-
+    // Auto-scroll logic
+    ScrollController secondcontroller = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.hasClients) {
-        if (isAutoScroll && autoScrollSpeed > 0) {
-          startAutoScroll(controller, autoScrollSpeed);
+      if (controller.hasClients && isAutoScroll) {
+        int currentSentence =
+            _getSentenceFromWordIndex(latestIndex, originalWords);
+        double lineHeight = fontSize * lineSpace;
+        double advanceOffset = lineHeight * 1.0;
+
+        double estimatedPosition = _estimateSentencePosition(
+          sentenceIndex: currentSentence,
+          fontSize: fontSize,
+          lineSpace: lineSpace,
+        );
+
+        double advancedPosition = estimatedPosition + advanceOffset;
+
+        double viewportHeight = controller.position.viewportDimension;
+        double targetPosition = advancedPosition - (viewportHeight * 0.3);
+
+        double maxScroll = controller.position.maxScrollExtent;
+        targetPosition = targetPosition.clamp(0.0, maxScroll);
+
+        double currentScroll = controller.offset;
+        double currentScreenPosition = estimatedPosition - currentScroll;
+        bool shouldScroll = currentScreenPosition < viewportHeight * 0.5;
+
+        if (shouldScroll) {
+          _scrollToCurrentPosition(
+            controller: controller,
+            currentWordIndex: latestIndex,
+            words: originalWords,
+            fontSize: fontSize,
+            lineSpace: lineSpace,
+            scrollSpeedPerSecond: 20,
+          );
         } else {
-          controller.jumpTo(controller.offset);
+          isAutoScroll = false;
         }
       }
     });
@@ -502,7 +823,6 @@ class PhoneticSpeechRecognizer {
                   margin: EdgeInsets.symmetric(vertical: 2),
                   padding: EdgeInsets.symmetric(horizontal: 2),
                   decoration: BoxDecoration(
-                    // color: backgroundColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -523,6 +843,106 @@ class PhoneticSpeechRecognizer {
     );
   }
 
+  void _scrollToCurrentPosition({
+    required ScrollController controller,
+    required int currentWordIndex,
+    required List<String> words,
+    required double fontSize,
+    required double lineSpace,
+    required double scrollSpeedPerSecond, // pixels per second
+  }) {
+    if (!controller.hasClients || currentWordIndex < 0) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!controller.hasClients) return;
+
+      int currentSentence = _getSentenceFromWordIndex(currentWordIndex, words);
+
+      double estimatedPosition = _estimateSentencePosition(
+        sentenceIndex: currentSentence,
+        fontSize: fontSize,
+        lineSpace: lineSpace,
+      );
+
+      double maxScroll = controller.position.maxScrollExtent;
+      estimatedPosition = estimatedPosition.clamp(0.0, maxScroll);
+      if (estimatedPosition <= 100) {
+        estimatedPosition = 100;
+      }
+
+      // Cancel any running scroll animation for smoother control
+      controller.jumpTo(controller.offset);
+
+      // Calculate distance
+      double distance = estimatedPosition - controller.offset;
+
+      // Determine time from speed
+      int durationMs = (distance.abs() / scrollSpeedPerSecond * 1000).round();
+
+      if (durationMs > 0) {
+        controller.animateTo(
+          estimatedPosition,
+          duration: Duration(milliseconds: durationMs),
+          curve: Curves.linear, // constant speed
+        );
+      }
+    });
+  }
+
+// Helper method to determine which sentence a word index belongs to
+  int _getSentenceFromWordIndex(int wordIndex, List<String> words) {
+    if (wordIndex < 0 || wordIndex >= words.length) return 0;
+
+    int sentenceCount = 0;
+    int currentWordCount = 0;
+
+    String fullText = words.join(' ');
+    List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
+
+    for (String sentence in sentences) {
+      List<String> sentenceWords = sentence.trim().split(RegExp(r'\s+'));
+      if (sentence.trim().isEmpty) continue;
+
+      if (wordIndex < currentWordCount + sentenceWords.length) {
+        return sentenceCount;
+      }
+
+      currentWordCount += sentenceWords.length;
+      sentenceCount++;
+    }
+
+    return sentenceCount;
+  }
+
+// Helper method to get the actual sentence text
+  String _getSentenceText(int sentenceIndex, List<String> words) {
+    if (sentenceIndex < 0) return "";
+
+    String fullText = words.join(' ');
+    List<String> sentences = fullText.split(RegExp(r'[.!?]+\s*'));
+
+    if (sentenceIndex < sentences.length) {
+      return sentences[sentenceIndex].trim();
+    }
+
+    return "";
+  }
+
+// Estimate position based on sentence index
+  double _estimateSentencePosition({
+    required int sentenceIndex,
+    required double fontSize,
+    required double lineSpace,
+  }) {
+    if (sentenceIndex < 0) return 0.0;
+
+    // Assume average 3-4 lines per sentence (more realistic for reading passages)
+    double linesPerSentence = 3;
+    double lineHeight = fontSize * lineSpace;
+
+    return sentenceIndex * linesPerSentence * lineHeight;
+  }
+
   Widget displayMistakeWords({
     required List<int> errorWordsList,
     required List<int> errorPronunciationList,
@@ -535,7 +955,7 @@ class PhoneticSpeechRecognizer {
     required double lineSpace,
   }) {
     int correctWords = correctPronouncationList.length;
-    int mispronounced = errorPronouncationList.length;
+    int mispronounced = errorPronunciationList.length;
     int skippedWords = errorWordsList.length;
 
     int totalSpokenWords = correctWords + mispronounced;
@@ -548,6 +968,7 @@ class PhoneticSpeechRecognizer {
     // Accuracy: correct words out of total words
     double accuracyPercentageDouble = (correctWords / totalWords) * 100;
     int accuracyPercentage = accuracyPercentageDouble.toInt();
+    AccuracyStore().accuracyPercentage = accuracyPercentage;
 
     // Split the text into words
     final List<String> words = randomText.split(' ');
@@ -738,13 +1159,6 @@ class PhoneticSpeechRecognizer {
     );
   }
 
-  /* does this recognize get the result:
-  {overallSimilarity=1.0, correctedPhrase=The toys are inside the box., accepted=true, reason=Perfect word match - all content words found,
-  wordAnalysis=[{recognizedWord=the, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=toys, confidence=1.0, phoneticContentSimilarity=1.0},
-  {recognizedWord=are, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=inside, confidence=1.0, phoneticContentSimilarity=1.0},
-  {recognizedWord=the, confidence=1.0, phoneticContentSimilarity=1.0}, {recognizedWord=box, confidence=1.0, phoneticContentSimilarity=1.0}],
-  summary={totalWords=6, averageConfidence=1.0, averagePhoneticSimilarity=1.0, strongWords=6, weakWords=0}}, ifyes then prnt it as RESULT LIBS: ....
-  */
   static Future<dynamic> recognize({
     required PhoneticType type,
     String? languageCode,
@@ -763,6 +1177,7 @@ class PhoneticSpeechRecognizer {
         'languageCode': languageCode,
         'timeout': timeout,
         'sentence': sentence,
+        'sendKeyOnly': sendKeyOnly,
       });
 
       if (raw == null) {
@@ -770,12 +1185,7 @@ class PhoneticSpeechRecognizer {
         return "";
       }
 
-      // Print the raw response from native
       debugPrint("RESULT LIBS: Raw native response: $raw");
-      debugPrint("RESULT LIBS: Raw response type: ${raw.runtimeType}");
-
-      // ALWAYS RETURN RAW RESPONSE
-      debugPrint("RESULT LIBS: Returning raw response directly");
       return raw;
     } on PlatformException catch (e) {
       debugPrint("RESULT LIBS: Platform Exception - ${e.code}: ${e.message}");
@@ -852,4 +1262,12 @@ class PhoneticSpeechRecognizer {
 
     return false;
   }
+}
+
+class AccuracyStore {
+  static final AccuracyStore _instance = AccuracyStore._internal();
+  factory AccuracyStore() => _instance;
+  AccuracyStore._internal();
+
+  int accuracyPercentage = 0;
 }
