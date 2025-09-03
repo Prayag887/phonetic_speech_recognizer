@@ -374,7 +374,7 @@ class PhoneticSpeechRecognizerPlugin : FlutterPlugin, MethodChannel.MethodCallHa
         } else {
           isListening = false
           Log.e("SpeechRecognition", "Fatal error occurred: ${getErrorText(error)}")
-          activeResult?.error("SPEECH_ERROR", getErrorText(error), null)
+          activeResult?.error("SPEECH_ERROR", getErrorText(error), "Error detected")
           speechRecognizer?.cancel()
           speechRecognizer?.destroy()
           cleanup()

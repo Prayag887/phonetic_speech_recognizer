@@ -825,7 +825,6 @@ class PhoneticSpeechRecognizer {
                 borderColor = Colors.blue;
               } else if (index < targetIndex) {
                 print("----- missed index 3: $index");
-                wordColor = highlightCorrectColor;
                 wordColor = highlightWrongColor;
                 borderColor = highlightWrongColor;
                 backgroundColor = highlightWrongColor;
