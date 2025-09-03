@@ -585,6 +585,20 @@ class PhoneticSpeechRecognizer {
       }
     }
 
+    for (int i = 0; i < targetIndex && i < targetWords.length; i++) {
+      if (!matchedIndexes.contains(i) &&
+          !mispronounceIndexes.contains(i) &&
+          !skippedIndexes.contains(i)) {
+        skippedIndexes.add(i);
+        print("----- Adding missed word to skipped during calculation: $i");
+      }
+    }
+
+    // Update the lastProcessedIndex to include all processed words
+    if (targetIndex > 0) {
+      lastProcessedIndex = targetIndex - 1;
+    }
+
     void autoHighlightFunctionalWords() {
       List<int> allMatchedIndexes = [...matchedIndexes, ...mispronounceIndexes];
       allMatchedIndexes.sort();
@@ -795,20 +809,23 @@ class PhoneticSpeechRecognizer {
               FontWeight weight = FontWeight.normal;
 
               if (matchedIndexes.contains(index)) {
+                print("----- Matched index: $index");
                 wordColor = highlightCorrectColor;
                 backgroundColor = highlightCorrectColor;
                 borderColor = highlightCorrectColor;
               } else if (mispronounceIndexes.contains(index)) {
-                wordColor = highlightCorrectColor;
-                borderColor = highlightCorrectColor;
+                print("----- missed index 1: $index");
+                wordColor = highlightWrongColor;
+                borderColor = highlightWrongColor;
                 backgroundColor = highlightCorrectColor;
-                weight = FontWeight.normal;
               } else if (skippedIndexes.contains(index)) {
-                wordColor = highlightCorrectColor;
-                backgroundColor = highlightCorrectColor;
+                print("----- missed index 2: $index");
+                wordColor = highlightWrongColor;
+                backgroundColor = highlightWrongColor;
                 borderColor = Colors.blue;
-                weight = FontWeight.normal;
               } else if (index < targetIndex) {
+                print("----- missed index 3: $index");
+                wordColor = highlightCorrectColor;
                 wordColor = highlightWrongColor;
                 borderColor = highlightWrongColor;
                 backgroundColor = highlightWrongColor;
@@ -820,7 +837,7 @@ class PhoneticSpeechRecognizer {
 
               return WidgetSpan(
                 child: Container(
-                  margin: EdgeInsets.symmetric(vertical: 2),
+                  margin: EdgeInsets.only(right: 10, top: 2, bottom: 2),
                   padding: EdgeInsets.symmetric(horizontal: 2),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(6),

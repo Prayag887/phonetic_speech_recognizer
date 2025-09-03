@@ -344,7 +344,10 @@ class _MyAppState extends State<MyApp> {
                                 {correctPronouncationListLength,
                                 errorPronouncationListLength,
                                 errorWordsIndexesLength,
-                                indexedSentenceCount}) {
+                                indexedSentenceCount,
+                                isCurrentSentenceCompleted,
+                                totalSentences,
+                                sentenceCompletionPercentage}) {
                               // log("Correct Pronouncation List Length: $correctPronouncationListLength");
                               // log("Error Pronouncation List Length: $errorPronouncationListLength");
                               // log("Error Words Indexes Length: $errorWordsIndexesLength");
@@ -367,12 +370,10 @@ class _MyAppState extends State<MyApp> {
                                 {correctPronouncationListLength,
                                 errorPronouncationListLength,
                                 errorWordsIndexesLength,
-                                indexedSentenceCount}) {
-                              // log("Correct Pronouncation List Length:::::::::: $correctPronouncationListLength");
-                              // log("Error Pronouncation List Length: $errorPronouncationListLength");
-                              // log("Error Words Indexes Length: $errorWordsIndexesLength");
-                              // log("Current sentence index: $indexedSentenceCount");
-                            },
+                                indexedSentenceCount,
+                                isCurrentSentenceCompleted,
+                                totalSentences,
+                                sentenceCompletionPercentage}) {},
                           );
                         }
                       },
