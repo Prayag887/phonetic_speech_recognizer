@@ -496,8 +496,11 @@ class PhoneticSimilarity {
                 }
             }
 
+            val isSingleWordCase = words1.size == 1 || words2.size == 1
+
             // Determine if word meets threshold
             val threshold = when {
+                isSingleWordCase -> 0.0 // Single word cases are automatically accepted
                 isMetaphoneZero -> 0.0 // Metaphone [0] words are automatically accepted
                 isStopWord -> 0.0 // Lower threshold for stop words (for now its 0, but if needed then put 0.6)
                 else -> 0.5 // 50% threshold for content words (for now its 0, but if needed then put 0.5)
